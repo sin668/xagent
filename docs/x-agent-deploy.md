@@ -1,6 +1,7 @@
 # XAgent - 海外车辆采购 AI 获客系统 P1 部署文档
 
-> 版本: 1.0 | 更新: 2026-06-01 | 阶段: PoC → MVP
+> 版本: 1.0 | 更新: 2026-06-04 | 阶段: PoC → MVP
+> 本次更新: 第 8.2 节补充当前数据库 35 张表的分组清单、用途说明和核心字段。
 
 ## 目录
 
@@ -149,7 +150,7 @@ apps/api/
 ├── app/
 │   ├── main.py              # FastAPI 应用入口, 18 个 Router 注册
 │   ├── settings.py          # Pydantic Settings 环境配置
-│   ├── models/              # SQLAlchemy 2.0 ORM 模型 (21+ 张表)
+│   ├── models/              # SQLAlchemy 2.0 ORM 模型 (33 张业务运行表)
 │   │   ├── enums.py         # 全部枚举定义
 │   │   └── ...
 │   ├── schemas/             # Pydantic 请求/响应模型
@@ -190,7 +191,7 @@ apps/api/
 │   └── ...
 ├── alembic/                 # 数据库迁移脚本
 │   ├── env.py
-│   └── versions/            # 20+ 迁移文件
+│   └── versions/            # 28 个迁移版本
 ├── alembic.ini
 ├── pyproject.toml
 ├── .env                     # 环境变量 (不入库)
@@ -835,33 +836,69 @@ alembic downgrade -1
 alembic revision --autogenerate -m "描述"
 ```
 
-### 8.2 数据库表清单 (21+ 张表)
+### 8.2 数据库表清单 (当前迁移共 35 张表)
+
+当前表清单以 `apps/api/app/models` 中的 SQLAlchemy ORM 模型和 `apps/api/alembic/versions` 中的 Alembic 迁移为准。其中 33 张为业务运行表，2 张为第一阶段数据层说明/映射表。
+
+#### 8.2.1 客户、线索与触达
 
 | 表名 | 说明 | 核心字段 |
 |------|------|---------|
-| `customers` | 正式客户 | name, grade, status, do_not_contact, country, city |
-| `contact_methods` | 客户联系方式 | customer_id, method_type(EMAIL/PHONE/WHATSAPP/...), value |
-| `lead_sources` | 线索来源 | customer_id, platform, source_url, channel_risk_level |
-| `outreach_records` | 触达记录 | customer_id, channel, status, response_summary |
-| `inventory_items` | 车源报价 | brand, model, year, mileage_km, quoted_price |
-| `lead_inventory_matches` | 线索-车源匹配 | customer_id, inventory_item_id, score, decision |
-| `staging_leads` | 暂存线索 (审核前) | customer_name, recommended_grade, review_status |
-| `candidate_urls` | 候选来源 URL | url, source_platform, source_risk_level, status |
-| `page_snapshots` | 页面快照 | candidate_url_id, text_excerpt, read_status |
-| `collection_tasks` | 采集任务 | channel_name, risk_level, status |
-| `channel_risk_rules` | 渠道风险规则 | channel_name, risk_level, allowed/forbidden_actions |
-| `channel_plans` | 渠道采集计划 | country, city, channel_name, daily_url_limit |
-| `compliance_reviews` | 合规审核 | customer_id, review_type, status |
-| `risk_events` | 风险事件 | channel, risk_level, severity, resolution_status |
-| `ai_audit_logs` | AI 审计日志 | task_type, model_name, tokens, cost, output_json |
-| `agent_run_logs` | Agent 执行日志 | agent_name, action, result |
-| `failed_cases` | 失败案例库 | case_type, failure_reason, usable_for_rag |
-| `knowledge_collections` | 知识集合 | name, description, status |
-| `knowledge_items` | 知识条目 | collection_id, title, body, language |
-| `knowledge_embeddings` | 知识向量 | item_id, embedding Vector(1536) |
-| `script_templates` | 话术模板 | name, script_type, russian_customer_text |
-| `sync_logs` | 同步日志 | source_name, object_name, status |
-| `roi_cost_entries` | ROI 成本记录 | cost_type, amount, channel_name |
+| `customers` | 正式客户主表，承载人工复核后进入客服/销售承接的客户。 | name, country, city, customer_type, grade, status, owner, owner_team, do_not_contact |
+| `contact_methods` | 正式客户联系方式，记录邮箱、电话、WhatsApp、Telegram、官网表单等公开可验证触达方式。 | customer_id, method_type, value, source_url, evidence_note, is_primary, is_verified |
+| `lead_sources` | 正式客户来源证据，保存平台、来源 URL、风险等级和采集证据。 | customer_id, platform, source_url, evidence_note, evidence_excerpt, channel_risk_level |
+| `staging_leads` | AI 抽取后的暂存线索池，进入正式客户前需要人工审核、去重和合规判断。 | candidate_url_id, customer_name, country, city, customer_type, contacts_json, recommended_grade, review_status, queue_status, dedupe_key |
+| `lead_source_candidates` | Source Discovery Agent 发现的候选来源池，审核通过后才允许进入抽取。 | source_url, normalized_domain, platform, channel_name, country, city, risk_level, review_status, approved_for_extraction, extraction_status, dedupe_key |
+| `lead_enrichment_results` | Deep Enrichment Agent 或人工补全的线索增强结果。 | staging_lead_id, enrichment_type, triggered_by, status, input_snapshot_json, output_json, evidence_links, confidence_score, missing_fields, recommended_action |
+| `lead_enrichment_field_candidates` | 线索增强产生的字段级候选值，支持逐字段人工接受/拒绝。 | enrichment_result_id, staging_lead_id, field_name, candidate_value, source_type, source_url, evidence_note, confidence_score, review_status |
+| `lead_cleanup_runs` | Lead Cleanup Agent 的清洗批次记录，用于追踪一次去重/合并/无效识别任务。 | trigger_source, status, input_snapshot_json, output_summary_json, llm_provider, prompt_template_id, token_usage_json |
+| `lead_cleanup_suggestions` | 清洗批次下的具体建议，如重复线索、无效线索、字段冲突或待合并项。 | cleanup_run_id, staging_lead_id, suggestion_type, target_lead_id, reason, evidence_json, review_status, executed_at |
+| `customer_vehicle_intents` | 正式客户的车辆采购意向，记录品牌、车型、预算、数量、交付地区和关注点。 | customer_id, brand, model, year_range, quantity, budget_range, delivery_country, concerns, source_type, status |
+| `customer_followups` | 客户跟进记录，沉淀客服/销售动作、客户反馈、下一步计划和合规触发。 | customer_id, owner_id, team, followup_type, content, customer_feedback, next_action, next_followup_at, triggered_dnc, triggered_compliance_review |
+| `outreach_records` | 人工触达记录，保存发送渠道、话术版本、发送人、负责人、回复摘要和勿扰触发。 | customer_id, channel, status, script_version, sent_by, owner, sent_at, response_summary, next_action, triggers_do_not_contact |
+| `compliance_reviews` | C 级报价、合同和高风险动作的人工合规审核记录。 | customer_id, review_type, status, reason, risk_note, reviewer, reviewed_at |
+
+#### 8.2.2 采集、渠道与风险
+
+| 表名 | 说明 | 核心字段 |
+|------|------|---------|
+| `channel_risk_rules` | 渠道风险规则登记表，定义每个渠道的风险等级、允许动作、禁止动作和政策来源。 | channel_name, channel_type, risk_level, collection_allowed, ai_processing_allowed, allowed_actions, forbidden_actions, policy_source_url, updated_by |
+| `channel_plans` | 渠道采集计划，控制国家/城市/渠道维度的关键词、每日 URL 限额和线索限额。 | country, city, channel_name, channel_type, risk_level, source_usage_type, keywords, daily_url_limit, daily_lead_limit, status, owner |
+| `collection_tasks` | 原始采集任务记录，描述某次渠道发现或采样任务的风险边界和执行状态。 | plan_id, task_type, channel_name, risk_level, source_usage_type, max_sample_size, allowed_actions, forbidden_actions, status |
+| `candidate_urls` | 原始候选 URL 队列，记录 URL 哈希、来源平台、风险等级、是否需要二次验证和队列资格。 | task_id, url, url_hash, source_platform, source_risk_level, source_usage_type, requires_secondary_verification, queue_eligible, status |
+| `page_snapshots` | 公开页面读取快照，保存页面标题、文本摘要、证据说明、读取状态和政策备注。 | candidate_url_id, page_title, text_excerpt, evidence_note, read_status, captured_at, robots_or_policy_note |
+| `risk_events` | 风险事件日志，用于记录阻断、暂停建议、风险等级和人工解决状态。 | channel_plan_id, task_id, agent_name, action, channel, risk_level, event_type, severity, resolution_status, pause_suggested, resolution_note |
+| `failed_cases` | 失败案例库，保存抓取失败、schema 错误、证据缺失、风险阻断、重复和疑似编造等案例。 | case_type, source_url, failure_reason, evidence_note, related_task_type, related_object_type, model_name, prompt_version, usable_for_rag, touch_queue_allowed |
+
+#### 8.2.3 车辆、匹配、知识与模板
+
+| 表名 | 说明 | 核心字段 |
+|------|------|---------|
+| `inventory_items` | 轻量车源/报价表，维护品牌、车型、年份、里程、报价、配置、媒体和有效期。 | brand, model, year, mileage_km, vehicle_type, quoted_price, currency, quote_status, export_ready, configuration, media_urls, valid_until |
+| `lead_inventory_matches` | 客户与车源的推荐匹配结果，保存匹配分数、推荐理由、风险提示和销售决策。 | customer_id, inventory_item_id, score, recommendation_reason, risk_tips, decision, decision_owner, decision_note |
+| `knowledge_collections` | RAG 知识集合，如关键词库、渠道 SOP、合规规则、FAQ、失败案例等。 | name, description, status, review_status, version |
+| `knowledge_items` | 知识条目正文，隶属于知识集合，支持国家、语言、版本和审核状态。 | collection_id, title, body, language, country, status, review_status, source_ref, version |
+| `knowledge_embeddings` | 知识条目的 pgvector 向量索引表，用于语义检索和 RAG 上下文召回。 | item_id, embedding_model, embedding, embedding_status |
+| `script_templates` | 触达话术模板库，保存中文内部话术、俄语客户话术、禁用承诺和审核状态。 | name, script_type, applicable_grades, applicable_channels, chinese_internal_text, russian_customer_text, forbidden_promises, review_status, version |
+| `llm_prompt_templates` | LLM Prompt 模板配置表，支持按任务类型、Provider、模型、版本和默认状态管理提示词。 | name, task_type, provider, model, system_prompt, user_prompt_template, output_schema_json, version, status, is_default |
+
+#### 8.2.4 审计、Agent、同步与成本
+
+| 表名 | 说明 | 核心字段 |
+|------|------|---------|
+| `ai_audit_logs` | AI 调用审计日志，全量记录输入、输出、模型、Prompt 版本、Token、费用和风险阻断结果。 | customer_id, task_type, model_name, prompt_version, channel_name, source_url, source_urls, input_payload, output_payload, output_json, total_tokens, cost_amount, risk_blocked |
+| `agent_task_runs` | 第二阶段 Agent 任务运行审计表，覆盖任务类型、状态、输入输出摘要、LLM 配置、Token、延迟和重试次数。 | task_type, status, trigger_source, input_json, output_summary_json, llm_provider, llm_model, prompt_template_id, token_usage_json, latency_ms, retry_count |
+| `agent_run_logs` | 第一阶段 Agent 执行日志，用于记录 agent_name、动作、输入输出引用和执行结果。 | task_id, agent_name, action, input_ref, output_ref, result, error_message, started_at, finished_at |
+| `review_logs` | 人工/Agent 复核日志，记录复核人、动作、输入输出引用和结论。 | task_id, agent_name, action, reviewer, input_ref, output_ref, result, error_message |
+| `sync_logs` | 飞书或其他外部系统同步日志，记录对象、成功/失败数量、错误摘要和元数据。 | source_name, object_name, status, success_count, failure_count, error_summary, metadata_json, started_at, finished_at |
+| `roi_cost_entries` | ROI 成本记录，保存 LLM、人工、渠道等成本类型、金额、币种、工时和渠道归属。 | cost_type, amount, currency, labor_hours, hourly_rate, channel_name, notes, occurred_at |
+
+#### 8.2.5 数据层说明表
+
+| 表名 | 说明 | 核心字段 |
+|------|------|---------|
+| `phase1_data_layers` | 第一阶段 raw/staging/core/audit/knowledge 数据层基线说明表，记录每层用途、允许表和准入门槛。 | layer_name, layer_order, purpose, allowed_tables, entry_gate |
+| `phase1_data_layer_table_map` | 第一阶段业务表到数据层的映射表，记录表名、层级、表角色、规划 Story 和备注。 | table_name, layer_name, table_role, planned_story, notes |
 
 ### 8.3 核心枚举值
 
