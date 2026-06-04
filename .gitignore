@@ -84,7 +84,15 @@ _bmad-output/
 .mcp.json
 
 # Generated runtime outputs
+_bmad/
+_bmad-output/
 outputs/
+scripts/
+tests/
+docs/poc/
+docs/crm/
+docs/database/
+docs/implementation-artifacts/
 
 # Added by code-review-graph / gstack
 .code-review-graph/
