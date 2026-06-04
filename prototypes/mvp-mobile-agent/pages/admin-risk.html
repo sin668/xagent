@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>渠道风险与计划</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div class="active"><i class="fa-solid fa-route mr-2"></i>渠道计划</div>
+        <div><i class="fa-solid fa-filter-circle-dollar mr-2"></i>复核队列</div>
+        <div><i class="fa-solid fa-robot mr-2"></i>Agent 任务</div>
+        <div><i class="fa-solid fa-shield-halved mr-2"></i>合规审计</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>渠道风险与运行计划</h2><p>配置 A/B/C 渠道、High 只读边界、每日配额和暂停条件。</p></div>
+        <span class="tag amber"><i class="fa-solid fa-gauge-high"></i>Medium 限量</span>
+      </div>
+      <section class="admin-grid-cards">
+        <div class="admin-card"><strong>14</strong><span>启用渠道计划</span></div>
+        <div class="admin-card"><strong class="text-emerald-700">7</strong><span>Low 渠道</span></div>
+        <div class="admin-card"><strong class="text-amber-700">4</strong><span>Medium 渠道</span></div>
+        <div class="admin-card"><strong class="text-red-700">3</strong><span>High 只读</span></div>
+      </section>
+      <section class="admin-split">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">渠道计划表</h3><span class="tag green">今日配额 100</span></div>
+          <table class="table">
+            <thead><tr><th>计划</th><th>等级</th><th>允许动作</th><th>日配额</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>官网 + 公开目录</td><td><span class="tag green">Low</span></td><td>read_public_page</td><td>40</td><td>Active</td></tr>
+              <tr><td>Yandex 地图核验</td><td><span class="tag amber">Medium</span></td><td>manual_small_batch</td><td>25</td><td>Active</td></tr>
+              <tr><td>Drom 公开商户页</td><td><span class="tag amber">Medium</span></td><td>read_public_page</td><td>20</td><td>Active</td></tr>
+              <tr><td>展会 / B2B 质量池</td><td><span class="tag violet">Quality</span></td><td>read_public_page</td><td>15</td><td>Active</td></tr>
+              <tr><td>VK / Avito 公开页</td><td><span class="tag red">High</span></td><td>public_discovery_only</td><td>8</td><td>Isolated</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-4">禁止动作</h3>
+          <div class="space-y-3">
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">login</span><span class="tag red">阻断</span></div></div>
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">message / friend_request</span><span class="tag red">阻断</span></div></div>
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">scrape_comments / followers</span><span class="tag red">阻断</span></div></div>
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">bypass_rate_limit</span><span class="tag red">阻断</span></div></div>
+          </div>
+        </div>
+      </section>
+      <section class="admin-card mt-4">
+        <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">暂停条件</h3><span class="tag blue">自动检查</span></div>
+        <table class="table">
+          <tbody>
+            <tr><td>出现验证码、登录墙、平台警告</td><td><span class="tag amber">暂停渠道</span></td><td>需人工复核后恢复</td></tr>
+            <tr><td>High 结果进入触达队列</td><td><span class="tag red">立即阻断</span></td><td>记录风险事件</td></tr>
+            <tr><td>勿扰客户被重新分配</td><td><span class="tag red">立即阻断</span></td><td>审计负责人</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

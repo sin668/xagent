@@ -1,0 +1,134 @@
+from pathlib import Path
+
+from pydantic import AliasChoices, Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+
+LOCAL_DEVELOPMENT_CORS_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
+    "http://localhost:5177",
+    "http://127.0.0.1:5177",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+)
+
+
+class Settings(BaseSettings):
+    database_url: str = Field(
+        default="postgresql+asyncpg://vehicle_leads:vehicle_leads@localhost:5432/vehicle_leads",
+        validation_alias=AliasChoices("VEHICLE_LEADS_DATABASE_URL", "DATABASE_URL"),
+    )
+    database_pool_size: int = Field(default=5, validation_alias=AliasChoices("VEHICLE_LEADS_DATABASE_POOL_SIZE", "DATABASE_POOL_SIZE"))
+    database_max_overflow: int = Field(
+        default=10,
+        validation_alias=AliasChoices("VEHICLE_LEADS_DATABASE_MAX_OVERFLOW", "DATABASE_MAX_OVERFLOW"),
+    )
+    redis_url: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_REDIS_URL", "REDIS_URL"))
+    agent_scheduler_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENT_SCHEDULER_ENABLED", "AGENT_SCHEDULER_ENABLED"),
+    )
+    agent_scheduler_lock_ttl_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENT_SCHEDULER_LOCK_TTL_SECONDS", "AGENT_SCHEDULER_LOCK_TTL_SECONDS"),
+    )
+    agent_source_discovery_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENT_SOURCE_DISCOVERY_ENABLED", "AGENT_SOURCE_DISCOVERY_ENABLED"),
+    )
+    agent_source_discovery_interval_seconds: int = Field(
+        default=3600,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS",
+            "AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS",
+        ),
+    )
+    agent_lead_extraction_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENT_LEAD_EXTRACTION_ENABLED", "AGENT_LEAD_EXTRACTION_ENABLED"),
+    )
+    agent_lead_extraction_interval_seconds: int = Field(
+        default=900,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_AGENT_LEAD_EXTRACTION_INTERVAL_SECONDS",
+            "AGENT_LEAD_EXTRACTION_INTERVAL_SECONDS",
+        ),
+    )
+    agent_retry_worker_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENT_RETRY_WORKER_ENABLED", "AGENT_RETRY_WORKER_ENABLED"),
+    )
+    agent_retry_worker_interval_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_AGENT_RETRY_WORKER_INTERVAL_SECONDS",
+            "AGENT_RETRY_WORKER_INTERVAL_SECONDS",
+        ),
+    )
+    feishu_app_id: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_FEISHU_APP_ID", "FEISHU_APP_ID"))
+    feishu_app_secret: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_FEISHU_APP_SECRET", "FEISHU_APP_SECRET"))
+    feishu_bitable_app_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_FEISHU_BITABLE_APP_TOKEN", "FEISHU_BITABLE_APP_TOKEN"),
+    )
+    cors_origins: str = Field(
+        default=(
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:5174,http://127.0.0.1:5174,"
+            "http://localhost:5175,http://127.0.0.1:5175,"
+            "http://localhost:5176,http://127.0.0.1:5176,"
+            "http://localhost:8080,http://127.0.0.1:8080"
+        ),
+        validation_alias=AliasChoices("VEHICLE_LEADS_CORS_ORIGINS", "CORS_ORIGINS"),
+    )
+    llm_provider: str = Field(
+        default="deepseek",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_PROVIDER", "LLM_PROVIDER"),
+    )
+    llm_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_API_KEY", "LLM_API_KEY"),
+    )
+    llm_base_url: str | None = Field(
+        default="https://api.deepseek.com/v1",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_BASE_URL", "LLM_BASE_URL"),
+    )
+    llm_default_model: str = Field(
+        default="deepseek-chat",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_DEFAULT_MODEL", "LLM_DEFAULT_MODEL"),
+    )
+    llm_source_discovery_model: str = Field(
+        default="deepseek-chat",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_SOURCE_DISCOVERY_MODEL", "LLM_SOURCE_DISCOVERY_MODEL"),
+    )
+    llm_extraction_model: str = Field(
+        default="deepseek-chat",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_EXTRACTION_MODEL", "LLM_EXTRACTION_MODEL"),
+    )
+    llm_grading_model: str = Field(
+        default="deepseek-chat",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_GRADING_MODEL", "LLM_GRADING_MODEL"),
+    )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        configured = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        merged = [*configured]
+        for origin in LOCAL_DEVELOPMENT_CORS_ORIGINS:
+            if origin not in merged:
+                merged.append(origin)
+        return merged
+
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
+
+
+settings = Settings()

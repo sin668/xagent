@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据洞察</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar"><div><div class="nav-title">数据洞察</div><div class="nav-subtitle">Go/No-Go · 有效线索优先</div></div><div class="nav-action"><i class="fa-solid fa-download"></i></div></div>
+    <main class="content">
+      <section class="metric-row">
+        <div class="metric-card"><strong>31</strong><span>core 有效</span></div>
+        <div class="metric-card"><strong class="text-blue-700">84</strong><span>staging</span></div>
+        <div class="metric-card"><strong class="text-emerald-700">0</strong><span>风险事件</span></div>
+      </section>
+      <div class="section-head"><h2>漏斗</h2><span>今日</span></div>
+      <section class="panel">
+        <div class="space-y-4">
+          <div><div class="row-between text-sm font-black"><span>候选 URL</span><span>126</span></div><div class="progress mt-2"><span style="width:100%;background:var(--blue)"></span></div></div>
+          <div><div class="row-between text-sm font-black"><span>staging 线索</span><span>84</span></div><div class="progress mt-2"><span style="width:67%;background:var(--teal)"></span></div></div>
+          <div><div class="row-between text-sm font-black"><span>core 有效线索</span><span>31</span></div><div class="progress mt-2"><span style="width:25%;background:var(--green)"></span></div></div>
+        </div>
+      </section>
+      <div class="section-head"><h2>渠道排名</h2><span>有效线索</span></div>
+      <section class="list">
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">官网 / 公开目录</div><div class="lead-meta">core 14 · 重复率 8%</div></div><span class="tag green">Low</span></div></article>
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">地图 / Drom</div><div class="lead-meta">core 9 · 二次复核通过 42%</div></div><span class="tag amber">Medium</span></div></article>
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">展会 / B2B / 清关链路</div><div class="lead-meta">core 8 · B/C 占比 63%</div></div><span class="tag violet">Quality</span></div></article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab"><i class="fa-solid fa-filter-circle-dollar"></i><span>复核</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab active"><i class="fa-solid fa-chart-simple"></i><span>洞察</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

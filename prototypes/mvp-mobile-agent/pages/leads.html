@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>线索复核池</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar">
+      <div><div class="nav-title">线索复核池</div><div class="nav-subtitle">staging -> core · 今日 84 条</div></div>
+      <div class="nav-action"><i class="fa-solid fa-sliders"></i></div>
+    </div>
+    <main class="content">
+      <div class="chip-row">
+        <span class="chip active">待复核 12</span><span class="chip">B/C 18</span><span class="chip">High 二次 7</span><span class="chip">缺联系方式 16</span><span class="chip">Watch 9</span>
+      </div>
+      <section class="list">
+        <article class="lead-card">
+          <div class="lead-top"><div><div class="lead-name">AutoCity Vladivostok</div><div class="lead-meta">Vladivostok · 二级经销商 · 官网/地图双证据</div></div><span class="tag green">B 级</span></div>
+          <div class="evidence-box">证据：官网联系页公开邮箱 sales@autocity-vl.ru；Yandex 地图商户名一致。AI 推荐：二手/进口相关性强。</div>
+          <div class="action-row"><div class="btn">退回补全</div><div class="btn primary">晋级 core</div></div>
+        </article>
+        <article class="lead-card">
+          <div class="lead-top"><div><div class="lead-name">Дром Дилер Центр</div><div class="lead-meta">Novosibirsk · Drom 公开商户页 · 需官网复核</div></div><span class="tag amber">Medium</span></div>
+          <div class="evidence-box">公开页显示电话与库存，但未找到官网。进入 core 前需补充 Low/Medium 二次来源。</div>
+          <div class="action-row"><div class="btn">标记 Watch</div><div class="btn blue">发起复核</div></div>
+        </article>
+        <article class="lead-card">
+          <div class="lead-top"><div><div class="lead-name">VK: Cars Import RU</div><div class="lead-meta">Moscow · High 只读公开页 · 不触达</div></div><span class="tag red">High</span></div>
+          <div class="evidence-box">公开主页简介含 Telegram 和官网短链。当前仅为发现入口，必须跳转官网或目录二次取证。</div>
+          <div class="action-row"><div class="btn red">禁止触达</div><div class="btn">二次取证</div></div>
+        </article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab active"><i class="fa-solid fa-filter-circle-dollar"></i><span>复核</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab"><i class="fa-solid fa-chart-simple"></i><span>洞察</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>客户详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar"><div class="nav-action"><i class="fa-solid fa-chevron-left"></i></div><div><div class="nav-title">客户详情</div><div class="nav-subtitle">完善线索 -> 客户档案</div></div><div class="nav-action"><i class="fa-solid fa-ellipsis"></i></div></div>
+    <main class="content no-tab">
+      <section class="panel customer-profile">
+        <div class="profile-logo">AC</div>
+        <div>
+          <div class="lead-name text-lg">AutoCity Vladivostok</div>
+          <div class="lead-meta">Russia · Vladivostok · 当地车商/二级经销商</div>
+          <div class="mt-3 flex gap-2 flex-wrap"><span class="tag green">B 级客户</span><span class="tag blue">客服队列</span><span class="tag dark">来源完整</span></div>
+        </div>
+      </section>
+
+      <div class="section-head"><h2>客户补全数据</h2><span>来自 staging 晋级</span></div>
+      <section class="detail-card mini-grid">
+        <div class="mini-cell"><div class="mini-label">客户类型</div><div class="mini-value">二级经销商</div></div>
+        <div class="mini-cell"><div class="mini-label">经营状态</div><div class="mini-value">活跃</div></div>
+        <div class="mini-cell"><div class="mini-label">规模信号</div><div class="mini-value">中型展厅</div></div>
+        <div class="mini-cell"><div class="mini-label">来源证据</div><div class="mini-value">官网 + 地图</div></div>
+      </section>
+
+      <div class="section-head"><h2>联系方式</h2><span>勿扰校验通过</span></div>
+      <section class="panel contact-list">
+        <div class="contact-row"><div class="contact-icon"><i class="fa-solid fa-envelope"></i></div><div><div class="step-title">sales@autocity-vl.ru</div><div class="step-note">官网联系页公开邮箱 · 已保存证据</div></div><span class="tag green">主联系</span></div>
+        <div class="contact-row"><div class="contact-icon teal"><i class="fa-brands fa-telegram"></i></div><div><div class="step-title">@autocity_vl</div><div class="step-note">官网页跳转公开 Telegram · 人工触达</div></div><span class="tag blue">社媒</span></div>
+        <div class="contact-row"><div class="contact-icon dark"><i class="fa-solid fa-phone"></i></div><div><div class="step-title">+7 423 *** **80</div><div class="step-note">公开电话 · 仅作人工核验</div></div><span class="tag dark">电话</span></div>
+      </section>
+
+      <div class="section-head"><h2>意向车型</h2><span>销售交接依据</span></div>
+      <section class="detail-card">
+        <div class="vehicle-intent-head">
+          <div><div class="lead-name">右舵日系二手车</div><div class="lead-meta">Toyota / Honda / Nissan · 2018-2021 · 低里程优先</div></div>
+          <span class="tag green">匹配强</span>
+        </div>
+        <div class="intent-spec-grid mt-3">
+          <div><span>采购频率</span><strong>月 5-10 台</strong></div>
+          <div><span>预算区间</span><strong>待确认</strong></div>
+          <div><span>关注点</span><strong>车况/手续</strong></div>
+        </div>
+        <div class="evidence-box">AI 摘要：客户公开库存多为日系二手车，存在进口/跨境采购相关描述。首次跟进应确认车型、车龄、目标价位和采购频率，不承诺价格、清关、物流或交付周期。</div>
+      </section>
+
+      <div class="section-head"><h2>触达历史</h2><span>3 条记录</span></div>
+      <section class="detail-card">
+        <div class="timeline">
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">06-03 10:20 · 邮件草稿已生成</div><div class="timeline-note">模板 TMP-RU-B-001/v2；合规检查 6/6 通过，等待人工发送。</div></div></div>
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">06-02 16:45 · 客户晋级 core</div><div class="timeline-note">线索补全客户名、城市、邮箱、社媒、车型相关信号。</div></div></div>
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">06-02 15:10 · 来源证据保存</div><div class="timeline-note">官网联系页与地图商户页完成一致性复核。</div></div></div>
+        </div>
+      </section>
+
+      <div class="action-row pb-4"><div class="btn">新增跟进</div><div class="btn primary">生成触达草稿</div></div>
+    </main>
+  </div>
+</body>
+</html>

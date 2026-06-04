@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>运行总览</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div class="active"><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div><i class="fa-solid fa-route mr-2"></i>渠道计划</div>
+        <div><i class="fa-solid fa-filter-circle-dollar mr-2"></i>复核队列</div>
+        <div><i class="fa-solid fa-robot mr-2"></i>Agent 任务</div>
+        <div><i class="fa-solid fa-shield-halved mr-2"></i>合规审计</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>第一阶段小范围运行总览</h2><p>俄罗斯 · A/B/C 渠道并重 · 每日 100 条候选 · PostgreSQL 直入库</p></div>
+        <span class="tag green"><i class="fa-solid fa-circle-check"></i>运行中</span>
+      </div>
+      <section class="admin-grid-cards">
+        <div class="admin-card"><strong>126</strong><span>候选 URL</span></div>
+        <div class="admin-card"><strong class="text-blue-700">84</strong><span>staging 线索</span></div>
+        <div class="admin-card"><strong class="text-emerald-700">31</strong><span>core 有效线索</span></div>
+        <div class="admin-card"><strong class="text-red-700">0</strong><span>风险事件</span></div>
+      </section>
+      <section class="admin-split">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">渠道产出</h3><span class="tag blue">有效线索优先</span></div>
+          <table class="table">
+            <thead><tr><th>渠道组</th><th>风险</th><th>候选</th><th>core</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>官网 / 公开目录</td><td><span class="tag green">Low</span></td><td>48</td><td>14</td><td>稳定</td></tr>
+              <tr><td>地图 / Drom / 公开论坛</td><td><span class="tag amber">Medium</span></td><td>51</td><td>9</td><td>限量运行</td></tr>
+              <tr><td>展会 / B2B / 清关链路</td><td><span class="tag violet">Quality</span></td><td>19</td><td>8</td><td>观察池</td></tr>
+              <tr><td>VK / Avito / Auto.ru 公开页</td><td><span class="tag red">High</span></td><td>8</td><td>0</td><td>只读发现</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-4">今日漏斗</h3>
+          <div class="space-y-5">
+            <div><div class="flex justify-between text-sm font-black"><span>candidate_urls</span><span>126</span></div><div class="progress mt-2"><span style="width:100%;background:var(--blue)"></span></div></div>
+            <div><div class="flex justify-between text-sm font-black"><span>staging_leads</span><span>84</span></div><div class="progress mt-2"><span style="width:67%;background:var(--teal)"></span></div></div>
+            <div><div class="flex justify-between text-sm font-black"><span>core_customers</span><span>31</span></div><div class="progress mt-2"><span style="width:25%;background:var(--green)"></span></div></div>
+            <div><div class="flex justify-between text-sm font-black"><span>human_review_queue</span><span>12</span></div><div class="progress mt-2"><span style="width:38%;background:var(--amber)"></span></div></div>
+          </div>
+        </div>
+      </section>
+      <section class="admin-three">
+        <div class="admin-card"><h3 class="font-black mb-3">硬闸门</h3><p class="text-sm font-bold text-slate-600 leading-6">High 不入触达队列、勿扰强阻断、C 级报价前复核。今日所有硬闸门未触发违规。</p></div>
+        <div class="admin-card"><h3 class="font-black mb-3">AI 质量</h3><p class="text-sm font-bold text-slate-600 leading-6">184 次 LLM 调用，输出 schema 校验通过率 98.4%，疑似编造 0。</p></div>
+        <div class="admin-card"><h3 class="font-black mb-3">团队承接</h3><p class="text-sm font-bold text-slate-600 leading-6">客服待接 18，销售待接 6。C 级线索均已标记合规复核。</p></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

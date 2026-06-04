@@ -1,0 +1,17 @@
+{
+  "name": "XAgent 获客",
+  "appid": "__UNI__XAGENT_MVP",
+  "description": "海外车辆采购 AI 获客移动端工作台",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "app-plus": {
+    "usingComponents": true
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": true
+    },
+    "usingComponents": true
+  }
+}

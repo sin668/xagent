@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>入库、知识库与审计</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div><i class="fa-solid fa-route mr-2"></i>渠道计划</div>
+        <div><i class="fa-solid fa-filter-circle-dollar mr-2"></i>复核队列</div>
+        <div><i class="fa-solid fa-robot mr-2"></i>Agent 任务</div>
+        <div class="active"><i class="fa-solid fa-database mr-2"></i>入库审计</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>PostgreSQL 入库、pgvector 知识库与 AI 审计</h2><p>raw/staging/core/audit 四层写入，所有 AI 输出保留来源证据和模型日志。</p></div>
+        <span class="tag green"><i class="fa-solid fa-database"></i>DB Online</span>
+      </div>
+      <section class="admin-grid-cards">
+        <div class="admin-card"><strong>126</strong><span>raw.page_snapshots</span></div>
+        <div class="admin-card"><strong class="text-blue-700">84</strong><span>staging_leads</span></div>
+        <div class="admin-card"><strong class="text-emerald-700">31</strong><span>core.customers</span></div>
+        <div class="admin-card"><strong class="text-violet-700">128</strong><span>approved knowledge</span></div>
+      </section>
+      <section class="admin-split">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">入库流水</h3><span class="tag blue">宽进严出</span></div>
+          <table class="table">
+            <thead><tr><th>时间</th><th>层</th><th>对象</th><th>结果</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>14:22</td><td>raw</td><td>candidate_url</td><td><span class="tag green">insert</span></td><td>Yandex maps source</td></tr>
+              <tr><td>14:23</td><td>staging</td><td>lead extraction</td><td><span class="tag blue">upsert</span></td><td>schema valid</td></tr>
+              <tr><td>14:25</td><td>core</td><td>customer</td><td><span class="tag green">promoted</span></td><td>human reviewed</td></tr>
+              <tr><td>14:28</td><td>audit</td><td>llm call</td><td><span class="tag green">saved</span></td><td>prompt v3</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-4">知识库状态</h3>
+          <div class="space-y-4">
+            <div><div class="flex justify-between text-sm font-black"><span>channel_sop</span><span>38</span></div><div class="progress mt-2"><span style="width:90%;background:var(--blue)"></span></div></div>
+            <div><div class="flex justify-between text-sm font-black"><span>faq / scripts</span><span>44</span></div><div class="progress mt-2"><span style="width:76%;background:var(--green)"></span></div></div>
+            <div><div class="flex justify-between text-sm font-black"><span>failed_cases</span><span>18</span></div><div class="progress mt-2"><span style="width:46%;background:var(--amber)"></span></div></div>
+            <div><div class="flex justify-between text-sm font-black"><span>compliance_rules</span><span>28</span></div><div class="progress mt-2"><span style="width:82%;background:var(--red)"></span></div></div>
+          </div>
+        </div>
+      </section>
+      <section class="admin-card mt-4">
+        <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">AI 审计日志</h3><span class="tag green">184 calls</span></div>
+        <table class="table">
+          <thead><tr><th>任务</th><th>模型</th><th>知识引用</th><th>来源证据</th><th>校验</th></tr></thead>
+          <tbody>
+            <tr><td>lead-extraction</td><td>gpt-4.1</td><td>keyword_library:RU-12</td><td>2 links</td><td><span class="tag green">valid</span></td></tr>
+            <tr><td>lead-grading</td><td>gpt-4.1</td><td>channel_sop:HIGH-03</td><td>1 link</td><td><span class="tag amber">Watch</span></td></tr>
+            <tr><td>outreach-draft</td><td>gpt-4.1</td><td>faq:PRICE-02</td><td>customer core</td><td><span class="tag green">valid</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

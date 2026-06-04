@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLM 与 Prompt 治理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div><i class="fa-solid fa-route mr-2"></i>渠道计划</div>
+        <div><i class="fa-solid fa-link mr-2"></i>来源候选</div>
+        <div class="active"><i class="fa-solid fa-brain mr-2"></i>LLM 治理</div>
+        <div><i class="fa-solid fa-shield-halved mr-2"></i>合规审计</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>LLM Provider 与 Prompt Schema</h2><p>默认 DeepSeek，prompt/schema 入库管理，每次调用保留版本、模型、token 和输出审计。</p></div>
+        <span class="tag green"><i class="fa-solid fa-plug-circle-check"></i>Health OK</span>
+      </div>
+
+      <section class="provider-grid">
+        <div class="provider-card"><strong>DeepSeek</strong><small>default · deepseek-chat · 286ms</small><span class="tag green mt-3">active</span></div>
+        <div class="provider-card"><strong>OpenAI</strong><small>备用 Provider · 未启用</small><span class="tag dark mt-3">standby</span></div>
+        <div class="provider-card"><strong>Claude</strong><small>预留适配层 · 未启用</small><span class="tag dark mt-3">reserved</span></div>
+        <div class="provider-card"><strong>Qwen/Gemini</strong><small>后续扩展 · fallback 池</small><span class="tag dark mt-3">reserved</span></div>
+      </section>
+
+      <section class="admin-wide">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">Prompt Template 版本</h3><span class="tag blue">仅管理员维护</span></div>
+          <table class="table">
+            <thead><tr><th>名称</th><th>任务</th><th>版本</th><th>状态</th><th>Schema</th><th>默认</th></tr></thead>
+            <tbody>
+              <tr><td>source_discovery_default</td><td>SOURCE_DISCOVERY</td><td>v1.0</td><td><span class="tag green">active</span></td><td>passed</td><td>yes</td></tr>
+              <tr><td>lead_extraction_public_page</td><td>LEAD_EXTRACTION</td><td>v1.2</td><td><span class="tag green">active</span></td><td>passed</td><td>yes</td></tr>
+              <tr><td>lead_grading_ru_market</td><td>LEAD_GRADING</td><td>v1.1</td><td><span class="tag green">active</span></td><td>passed</td><td>yes</td></tr>
+              <tr><td>social_high_review_probe</td><td>SOURCE_DISCOVERY</td><td>v0.4</td><td><span class="tag amber">paused</span></td><td>passed</td><td>no</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-4">Fallback 边界</h3>
+          <div class="space-y-3">
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">网络/超时/限流</span><span class="tag blue">可 fallback</span></div></div>
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">schema 校验失败</span><span class="tag red">不 fallback</span></div></div>
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">疑似编造来源</span><span class="tag red">阻断</span></div></div>
+            <div class="lead-card shadow-none"><div class="lead-top"><span class="font-black text-sm">命中 Forbidden</span><span class="tag red">阻断</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-card mt-4">
+        <div class="flex justify-between items-center mb-4"><h3 class="font-black text-lg">Source Discovery 输出 Schema</h3><span class="tag green">active v1.0</span></div>
+        <div class="json-card">{
+  "task_type": "SOURCE_DISCOVERY",
+  "candidates": [{
+    "source_url": "required",
+    "platform": "required",
+    "risk_level": "Low | Medium | High | Forbidden",
+    "discovery_reason": "required",
+    "evidence_note": "required",
+    "approved_for_extraction": "boolean"
+  }],
+  "blocked_candidates": []
+}</div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

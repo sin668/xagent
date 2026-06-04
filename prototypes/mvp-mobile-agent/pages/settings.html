@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设置与合规</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar"><div><div class="nav-title">设置与合规</div><div class="nav-subtitle">渠道边界 · 模型审计 · 知识库</div></div><div class="nav-action"><i class="fa-solid fa-user-shield"></i></div></div>
+    <main class="content">
+      <section class="panel stepper">
+        <div class="step-row"><div class="step-dot green"><i class="fa-solid fa-lock"></i></div><div><div class="step-title">禁止自动社交触达</div><div class="step-note">私信、加好友、入群、自动互动全部阻断</div></div><span class="tag green">启用</span></div>
+        <div class="step-row"><div class="step-dot green"><i class="fa-solid fa-database"></i></div><div><div class="step-title">PostgreSQL 直入库</div><div class="step-note">raw / staging / core / audit 四层</div></div><span class="tag blue">在线</span></div>
+        <div class="step-row"><div class="step-dot amber"><i class="fa-solid fa-brain"></i></div><div><div class="step-title">pgvector 知识库</div><div class="step-note">仅 approved 条目进入 Agent RAG</div></div><span class="tag amber">128 条</span></div>
+      </section>
+      <div class="section-head"><h2>规则开关</h2><span>生产约束</span></div>
+      <section class="list">
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">High 二次复核</div><div class="lead-meta">High 公开页只能作为发现入口</div></div><span class="tag green">强制</span></div></article>
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">勿扰客户阻断</div><div class="lead-meta">拒绝联系后不得再次进入触达队列</div></div><span class="tag green">强制</span></div></article>
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">C 级合规复核</div><div class="lead-meta">报价、合同前必须复核</div></div><span class="tag green">强制</span></div></article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab"><i class="fa-solid fa-filter-circle-dollar"></i><span>复核</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab"><i class="fa-solid fa-chart-simple"></i><span>洞察</span></div>
+      <div class="tab active"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

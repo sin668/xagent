@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第二阶段小范围运行 · 移动智能体与管理后台原型</title>
+  <link rel="stylesheet" href="css/prototype.css">
+</head>
+<body class="prototype-index">
+  <header class="index-hero">
+    <div>
+      <h1>海外车辆采购 AI 获客系统 · 第二阶段小范围运行原型</h1>
+      <p>面向线索运营、客服、销售、合规和管理员的高保真原型。第二阶段聚焦真实 LLM 连接、Source Discovery Agent 自动新增来源、移动端来源审核、LEAD_EXTRACTION 自动消费、PostgreSQL 审计和风险治理闭环。</p>
+    </div>
+    <div class="index-badge">iPhone 17 Pro · iframe 平铺 · 可拆分开发</div>
+  </header>
+
+  <main class="screen-grid">
+    <section class="screen-card">
+      <div class="screen-title">01 智能体首页 <span>mobile-home.html</span></div>
+      <div class="phone-frame"><iframe src="pages/mobile-home.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">02 线索复核池 <span>leads.html</span></div>
+      <div class="phone-frame"><iframe src="pages/leads.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">03 线索详情 <span>lead-detail.html</span></div>
+      <div class="phone-frame"><iframe src="pages/lead-detail.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">04 客户工作台 <span>customers.html</span></div>
+      <div class="phone-frame"><iframe src="pages/customers.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">05 客户详情 <span>customer-detail.html</span></div>
+      <div class="phone-frame"><iframe src="pages/customer-detail.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">06 跟进记录 <span>customer-followups.html</span></div>
+      <div class="phone-frame"><iframe src="pages/customer-followups.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">07 Agent 任务中心 <span>agent-tasks.html</span></div>
+      <div class="phone-frame"><iframe src="pages/agent-tasks.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">08 来源候选队列 <span>source-candidates.html</span></div>
+      <div class="phone-frame"><iframe src="pages/source-candidates.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">09 来源详情审核 <span>source-detail.html</span></div>
+      <div class="phone-frame"><iframe src="pages/source-detail.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">10 Agent 手动调用 <span>agent-run.html</span></div>
+      <div class="phone-frame"><iframe src="pages/agent-run.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">11 触达助手 <span>outreach.html</span></div>
+      <div class="phone-frame"><iframe src="pages/outreach.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">12 车源匹配 <span>inventory.html</span></div>
+      <div class="phone-frame"><iframe src="pages/inventory.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">13 数据洞察 <span>analytics.html</span></div>
+      <div class="phone-frame"><iframe src="pages/analytics.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">14 设置与合规 <span>settings.html</span></div>
+      <div class="phone-frame"><iframe src="pages/settings.html"></iframe></div>
+    </section>
+  </main>
+
+  <section class="admin-grid">
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">15 运行总览 <span>admin-dashboard.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-dashboard.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">16 渠道风险与计划 <span>admin-risk.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-risk.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">17 入库、知识库与审计 <span>admin-sync.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-sync.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">18 第二阶段运行看板 <span>admin-phase2.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-phase2.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">19 LLM 与 Prompt 治理 <span>admin-llm.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-llm.html"></iframe></div>
+    </div>
+  </section>
+</body>
+</html>

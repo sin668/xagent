@@ -1,0 +1,91 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Python local data
+*.sqlite
+*.sqlite3
+*.db
+
+# Node / frontend
+node_modules
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.vite/
+dist/
+build/
+coverage/
+
+# Keep dependency lock files versioned.
+!package-lock.json
+!apps/**/package-lock.json
+!pnpm-lock.yaml
+!apps/**/pnpm-lock.yaml
+!yarn.lock
+!apps/**/yarn.lock
+
+# Uni-app / mobile build outputs
+unpackage/
+apps/**/unpackage/
+
+# Playwright / browser test artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# BMAD / local agent outputs
+_bmad-output/
+.agents/
+.claude/
+.omc/
+.mcp.json
+
+# Generated runtime outputs
+outputs/
+
+# Added by code-review-graph / gstack
+.code-review-graph/
+.gstack/

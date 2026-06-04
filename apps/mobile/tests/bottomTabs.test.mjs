@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { buildBottomTabs, navigateBottomTab } from '../src/services/bottomTabs.js';
+
+test('bottom tabs expose top-level mobile destinations with active state', () => {
+  const tabs = buildBottomTabs('leads');
+
+  assert.deepEqual(
+    tabs.map((tab) => `${tab.key}:${tab.path}:${tab.active}`),
+    [
+      'home:/pages/home/index:false',
+      'leads:/pages/leads/index:true',
+      'sources:/pages/sources/index:false',
+      'ai:/pages/outreach/index:false',
+      'insights:/pages/inventory/index:false',
+    ],
+  );
+});
+
+test('bottom tab navigation uses redirectTo and skips the active tab', () => {
+  const calls = [];
+  const fakeUni = {
+    redirectTo(payload) {
+      calls.push(payload);
+    },
+  };
+  const [home, leads] = buildBottomTabs('leads');
+
+  assert.equal(navigateBottomTab(leads, fakeUni), false);
+  assert.equal(navigateBottomTab(home, fakeUni), true);
+  assert.deepEqual(calls, [{ url: '/pages/home/index' }]);
+});
+
+test('bottom tab navigation falls back to navigateTo when redirectTo is unavailable', () => {
+  const calls = [];
+  const fakeUni = {
+    navigateTo(payload) {
+      calls.push(payload);
+    },
+  };
+  const [home] = buildBottomTabs('leads');
+
+  assert.equal(navigateBottomTab(home, fakeUni), true);
+  assert.deepEqual(calls, [{ url: '/pages/home/index' }]);
+});

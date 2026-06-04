@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+coverage/
+unpackage/
+
+# Vite / uni-app caches
+.vite/
+.vitest/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Keep dependency lock files versioned.
+!package-lock.json
+!pnpm-lock.yaml
+!yarn.lock
+
+# OS / local tool state
+.DS_Store
+.omc/

@@ -1,0 +1,56 @@
+{
+  "pages": [
+    {
+      "path": "src/pages/home/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/leads/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/leads/detail",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/sources/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/sources/detail",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/agent-run/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/outreach/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/inventory/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "globalStyle": {
+    "backgroundColor": "#eef3f8",
+    "navigationBarTextStyle": "black"
+  }
+}

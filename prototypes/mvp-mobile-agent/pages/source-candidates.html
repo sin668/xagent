@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>来源候选队列</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar">
+      <div><div class="nav-title">来源审核</div><div class="nav-subtitle">lead_source_candidates · 自动发现候选池</div></div>
+      <div class="nav-action"><i class="fa-solid fa-sliders"></i></div>
+    </div>
+    <main class="content">
+      <section class="panel">
+        <div class="row-between">
+          <div>
+            <div class="lead-name">第二阶段今日来源池</div>
+            <div class="lead-meta">每小时巡航 · Low/Medium 自动准入 · High 人工复核</div>
+          </div>
+          <span class="tag blue">312 新增</span>
+        </div>
+        <div class="source-map">
+          <div class="source-tile"><div class="source-kicker">待审 High</div><div class="source-number text-red-700">38</div></div>
+          <div class="source-tile"><div class="source-kicker">可抽取来源</div><div class="source-number text-emerald-700">184</div></div>
+          <div class="source-tile"><div class="source-kicker">重复候选</div><div class="source-number text-amber-700">27</div></div>
+          <div class="source-tile"><div class="source-kicker">阻断来源</div><div class="source-number">9</div></div>
+        </div>
+      </section>
+
+      <div class="section-head"><h2>风险筛选</h2><span>按准入状态</span></div>
+      <div class="chip-row">
+        <div class="chip active">全部</div>
+        <div class="chip">Low</div>
+        <div class="chip">Medium</div>
+        <div class="chip">High 待审</div>
+        <div class="chip">Forbidden</div>
+      </div>
+      <div class="risk-strip">
+        <div class="risk-pill"><strong class="text-emerald-700">126</strong><span>Low</span></div>
+        <div class="risk-pill"><strong class="text-amber-700">58</strong><span>Medium</span></div>
+        <div class="risk-pill"><strong class="text-red-700">38</strong><span>High</span></div>
+        <div class="risk-pill"><strong>9</strong><span>Blocked</span></div>
+      </div>
+
+      <div class="section-head"><h2>候选来源</h2><span>证据优先</span></div>
+      <section class="list">
+        <article class="lead-card">
+          <div class="lead-top">
+            <div>
+              <div class="lead-name">Moscow dealer directory</div>
+              <div class="lead-meta">official_website · Moscow · keyword_search</div>
+            </div>
+            <span class="tag green">auto_approved</span>
+          </div>
+          <div class="url-line">https://example-auto.ru/dealers/moscow</div>
+          <div class="evidence-box">公开目录页面展示多个 auto dealer、contact、import cars 相关词，建议进入自动抽取。</div>
+        </article>
+        <article class="lead-card">
+          <div class="lead-top">
+            <div>
+              <div class="lead-name">Vladivostok import auto service list</div>
+              <div class="lead-meta">B2B / logistics chain · Vladivostok</div>
+            </div>
+            <span class="tag amber">auto_approved</span>
+          </div>
+          <div class="url-line">https://trade-example.com/ru/import-auto-services</div>
+          <div class="evidence-box">公开企业页包含 imported vehicles、wholesale、customs service 线索信号；Medium 限量抽取。</div>
+        </article>
+        <article class="lead-card">
+          <div class="lead-top">
+            <div>
+              <div class="lead-name">VK public merchant page</div>
+              <div class="lead-meta">public_social_page · Saint Petersburg</div>
+            </div>
+            <span class="tag red">high_risk_review</span>
+          </div>
+          <div class="url-line">https://vk.com/public-auto-example</div>
+          <div class="evidence-box">公开主页含车商经营信号；不登录、不互动、不触达，需人工审核后只读抽取。</div>
+        </article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab active"><i class="fa-solid fa-link"></i><span>来源</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab"><i class="fa-solid fa-chart-simple"></i><span>洞察</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

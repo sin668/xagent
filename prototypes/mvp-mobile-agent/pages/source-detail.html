@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>来源详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar">
+      <div><div class="nav-title">来源详情</div><div class="nav-subtitle">审核通过只代表允许抽取</div></div>
+      <div class="nav-action"><i class="fa-solid fa-ellipsis"></i></div>
+    </div>
+    <main class="content">
+      <section class="hero-card">
+        <img src="https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?auto=format&fit=crop&w=900&q=80" alt="car dealership">
+        <div class="hero-overlay">
+          <div class="hero-eyebrow"><i class="fa-solid fa-eye mr-1"></i> High 风险 · 只读公开页</div>
+          <div>
+            <div class="hero-title">VK public merchant page</div>
+            <div class="hero-desc">Saint Petersburg · public_social_page · confidence 0.68</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel mt-4">
+        <div class="lead-top">
+          <div>
+            <div class="lead-name">来源风险与准入</div>
+            <div class="lead-meta">review_status: high_risk_review</div>
+          </div>
+          <span class="tag red">未准入</span>
+        </div>
+        <div class="url-line">https://vk.com/public-auto-example</div>
+        <div class="mini-grid mt-3">
+          <div class="mini-cell"><div class="mini-label">risk_level</div><div class="mini-value text-red-700">High</div></div>
+          <div class="mini-cell"><div class="mini-label">approved_for_extraction</div><div class="mini-value">false</div></div>
+          <div class="mini-cell"><div class="mini-label">platform</div><div class="mini-value">VK</div></div>
+          <div class="mini-cell"><div class="mini-label">city</div><div class="mini-value">SPB</div></div>
+        </div>
+      </section>
+
+      <div class="section-head"><h2>发现证据</h2><span>必须保留</span></div>
+      <section class="detail-card">
+        <div class="evidence-box mt-0">公开主页描述含 автосалон、авто из Китая、trade-in 等经营信号；未发现登录墙，但平台属于 High 风险来源。</div>
+        <div class="timeline mt-3">
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">SOURCE_DISCOVERY</div><div class="timeline-note">DeepSeek · prompt v1.0 · schema passed</div></div></div>
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">risk gate</div><div class="timeline-note">High 默认进入人工复核，不进入自动抽取队列</div></div></div>
+        </div>
+      </section>
+
+      <div class="section-head"><h2>LLM 输出摘要</h2><span>agent_task_runs</span></div>
+      <section class="detail-card">
+        <div class="json-card">{
+  "source_url": "https://vk.com/public-auto-example",
+  "risk_level": "High",
+  "recommended_review_status": "high_risk_review",
+  "approved_for_extraction": false,
+  "missing_fields": []
+}</div>
+      </section>
+
+      <section class="panel mt-4">
+        <div class="lead-name">审核动作</div>
+        <div class="lead-meta">所有动作写入 reviewer、review_note、reviewed_at</div>
+        <div class="action-row">
+          <div class="btn blue"><i class="fa-solid fa-check mr-2"></i>只读抽取</div>
+          <div class="btn"><i class="fa-solid fa-user-shield mr-2"></i>二次复核</div>
+          <div class="btn"><i class="fa-solid fa-pause mr-2"></i>暂停渠道</div>
+          <div class="btn red"><i class="fa-solid fa-xmark mr-2"></i>驳回</div>
+        </div>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab active"><i class="fa-solid fa-link"></i><span>来源</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab"><i class="fa-solid fa-chart-simple"></i><span>洞察</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

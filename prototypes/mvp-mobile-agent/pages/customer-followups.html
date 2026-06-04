@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>客户跟进记录</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar"><div class="nav-action"><i class="fa-solid fa-chevron-left"></i></div><div><div class="nav-title">跟进记录</div><div class="nav-subtitle">触达历史 · 客户反馈 · 下一步</div></div><div class="nav-action"><i class="fa-solid fa-plus"></i></div></div>
+    <main class="content no-tab">
+      <section class="panel">
+        <div class="lead-top"><div><div class="lead-name">AutoCity Vladivostok</div><div class="lead-meta">B 级 · 客服 Anna · 下一次跟进 06-04 10:00</div></div><span class="tag green">进行中</span></div>
+      </section>
+
+      <div class="section-head"><h2>跟进状态</h2><span>不可自动发送</span></div>
+      <section class="panel stepper">
+        <div class="step-row"><div class="step-dot green"><i class="fa-solid fa-check"></i></div><div><div class="step-title">客户未勿扰</div><div class="step-note">未出现拒绝联系或退订要求</div></div><span class="tag green">通过</span></div>
+        <div class="step-row"><div class="step-dot amber"><i class="fa-solid fa-clock"></i></div><div><div class="step-title">等待人工首次发送</div><div class="step-note">邮件草稿已准备，需客服确认后发送</div></div><span class="tag amber">待办</span></div>
+        <div class="step-row"><div class="step-dot"><i class="fa-solid fa-car"></i></div><div><div class="step-title">车型需求待确认</div><div class="step-note">需确认预算、数量、车龄、排放与交付国家</div></div><span class="tag blue">问题清单</span></div>
+      </section>
+
+      <div class="section-head"><h2>触达与跟进时间线</h2><span>审计保留</span></div>
+      <section class="detail-card followup-feed">
+        <article class="followup-item">
+          <div class="followup-icon"><i class="fa-solid fa-envelope-open-text"></i></div>
+          <div>
+            <div class="timeline-title">邮件草稿创建</div>
+            <div class="timeline-note">06-03 10:20 · TMP-RU-B-001/v2 · 未承诺价格、物流、清关或交付周期。</div>
+            <div class="followup-quote">Здравствуйте! Мы хотели бы обсудить возможное сотрудничество...</div>
+          </div>
+        </article>
+        <article class="followup-item">
+          <div class="followup-icon teal"><i class="fa-solid fa-user-check"></i></div>
+          <div>
+            <div class="timeline-title">客服接收客户</div>
+            <div class="timeline-note">06-03 09:35 · 系统自动分配至客服队列，来源和联系方式完整。</div>
+            <div class="followup-tags"><span class="tag green">邮箱</span><span class="tag blue">Telegram</span><span class="tag dark">官网证据</span></div>
+          </div>
+        </article>
+        <article class="followup-item">
+          <div class="followup-icon dark"><i class="fa-solid fa-clipboard-check"></i></div>
+          <div>
+            <div class="timeline-title">线索补全完成</div>
+            <div class="timeline-note">06-02 16:45 · 从 staging_leads 晋级 customers，并同步 lead_sources/contact_methods。</div>
+            <div class="followup-tags"><span class="tag green">core-ready</span><span class="tag amber">车型待确认</span></div>
+          </div>
+        </article>
+      </section>
+
+      <div class="section-head"><h2>新增跟进</h2><span>CRM 记录</span></div>
+      <section class="panel form-card">
+        <div class="field"><label>跟进方式</label><div class="control">Email · 人工发送 <i class="fa-solid fa-chevron-down"></i></div></div>
+        <div class="field"><label>客户反馈</label><div class="control large-control">待发送首次邮件，计划询问车型、数量、预算和采购周期。</div></div>
+        <div class="field"><label>下一步动作</label><div class="control">06-04 10:00 · 复查是否回复 <i class="fa-regular fa-calendar"></i></div></div>
+      </section>
+      <div class="action-row pb-4"><div class="btn">保存草稿</div><div class="btn primary">记录跟进</div></div>
+    </main>
+  </div>
+</body>
+</html>

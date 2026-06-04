@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智能体首页</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar">
+      <div><div class="nav-title">小范围运行</div><div class="nav-subtitle">俄罗斯 · 每日 100 条候选 · PostgreSQL</div></div>
+      <div class="nav-action"><i class="fa-solid fa-bell"></i></div>
+    </div>
+    <main class="content">
+      <section class="hero-card">
+        <img src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=900&q=80" alt="vehicle operations">
+        <div class="hero-overlay">
+          <div class="hero-eyebrow"><i class="fa-solid fa-shield-halved mr-1"></i> 受控自动发现 · 无自动触达</div>
+          <div>
+            <div class="hero-title">今日已发现 84 条候选线索</div>
+            <div class="hero-desc">raw 126 · staging 84 · core 31 · 风险事件 0</div>
+          </div>
+        </div>
+      </section>
+      <section class="metric-row">
+        <div class="metric-card"><strong>100</strong><span>今日目标</span></div>
+        <div class="metric-card"><strong class="text-emerald-700">31</strong><span>有效线索</span></div>
+        <div class="metric-card"><strong class="text-amber-700">12</strong><span>待复核</span></div>
+      </section>
+      <div class="section-head"><h2>运行管线</h2><span>宽进严出</span></div>
+      <section class="panel stepper">
+        <div class="step-row"><div class="step-dot green"><i class="fa-solid fa-link"></i></div><div><div class="step-title">候选 URL</div><div class="step-note">A/B/C 渠道并行发现 126 个公开来源</div></div><span class="tag green">通过</span></div>
+        <div class="step-row"><div class="step-dot"><i class="fa-solid fa-file-lines"></i></div><div><div class="step-title">页面读取</div><div class="step-note">公开文本摘要与证据摘录已写入 raw</div></div><span class="tag blue">运行中</span></div>
+        <div class="step-row"><div class="step-dot amber"><i class="fa-solid fa-user-check"></i></div><div><div class="step-title">人工复核</div><div class="step-note">High 来源需二次复核，Invalid/Watch 不入队</div></div><span class="tag amber">12 条</span></div>
+      </section>
+      <div class="section-head"><h2>渠道今日表现</h2><a>详情</a></div>
+      <section class="list">
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">官网 / 公开目录</div><div class="lead-meta">Low · core 14 · 联系方式完整率 78%</div></div><span class="tag green">稳定</span></div><div class="progress mt-3"><span style="width:78%;background:var(--green)"></span></div></article>
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">地图 / Drom / 公开论坛</div><div class="lead-meta">Medium · staging 37 · 二次复核通过 42%</div></div><span class="tag amber">限量</span></div><div class="progress mt-3"><span style="width:42%;background:var(--amber)"></span></div></article>
+        <article class="lead-card"><div class="lead-top"><div><div class="lead-name">VK / Avito 公开页发现</div><div class="lead-meta">High · 只读公开页 · 不进入触达队列</div></div><span class="tag red">需复核</span></div></article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab active"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab"><i class="fa-solid fa-filter-circle-dollar"></i><span>复核</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab"><i class="fa-solid fa-chart-simple"></i><span>洞察</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

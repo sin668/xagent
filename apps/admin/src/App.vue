@@ -1,0 +1,486 @@
+<template>
+  <div class="admin-shell">
+    <aside class="sidebar">
+      <h1>XAgent CRM</h1>
+      <nav class="side-nav">
+        <a class="active" href="#overview">总览</a>
+        <a href="#channels">渠道</a>
+        <a href="#risk-config">风险配置</a>
+        <a href="#queues">队列</a>
+        <a href="#risk-audit">审计</a>
+        <a href="#sync-audit">同步</a>
+        <a href="#phase2">第二阶段</a>
+        <a href="#llm-governance">LLM 治理</a>
+      </nav>
+    </aside>
+    <main id="overview" class="admin-main">
+      <header class="admin-top">
+        <div>
+          <h2>后台总览</h2>
+          <p>候选线索、团队队列、SLA 风险与阻断任务集中看板</p>
+        </div>
+        <span class="tag green">MVP 试运行</span>
+      </header>
+
+      <section class="admin-grid-cards">
+        <article class="admin-card">
+          <strong>{{ overview.summary.candidateCount }}</strong>
+          <span>候选线索</span>
+        </article>
+        <article class="admin-card">
+          <strong>{{ overview.summary.bcGradeCount }}</strong>
+          <span>B/C 级线索</span>
+        </article>
+        <article class="admin-card">
+          <strong>{{ overview.summary.responseRateText }}</strong>
+          <span>回复率</span>
+        </article>
+        <article class="admin-card">
+          <strong>{{ overview.summary.slaRiskCount }}</strong>
+          <span>SLA 风险</span>
+        </article>
+      </section>
+
+      <section id="channels" class="admin-card channel-card">
+        <div class="card-head">
+          <h3>渠道产出</h3>
+          <span>按 B/C 级线索排序</span>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>渠道</th>
+              <th>风险</th>
+              <th>状态</th>
+              <th>候选</th>
+              <th>B/C</th>
+              <th>无效率</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="channel in overview.channelOutputs" :key="channel.channelName">
+              <td>{{ channel.displayName }}</td>
+              <td>
+                <span :class="['tag', channel.riskLevel === 'Low' ? 'green' : channel.riskLevel === 'Medium' ? 'amber' : 'red']">
+                  {{ channel.riskLabel }}
+                </span>
+              </td>
+              <td>{{ channel.statusLabel }}</td>
+              <td>{{ channel.candidateCount }}</td>
+              <td>{{ channel.bcText }}</td>
+              <td>{{ channel.invalidRateText }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="risk-config" class="admin-card risk-config-card">
+        <div class="card-head">
+          <h3>渠道风险配置</h3>
+          <span>允许动作、禁止动作、政策来源和变更留痕</span>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>渠道</th>
+              <th>风险</th>
+              <th>允许动作</th>
+              <th>禁止动作</th>
+              <th>政策来源</th>
+              <th>变更人</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="rule in riskConfig.rules" :key="rule.channelName">
+              <td>{{ rule.channelName }}</td>
+              <td>
+                <span :class="['tag', rule.riskLevel === 'Low' ? 'green' : rule.riskLevel === 'Medium' ? 'amber' : 'red']">
+                  {{ rule.riskLabel }}
+                </span>
+              </td>
+              <td>{{ rule.allowedActions }}</td>
+              <td>{{ rule.forbiddenActions }}</td>
+              <td class="source-cell">{{ rule.policySourceUrl }}</td>
+              <td>{{ rule.updatedBy }}</td>
+              <td>{{ rule.statusLabel }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="blocked-reasons">
+          <article v-for="rule in riskConfig.blockedRules" :key="`${rule.channelName}-blocked`">
+            <strong>{{ rule.channelName }}</strong>
+            <span>{{ rule.blockReason }}</span>
+          </article>
+        </div>
+      </section>
+
+      <section id="sync-audit" class="admin-card sync-audit-card">
+        <div class="card-head">
+          <h3>飞书同步与 AI 审计</h3>
+          <span>最近同步 {{ syncAudit.summary.latestSyncAt || '暂无' }}</span>
+        </div>
+        <div class="sync-audit-grid">
+          <div>
+            <strong>{{ syncAudit.summary.syncSuccessCount }}</strong>
+            <span>同步成功</span>
+          </div>
+          <div>
+            <strong>{{ syncAudit.summary.syncFailureCount }}</strong>
+            <span>同步失败</span>
+          </div>
+          <div>
+            <strong>{{ syncAudit.summary.aiTaskCount }}</strong>
+            <span>AI 审计日志</span>
+          </div>
+          <div>
+            <strong>{{ syncAudit.summary.aiBlockedCount }}</strong>
+            <span>被阻断任务</span>
+          </div>
+        </div>
+        <div class="audit-columns">
+          <section>
+            <h4>同步日志</h4>
+            <article v-for="item in syncAudit.syncLogs" :key="item.id" class="audit-row">
+              <div>
+                <strong>{{ item.objectName }}</strong>
+                <span>{{ item.successCount }} 成功 / {{ item.failureCount }} 失败</span>
+              </div>
+              <p>{{ item.errorSummary || item.statusLabel }}</p>
+            </article>
+          </section>
+          <section>
+            <h4>AI 执行审计</h4>
+            <article v-for="item in syncAudit.aiAuditLogs" :key="item.id" class="audit-row">
+              <div>
+                <strong>{{ item.taskType }}</strong>
+                <span>{{ item.modelName }} · {{ item.promptVersion }}</span>
+              </div>
+              <p>{{ item.riskBlockReason || item.statusLabel }}</p>
+            </article>
+          </section>
+        </div>
+      </section>
+
+      <section id="queues" class="admin-card queue-card">
+        <div class="card-head">
+          <h3>今日队列</h3>
+          <span>{{ overview.queueSummaryText }}</span>
+        </div>
+        <div class="queue-grid">
+          <article class="queue-column">
+            <strong>{{ overview.teamQueues.operations.count }}</strong>
+            <span>运营待复核</span>
+            <p v-for="item in overview.teamQueues.operations.items" :key="item.customerId">
+              {{ item.customerName }} · {{ item.grade }} · {{ item.owner }}
+            </p>
+          </article>
+          <article class="queue-column">
+            <strong>{{ overview.teamQueues.customerService.count }}</strong>
+            <span>客服待跟进</span>
+            <p v-for="item in overview.teamQueues.customerService.items" :key="item.customerId">
+              {{ item.customerName }} · {{ item.grade }} · {{ item.owner }}
+            </p>
+          </article>
+          <article class="queue-column">
+            <strong>{{ overview.teamQueues.sales.count }}</strong>
+            <span>销售待承接</span>
+            <p v-for="item in overview.teamQueues.sales.items" :key="item.customerId">
+              {{ item.customerName }} · {{ item.grade }} · {{ item.owner }}
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="risk-audit" class="admin-card risk-card">
+        <div class="card-head">
+          <h3>风险事件与阻断任务</h3>
+          <span>管理者必须可见阻断原因</span>
+        </div>
+        <div class="risk-list">
+          <article v-for="event in overview.riskEvents" :key="event.id" class="risk-row">
+            <div>
+              <strong>{{ event.taskType }}</strong>
+              <span>{{ event.sourceUrl || '无来源链接' }}</span>
+            </div>
+            <p>{{ event.riskBlockReason || '未填写阻断原因' }}</p>
+          </article>
+        </div>
+        <p class="guardrail">High/Forbidden 渠道和勿扰客户不得进入自动化触达；C 级线索报价或合同前必须合规复核。</p>
+      </section>
+
+      <section id="phase2" class="admin-card phase2-card">
+        <div class="card-head">
+          <div>
+            <h3>第二阶段小范围运行看板</h3>
+            <span>Source Discovery -> 来源审核 -> LEAD_EXTRACTION -> staging/core</span>
+          </div>
+          <span :class="['tag', phase2StatusClass]">{{ phase2StatusText }}</span>
+        </div>
+
+        <p v-if="phase2Error" class="guardrail">{{ phase2Error }}</p>
+
+        <div class="phase2-summary">
+          <article>
+            <strong>{{ phase2.summary.sourceCandidateCount }}</strong>
+            <span>来源新增</span>
+          </article>
+          <article>
+            <strong>{{ phase2.summary.extractableSourceCount }}</strong>
+            <span>可抽取来源</span>
+          </article>
+          <article class="danger-metric">
+            <strong>{{ phase2.summary.highReviewBacklogCount }}</strong>
+            <span>High 待审</span>
+          </article>
+          <article>
+            <strong>{{ phase2.summary.llmCostText }}</strong>
+            <span>LLM 成本</span>
+          </article>
+        </div>
+
+        <div class="phase2-flow">
+          <article v-for="node in phase2.taskFlow" :key="node.title" class="phase2-flow-node">
+            <strong>{{ node.title }}</strong>
+            <span>{{ node.metricText }}</span>
+            <p>{{ node.description }}</p>
+          </article>
+        </div>
+
+        <div class="phase2-split">
+          <section>
+            <div class="card-head compact-head">
+              <h4>Agent Task Runs</h4>
+              <span>真实 API 审计事实</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>任务</th>
+                  <th>模型</th>
+                  <th>状态</th>
+                  <th>输出</th>
+                  <th>成本</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="run in phase2.llmTaskRuns" :key="run.runId">
+                  <td>{{ run.runId || '-' }}</td>
+                  <td>{{ run.taskType }}</td>
+                  <td>{{ run.provider }}</td>
+                  <td><span :class="['tag', run.statusClass]">{{ run.statusLabel }}</span></td>
+                  <td>{{ run.outputText }}</td>
+                  <td>{{ run.costText }}</td>
+                </tr>
+                <tr v-if="phase2.llmTaskRuns.length === 0">
+                  <td colspan="6">暂无真实 LLM 任务成本数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <div class="card-head compact-head">
+              <h4>自动暂停阈值</h4>
+              <span>触发后停止自动任务</span>
+            </div>
+            <div class="pause-list">
+              <article v-for="threshold in phase2PauseThresholds" :key="threshold.label">
+                <div>
+                  <strong>{{ threshold.label }}</strong>
+                  <span>{{ threshold.text || `${threshold.current} / ${threshold.limit}` }}</span>
+                </div>
+                <div class="progress"><span :class="threshold.className" :style="{ width: `${threshold.percent}%` }"></span></div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <div class="phase2-risk-list">
+          <div class="card-head compact-head">
+            <h4>High/Forbidden 风险事件</h4>
+            <span>{{ phase2.summary.highForbiddenRiskEventCount }} 个高风险事件</span>
+          </div>
+          <article v-for="event in phase2.highForbiddenRiskEvents" :key="event.id" class="risk-row">
+            <div>
+              <strong>{{ event.channel }}</strong>
+              <span>{{ event.eventType }} · {{ event.createdAt }}</span>
+            </div>
+            <p>
+              <span :class="['tag', event.highlightClass]">{{ event.riskLabel }}</span>
+              {{ event.blockReason }}
+            </p>
+          </article>
+          <p v-if="phase2.highForbiddenRiskEvents.length === 0" class="empty-note">暂无 High/Forbidden 风险事件。</p>
+        </div>
+
+        <p class="guardrail">{{ phase2.guardrail }}</p>
+      </section>
+
+      <section id="llm-governance" class="admin-card llm-card">
+        <div class="card-head">
+          <div>
+            <h3>LLM Provider 与 Prompt Schema</h3>
+            <span>Provider 健康、prompt/schema 版本、fallback 边界和只读治理</span>
+          </div>
+          <span :class="['tag', llmStatusClass]">{{ llmStatusText }}</span>
+        </div>
+
+        <p v-if="llmError" class="guardrail">{{ llmError }}</p>
+
+        <div class="provider-grid">
+          <article class="provider-card">
+            <strong>{{ llmGovernance.providerHealth.providerName }}</strong>
+            <small>{{ llmGovernance.providerHealth.modelSummary || '暂无模型配置' }}</small>
+            <span :class="['tag', llmGovernance.providerHealth.statusClass]">{{ llmGovernance.providerHealth.statusLabel }}</span>
+          </article>
+          <article class="provider-card">
+            <strong>Base URL</strong>
+            <small>仅展示配置状态，不展示具体密钥或敏感配置</small>
+            <span :class="['tag', llmGovernance.providerHealth.baseUrlConfigured ? 'green' : 'amber']">
+              {{ llmGovernance.providerHealth.baseUrlConfigured ? 'configured' : 'missing' }}
+            </span>
+          </article>
+          <article class="provider-card">
+            <strong>API Key</strong>
+            <small>页面只显示是否已配置，禁止展示 API key 原文</small>
+            <span :class="['tag', llmGovernance.providerHealth.apiKeyConfigured ? 'green' : 'amber']">
+              {{ llmGovernance.providerHealth.apiKeyConfigured ? 'configured' : 'missing' }}
+            </span>
+          </article>
+          <article class="provider-card">
+            <strong>Read Only</strong>
+            <small>{{ llmGovernance.readOnlyNotice }}</small>
+            <span class="tag blue">governance</span>
+          </article>
+        </div>
+
+        <div class="llm-split">
+          <section>
+            <div class="card-head compact-head">
+              <h4>Prompt Template 版本</h4>
+              <span>仅管理员维护</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>任务</th>
+                  <th>Provider</th>
+                  <th>版本</th>
+                  <th>状态</th>
+                  <th>Schema</th>
+                  <th>默认</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="template in llmGovernance.promptTemplates" :key="template.id">
+                  <td>{{ template.name }}</td>
+                  <td>{{ template.taskType }}</td>
+                  <td>{{ template.provider }} / {{ template.model }}</td>
+                  <td>{{ template.version }}</td>
+                  <td><span :class="['tag', template.statusClass]">{{ template.statusLabel }}</span></td>
+                  <td>{{ template.schemaSummary }}</td>
+                  <td>{{ template.defaultLabel }}</td>
+                </tr>
+                <tr v-if="llmGovernance.promptTemplates.length === 0">
+                  <td colspan="7">暂无真实 prompt template 数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <div class="card-head compact-head">
+              <h4>Fallback 边界</h4>
+              <span>合规失败不得 fallback</span>
+            </div>
+            <div class="fallback-list">
+              <article v-for="item in llmGovernance.fallbackBoundaries" :key="item.condition">
+                <strong>{{ item.condition }}</strong>
+                <span :class="['tag', item.className]">{{ item.decisionLabel }}</span>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <section class="schema-preview">
+          <div class="card-head compact-head">
+            <h4>{{ llmGovernance.schemaPreview.name }} 输出 Schema</h4>
+            <span>{{ llmGovernance.schemaPreview.version || '无版本' }}</span>
+          </div>
+          <pre>{{ llmGovernance.schemaPreview.schemaText }}</pre>
+        </section>
+
+        <p class="guardrail">{{ llmGovernance.readOnlyNotice }} 页面不展示 API key、secret 或完整敏感连接配置。</p>
+      </section>
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from 'vue';
+
+import { adminOverviewSeed } from './data/adminOverviewSeed.js';
+import { channelRiskConfigSeed } from './data/channelRiskConfigSeed.js';
+import { syncAiAuditSeed } from './data/syncAiAuditSeed.js';
+import { buildAdminOverviewView } from './services/adminOverview.js';
+import { buildChannelRiskConfigView } from './services/channelRiskConfig.js';
+import { buildLlmGovernanceView, fetchLlmGovernance } from './services/llmGovernance.js';
+import { buildPhase2DashboardView, fetchPhase2Dashboard } from './services/phase2Dashboard.js';
+import { buildSyncAiAuditView } from './services/syncAiAudit.js';
+
+const overview = computed(() => buildAdminOverviewView(adminOverviewSeed));
+const riskConfig = computed(() => buildChannelRiskConfigView(channelRiskConfigSeed));
+const syncAudit = computed(() => buildSyncAiAuditView(syncAiAuditSeed));
+const phase2Payload = ref(null);
+const phase2Loading = ref(true);
+const phase2Error = ref('');
+const llmGovernancePayload = ref(null);
+const llmLoading = ref(true);
+const llmError = ref('');
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+
+const phase2 = computed(() => buildPhase2DashboardView(phase2Payload.value || {}));
+const llmGovernance = computed(() => buildLlmGovernanceView(llmGovernancePayload.value || {}));
+const phase2PauseThresholds = computed(() => Object.values(phase2.value.pauseThresholds));
+const phase2StatusText = computed(() => {
+  if (phase2Loading.value) return '加载中';
+  if (phase2Error.value) return 'API 异常';
+  if (phase2.value.summary.highForbiddenRiskEventCount > 0) return '需复核';
+  return '运行中';
+});
+const phase2StatusClass = computed(() => {
+  if (phase2Error.value || phase2.value.summary.highForbiddenRiskEventCount > 0) return 'red';
+  if (phase2Loading.value) return 'amber';
+  return 'green';
+});
+const llmStatusText = computed(() => {
+  if (llmLoading.value) return '加载中';
+  if (llmError.value) return 'API 异常';
+  return llmGovernance.value.providerHealth.statusLabel;
+});
+const llmStatusClass = computed(() => {
+  if (llmError.value) return 'red';
+  if (llmLoading.value) return 'amber';
+  return llmGovernance.value.providerHealth.statusClass;
+});
+
+onMounted(async () => {
+  try {
+    const [phase2Result, llmGovernanceResult] = await Promise.all([
+      fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
+      fetchLlmGovernance({ baseUrl: apiBaseUrl }),
+    ]);
+    phase2Payload.value = phase2Result;
+    llmGovernancePayload.value = llmGovernanceResult;
+  } catch (error) {
+    phase2Error.value = `无法加载第二阶段真实 API 指标：${error.message}`;
+    llmError.value = `无法加载 LLM/Prompt 治理真实 API：${error.message}`;
+  } finally {
+    phase2Loading.value = false;
+    llmLoading.value = false;
+  }
+});
+</script>

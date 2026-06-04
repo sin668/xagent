@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>客户工作台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar">
+      <div><div class="nav-title">客户工作台</div><div class="nav-subtitle">由完善线索晋级 · core customers</div></div>
+      <div class="nav-action"><i class="fa-solid fa-magnifying-glass"></i></div>
+    </div>
+    <main class="content">
+      <section class="customer-hero">
+        <img src="https://images.unsplash.com/photo-1549921296-3a6b7b5b56a2?auto=format&fit=crop&w=900&q=80" alt="vehicle showroom">
+        <div class="customer-hero-overlay">
+          <div class="hero-eyebrow"><i class="fa-solid fa-user-check mr-1"></i> 线索完善后进入客户池</div>
+          <div>
+            <div class="hero-title">31 个有效客户正在跟进</div>
+            <div class="hero-desc">B/C 级 18 · 今日待跟进 9 · 有车型意向 14 · 合规待复核 3</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="metric-row customer-metrics">
+        <div class="metric-card"><strong>18</strong><span>B/C 级客户</span></div>
+        <div class="metric-card"><strong class="text-emerald-700">14</strong><span>车型意向</span></div>
+        <div class="metric-card"><strong class="text-amber-700">9</strong><span>今日跟进</span></div>
+      </section>
+
+      <div class="chip-row">
+        <span class="chip active">全部 31</span>
+        <span class="chip">今日跟进 9</span>
+        <span class="chip">有车型意向 14</span>
+        <span class="chip">C 级待合规 3</span>
+        <span class="chip">待分配 5</span>
+      </div>
+
+      <div class="section-head"><h2>重点客户</h2><span>按下一步动作排序</span></div>
+      <section class="list">
+        <article class="customer-card">
+          <div class="customer-top">
+            <div>
+              <div class="lead-name">AutoCity Vladivostok</div>
+              <div class="lead-meta">Russia · Vladivostok · 二级经销商 · 来源已复核</div>
+            </div>
+            <span class="tag green">B 级</span>
+          </div>
+          <div class="customer-contact-strip">
+            <span><i class="fa-solid fa-envelope"></i> sales@autocity-vl.ru</span>
+            <span><i class="fa-brands fa-telegram"></i> @autocity_vl</span>
+          </div>
+          <div class="intent-card">
+            <div><strong>Toyota / Honda / Nissan</strong><span>右舵二手车 · 5-8 年车龄 · 每月 5-10 台</span></div>
+            <span class="tag blue">客服跟进</span>
+          </div>
+          <div class="customer-next">
+            <div><div class="mini-label">下一步</div><div class="mini-value">确认采购频率和目标价位</div></div>
+            <div class="btn primary">进入详情</div>
+          </div>
+        </article>
+
+        <article class="customer-card">
+          <div class="customer-top">
+            <div>
+              <div class="lead-name">Siberia Auto Trade</div>
+              <div class="lead-meta">Russia · Novosibirsk · 展厅 + 公开库存页</div>
+            </div>
+            <span class="tag amber">C 级</span>
+          </div>
+          <div class="customer-contact-strip">
+            <span><i class="fa-solid fa-phone"></i> +7 383 *** **22</span>
+            <span><i class="fa-brands fa-whatsapp"></i> WhatsApp</span>
+          </div>
+          <div class="intent-card">
+            <div><strong>新能源 / 混动 SUV</strong><span>关注出口手续、批量价格和交付节奏</span></div>
+            <span class="tag amber">合规复核</span>
+          </div>
+          <div class="customer-next">
+            <div><div class="mini-label">下一步</div><div class="mini-value">销售接手前完成 C 级复核</div></div>
+            <div class="btn blue">查看记录</div>
+          </div>
+        </article>
+
+        <article class="customer-card">
+          <div class="customer-top">
+            <div>
+              <div class="lead-name">Kazan Motors Partner</div>
+              <div class="lead-meta">Russia · Kazan · 官网表单线索 · 已补全邮箱</div>
+            </div>
+            <span class="tag blue">A 级</span>
+          </div>
+          <div class="customer-contact-strip">
+            <span><i class="fa-solid fa-envelope"></i> info@kazan-motors.ru</span>
+            <span><i class="fa-solid fa-globe"></i> 官网</span>
+          </div>
+          <div class="intent-card">
+            <div><strong>待确认车型</strong><span>已完成客户名、城市、联系人和来源证据补全</span></div>
+            <span class="tag dark">待分配</span>
+          </div>
+          <div class="customer-next">
+            <div><div class="mini-label">下一步</div><div class="mini-value">分配客服并生成首次触达草稿</div></div>
+            <div class="btn">分配</div>
+          </div>
+        </article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab"><i class="fa-solid fa-filter-circle-dollar"></i><span>线索</span></div>
+      <div class="tab active"><i class="fa-solid fa-address-book"></i><span>客户</span></div>
+      <div class="tab"><i class="fa-solid fa-paper-plane"></i><span>触达</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

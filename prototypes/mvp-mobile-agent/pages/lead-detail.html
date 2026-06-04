@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>线索详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar"><div class="nav-action"><i class="fa-solid fa-chevron-left"></i></div><div><div class="nav-title">线索详情</div><div class="nav-subtitle">core 准入检查</div></div><div class="nav-action"><i class="fa-solid fa-ellipsis"></i></div></div>
+    <main class="content no-tab">
+      <section class="panel">
+        <div class="lead-top"><div><div class="lead-name text-lg">AutoCity Vladivostok</div><div class="lead-meta">Russia · Vladivostok · 当地车商/二级经销商</div></div><span class="tag green">B 级</span></div>
+        <div class="mt-3 flex gap-2 flex-wrap"><span class="tag green">Low 复核通过</span><span class="tag blue">可交付客服</span><span class="tag dark">core-ready</span></div>
+      </section>
+      <div class="section-head"><h2>准入闸门</h2><span>规则 + 人工</span></div>
+      <section class="panel stepper">
+        <div class="step-row"><div class="step-dot green"><i class="fa-solid fa-link"></i></div><div><div class="step-title">来源链接完整</div><div class="step-note">官网联系页 + Yandex 地图商户页</div></div><span class="tag green">通过</span></div>
+        <div class="step-row"><div class="step-dot green"><i class="fa-solid fa-envelope"></i></div><div><div class="step-title">至少一个联系方式</div><div class="step-note">Email + 电话，未发现拒绝联系声明</div></div><span class="tag green">通过</span></div>
+        <div class="step-row"><div class="step-dot amber"><i class="fa-solid fa-scale-balanced"></i></div><div><div class="step-title">C 级合规复核</div><div class="step-note">当前 B 级无需报价复核，升级 C 后触发</div></div><span class="tag amber">待触发</span></div>
+      </section>
+      <div class="section-head"><h2>AI 摘要</h2><span>gpt-4.1 · prompt v3</span></div>
+      <section class="detail-card">
+        <p class="text-sm leading-6 font-bold text-slate-700 m-0">该客户展示多款日系二手车库存，页面有进口车与本地零售相关描述。推荐客服先确认批量采购意向、目标车型和可持续联系方式。</p>
+        <div class="mini-grid mt-3">
+          <div class="mini-cell"><div class="mini-label">活跃度</div><div class="mini-value">中高</div></div>
+          <div class="mini-cell"><div class="mini-label">规模信号</div><div class="mini-value">中型</div></div>
+          <div class="mini-cell"><div class="mini-label">二手相关性</div><div class="mini-value">强</div></div>
+          <div class="mini-cell"><div class="mini-label">缺失信息</div><div class="mini-value">主营车型</div></div>
+        </div>
+      </section>
+      <div class="section-head"><h2>来源证据</h2><span>不可删除</span></div>
+      <section class="detail-card">
+        <div class="timeline">
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">官网联系页</div><div class="timeline-note">公开邮箱、电话、营业地址；保存 URL hash 与摘录。</div></div></div>
+          <div class="timeline-item"><div class="timeline-mark"></div><div><div class="timeline-title">Yandex 地图</div><div class="timeline-note">商户名与地址一致，仅作为公开核验，不批量复制地图内容。</div></div></div>
+        </div>
+      </section>
+      <div class="action-row pb-4"><div class="btn">标记重复</div><div class="btn primary">交付客服</div></div>
+    </main>
+  </div>
+</body>
+</html>
