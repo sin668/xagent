@@ -42,6 +42,17 @@ class FakeEmailReplyApiClient:
             "rejection_reason": None,
         }
 
+    def auto_send_check(self, **kwargs):
+        return {
+            "route": "hold_for_manual_review",
+            "auto_send_allowed": False,
+            "manual_review_required": True,
+            "manual_review_reason": "测试替身默认进入人工确认。",
+            "reasons": ["test_default_manual_review"],
+            "dry_run": True,
+            "send_triggered": False,
+        }
+
 
 def test_email_reply_graph_loads_context_and_retrieves_knowledge_through_api_client() -> None:
     api_client = FakeEmailReplyApiClient()
@@ -68,7 +79,14 @@ def test_email_reply_graph_loads_context_and_retrieves_knowledge_through_api_cli
         )
     )
 
-    assert result.executed_nodes == ["load_context", "retrieve_knowledge", "draft_reply", "schema_validation"]
+    assert result.executed_nodes == [
+        "load_context",
+        "retrieve_knowledge",
+        "draft_reply",
+        "schema_validation",
+        "auto_send_check",
+        "route_decision",
+    ]
     assert api_client.context_calls[0].schema_version == "email-reply-v1"
     assert api_client.knowledge_calls == [
         {
@@ -92,6 +110,8 @@ def test_email_reply_graph_loads_context_and_retrieves_knowledge_through_api_cli
         "retrieve_knowledge",
         "draft_reply",
         "schema_validation",
+        "auto_send_check",
+        "route_decision",
     ]
 
 
@@ -155,3 +175,43 @@ def test_email_reply_api_client_uses_internal_context_and_knowledge_endpoints(mo
     assert calls[0]["url"] == "http://api.test/internal/email-reply/context"
     assert calls[1]["url"] == "http://api.test/internal/email-reply/knowledge"
     assert calls[0]["headers"] == {"X-Agents-Api-Key": "secret"}
+
+
+def test_email_reply_api_client_uses_internal_auto_send_check_endpoint(monkeypatch) -> None:
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"route": "hold_for_manual_review"}
+
+    def fake_post(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return FakeResponse()
+
+    monkeypatch.setattr("app.adapters.email_reply_api.httpx.post", fake_post)
+    client = EmailReplyApiClient(base_url="http://api.test", api_key="secret")
+
+    envelope = __import__(
+        "app.schemas.email_reply",
+        fromlist=["EmailReplyRequestEnvelope"],
+    ).EmailReplyRequestEnvelope(
+        request_id=uuid4(),
+        thread_id=uuid4(),
+        message_id=uuid4(),
+    )
+    response = client.auto_send_check(
+        envelope=envelope,
+        output={"schema_version": "email-reply-v1"},
+        context={},
+        knowledge_hits=[],
+        options={},
+        dry_run=True,
+    )
+
+    assert response["route"] == "hold_for_manual_review"
+    assert calls[0]["url"] == "http://api.test/internal/email-reply/auto-send-check"
+    assert calls[0]["headers"] == {"X-Agents-Api-Key": "secret"}
+    assert calls[0]["json"]["dry_run"] is True

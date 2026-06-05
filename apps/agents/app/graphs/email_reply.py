@@ -12,7 +12,14 @@ from app.schemas.email_reply import EMAIL_REPLY_SCHEMA_VERSION, EmailReplyAgentO
 from app.settings import get_settings
 
 
-EMAIL_REPLY_NODE_SEQUENCE = ("load_context", "retrieve_knowledge", "draft_reply", "schema_validation")
+EMAIL_REPLY_NODE_SEQUENCE = (
+    "load_context",
+    "retrieve_knowledge",
+    "draft_reply",
+    "schema_validation",
+    "auto_send_check",
+    "route_decision",
+)
 
 
 @dataclass(slots=True)
@@ -28,6 +35,7 @@ class EmailReplyGraphState:
     knowledge_hits: list[EmailReplyKnowledgeHit] = field(default_factory=list)
     raw_draft: dict[str, Any] = field(default_factory=dict)
     validated_output: EmailReplyAgentOutput | None = None
+    auto_send_decision: dict[str, Any] = field(default_factory=dict)
     risk_flags: list[str] = field(default_factory=list)
     audit: dict[str, Any] = field(default_factory=dict)
 
@@ -168,6 +176,64 @@ class EmailReplyGraphRunner:
         state.audit["schema_validation_status"] = "succeeded"
         return state
 
+    def auto_send_check(self, state: EmailReplyGraphState) -> EmailReplyGraphState:
+        self.mark("auto_send_check")
+        if state.validated_output is None:
+            raise ValueError("auto_send_check requires validated_output.")
+        envelope = EmailReplyRequestEnvelope(
+            schema_version=EMAIL_REPLY_SCHEMA_VERSION,
+            request_id=state.request_id,
+            draft_id=state.draft_id,
+            thread_id=state.thread_id,
+            message_id=state.message_id,
+            customer_id=state.customer_id,
+            context=state.context,
+            prompt=state.prompt,
+            options=state.options,
+        )
+        state.auto_send_decision = self.api_client.auto_send_check(
+            envelope=envelope,
+            output=state.validated_output.model_dump(mode="json"),
+            context=state.context,
+            knowledge_hits=[
+                item.model_dump(mode="json") if isinstance(item, EmailReplyKnowledgeHit) else dict(item)
+                for item in state.knowledge_hits
+            ],
+            options=state.options,
+            dry_run=bool((state.options or {}).get("dry_run", True)),
+        )
+        state.audit["auto_send_check_completed"] = True
+        return state
+
+    def route_decision(self, state: EmailReplyGraphState) -> EmailReplyGraphState:
+        self.mark("route_decision")
+        if state.validated_output is None:
+            raise ValueError("route_decision requires validated_output.")
+        decision = dict(state.auto_send_decision or {})
+        route = str(decision.get("route") or "hold_for_manual_review")
+        normalized_route = "block" if route == "blocked" else route
+        if normalized_route == "auto_send":
+            next_action = "auto_send_candidate"
+        elif normalized_route == "block":
+            next_action = "block"
+        else:
+            next_action = "hold_for_manual_review"
+
+        update_payload = {
+            **state.validated_output.model_dump(),
+            "auto_send_allowed": bool(decision.get("auto_send_allowed", False)),
+            "manual_review_required": bool(decision.get("manual_review_required", True)),
+            "next_action": next_action,
+        }
+        state.validated_output = EmailReplyAgentOutput(**update_payload)
+        state.audit["route_decision"] = normalized_route
+        state.audit["route_reasons"] = list(decision.get("reasons") or [])
+        state.audit["manual_review_reason"] = decision.get("manual_review_reason")
+        state.audit["block_reasons"] = list(decision.get("block_reasons") or [])
+        state.audit["dry_run"] = bool(decision.get("dry_run", True))
+        state.audit["send_triggered"] = bool(decision.get("send_triggered", False))
+        return state
+
     def run(self, state: EmailReplyGraphState) -> EmailReplyGraphResult:
         try:
             invoked_state = self.compiled_graph.invoke(state)
@@ -210,6 +276,7 @@ class EmailReplyGraphRunner:
             ],
             raw_draft=dict(result.get("raw_draft") or {}),
             validated_output=result.get("validated_output"),
+            auto_send_decision=dict(result.get("auto_send_decision") or {}),
             risk_flags=list(result.get("risk_flags") or []),
             audit=dict(result.get("audit") or {}),
         )

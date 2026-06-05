@@ -169,3 +169,114 @@ def test_internal_email_reply_knowledge_requires_agent_api_key() -> None:
     )
 
     assert response.status_code == 401
+
+
+def test_internal_email_reply_auto_send_check_requires_agent_api_key() -> None:
+    response = client.post(
+        "/internal/email-reply/auto-send-check",
+        json={
+            "schema_version": "email-reply-v1",
+            "request_id": str(uuid4()),
+            "thread_id": str(uuid4()),
+            "message_id": str(uuid4()),
+            "draft_id": str(uuid4()),
+            "output": {
+                "schema_version": "email-reply-v1",
+                "reply_language": "ru",
+                "detected_language": "ru",
+                "suggested_subject": "Toyota sourcing",
+                "suggested_body": "Здравствуйте.",
+                "knowledge_hits": [],
+                "risk_flags": [],
+                "auto_send_allowed": True,
+                "manual_review_required": False,
+                "next_action": "auto_send_candidate",
+                "audit": {"writes_core_tables": False},
+            },
+            "context": {},
+            "knowledge_hits": [],
+            "options": {},
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_internal_email_reply_auto_send_check_returns_apps_api_rule_decision() -> None:
+    response = client.post(
+        "/internal/email-reply/auto-send-check",
+        headers={"X-Agents-Api-Key": INTERNAL_API_KEY},
+        json={
+            "schema_version": "email-reply-v1",
+            "request_id": str(uuid4()),
+            "thread_id": str(uuid4()),
+            "message_id": str(uuid4()),
+            "draft_id": str(uuid4()),
+            "output": {
+                "schema_version": "email-reply-v1",
+                "reply_language": "ru",
+                "detected_language": "ru",
+                "suggested_subject": "Toyota sourcing",
+                "suggested_body": "Здравствуйте.",
+                "knowledge_hits": [
+                    {
+                        "knowledge_item_id": str(uuid4()),
+                        "title": "Fixed FAQ",
+                        "version": "v1",
+                        "similarity_score": 0.95,
+                        "evidence_note": "Approved FAQ wording.",
+                    }
+                ],
+                "risk_flags": [],
+                "auto_send_allowed": True,
+                "manual_review_required": False,
+                "next_action": "auto_send_candidate",
+                "audit": {"writes_core_tables": False},
+            },
+            "context": {
+                "customer": {
+                    "is_whitelisted": True,
+                    "grade": "A",
+                    "status": "ready_for_sales",
+                    "do_not_contact": False,
+                },
+                "inbound_message": {
+                    "risk_flags": [],
+                    "sensitive_topics": [],
+                    "language": "ru",
+                },
+            },
+            "knowledge_hits": [
+                {
+                    "knowledge_item_id": str(uuid4()),
+                    "title": "Fixed FAQ",
+                    "version": "v1",
+                    "similarity_score": 0.95,
+                    "evidence_note": "Approved FAQ wording.",
+                    "content_type": "qa_entry",
+                    "business_scene": "fixed_faq",
+                    "risk_level": "low",
+                    "auto_reply_allowed": True,
+                    "embedding_status": "ready",
+                }
+            ],
+            "options": {
+                "business_scene": "fixed_faq",
+                "scene_risk_level": "low",
+                "is_first_touch": True,
+                "reply_language_confident": True,
+                "channel_risk_level": "low",
+            },
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["route"] == "auto_send"
+    assert payload["auto_send_allowed"] is True
+    assert payload["manual_review_required"] is False
+    assert payload["dry_run"] is True
+    assert payload["send_triggered"] is False
+    assert "whitelisted_customer" in payload["reasons"]

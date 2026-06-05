@@ -28,6 +28,17 @@ class FakeEmailReplyApiClient:
             "rejection_reason": None,
         }
 
+    def auto_send_check(self, **kwargs):
+        return {
+            "route": "hold_for_manual_review",
+            "auto_send_allowed": False,
+            "manual_review_required": True,
+            "manual_review_reason": "测试替身默认进入人工确认。",
+            "reasons": ["test_default_manual_review"],
+            "dry_run": True,
+            "send_triggered": False,
+        }
+
 
 class MissingFieldsDrafter:
     def draft(self, *, context, knowledge_hits, prompt, options):
@@ -76,7 +87,14 @@ def test_email_reply_draft_reply_normalizes_missing_fields_without_fabrication()
         )
     )
 
-    assert result.executed_nodes == ["load_context", "retrieve_knowledge", "draft_reply", "schema_validation"]
+    assert result.executed_nodes == [
+        "load_context",
+        "retrieve_knowledge",
+        "draft_reply",
+        "schema_validation",
+        "auto_send_check",
+        "route_decision",
+    ]
     assert result.output.schema_version == "email-reply-v1"
     assert result.output.reply_language == "Unknown"
     assert result.output.suggested_subject == "Unknown"

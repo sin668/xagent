@@ -60,3 +60,35 @@ class EmailReplyApiClient:
         if response.status_code >= 400:
             raise RuntimeError(f"apps/api internal knowledge retrieval failed: {response.status_code}")
         return dict(response.json())
+
+    def auto_send_check(
+        self,
+        *,
+        envelope: EmailReplyRequestEnvelope,
+        output: dict[str, Any],
+        context: dict[str, Any],
+        knowledge_hits: list[dict[str, Any]],
+        options: dict[str, Any],
+        dry_run: bool,
+    ) -> dict[str, Any]:
+        response = httpx.post(
+            f"{self.base_url}/internal/email-reply/auto-send-check",
+            headers=self.headers,
+            json={
+                "schema_version": envelope.schema_version,
+                "request_id": str(envelope.request_id),
+                "draft_id": str(envelope.draft_id) if envelope.draft_id else None,
+                "thread_id": str(envelope.thread_id),
+                "message_id": str(envelope.message_id),
+                "customer_id": str(envelope.customer_id) if envelope.customer_id else None,
+                "output": output,
+                "context": context,
+                "knowledge_hits": knowledge_hits,
+                "options": options,
+                "dry_run": dry_run,
+            },
+            timeout=self.timeout_seconds,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(f"apps/api internal auto-send check failed: {response.status_code}")
+        return dict(response.json())
