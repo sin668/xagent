@@ -1,8 +1,8 @@
 # Story P5-E2-S4：Prompt 变量、schema 与测试样例校验 API
 
-状态：未开始  
-Sprint：Sprint 2  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 2
+优先级：P0
 Epic：P5-E2（Prompt 入库治理）
 
 ## 用户故事
@@ -190,3 +190,29 @@ leftover_phase5_validation_api_rows=0
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 Prompt 校验预览 API 已存在，并已由历史提交 `4f97110a feat: add prompt validation preview api` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_validation_preview_api.py tests/test_phase5_prompt_draft_edit_api.py tests/test_llm_prompt_templates_api.py tests/test_llm_prompt_template_model.py tests/test_phase5_prompt_import_service.py tests/test_phase5_prompt_file_parser.py tests/test_phase5_prompt_template_governance.py -q
+```
+
+复核结果：
+
+```text
+31 passed, 1 warning in 13.71s
+```
+
+警告说明：
+
+- warning 为既有知识库双路由兼容造成的 FastAPI duplicate operation ID warning，位于 `apps/api/app/api/knowledge.py`，不影响 Prompt 校验预览 API 验收，本 Story 不扩范围修复。
+
+两轮复核结论：
+
+- 第一轮：校验预览 API 已覆盖必填变量、JSON Schema 基础结构、任务类型和 EMAIL_REPLY 风险边界校验；校验失败只回写 `validation_failed`，`would_publish=false`，不会发布。
+- 第二轮：本 Story 只校验草稿并渲染测试样例，不调用 LLM、不切默认版本、不执行自动触达或自动发送；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
