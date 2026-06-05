@@ -1,8 +1,8 @@
 # Story P5-E1-S1：扩展 Prompt 模板治理字段与枚举
 
-状态：未开始  
-Sprint：Sprint 1  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 1
+优先级：P0
 Epic：P5-E1（数据底座）
 
 ## 用户故事
@@ -240,3 +240,25 @@ E assert 0 == 1
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `LLMPromptTemplate` 模型、Pydantic schema、`20260605_0029_extend_llm_prompt_templates_governance.py` migration 和 `tests/test_phase5_prompt_template_governance.py` 已存在，并已由历史提交 `2f830313 feat: extend prompt template governance fields` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_template_governance.py tests/test_llm_prompt_template_model.py tests/test_llm_prompt_templates.py tests/test_llm_prompt_templates_api.py -q
+```
+
+复核结果：
+
+```text
+19 passed, 1 warning in 4.85s
+```
+
+两轮复核结论：
+
+- 第一轮：模型字段、`EMAIL_REPLY_*` 枚举、migration 文件和 Prompt API 兼容测试均已覆盖本 Story 验收标准；未发现需要新增实现的缺口。
+- 第二轮：本 Story 不涉及自动触达、自动发送或 Agent 写业务 core 表，架构边界保持 `apps/api` 业务数据权威；未发现新的实质阻塞问题。
