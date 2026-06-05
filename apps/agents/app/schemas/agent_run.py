@@ -8,7 +8,7 @@ AGENT_RUN_SCHEMA_VERSION = "phase4.agent.run.v1"
 
 AgentTriggerSource = Literal["manual_api", "shadow_run", "scheduler", "test"]
 AgentMode = Literal["active", "shadow", "dry_run"]
-AgentType = Literal["deep_enrichment", "lead_cleanup", "source_discovery", "lead_extraction_grading"]
+AgentType = Literal["deep_enrichment", "lead_cleanup", "source_discovery", "lead_extraction_grading", "email_reply"]
 AgentRunStatus = Literal["pending", "running", "retrying", "succeeded", "failed", "blocked", "cancelled"]
 
 

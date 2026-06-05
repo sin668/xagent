@@ -1,16 +1,18 @@
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
 from app.graphs.deep_enrichment import DeepEnrichmentGraphRunner, DeepEnrichmentGraphState
+from app.graphs.email_reply import EmailReplyGraphRunner, EmailReplyGraphState
 from app.graphs.lead_cleanup import LeadCleanupGraphRunner, LeadCleanupGraphState
 from app.graphs.lead_extraction_grading import LeadExtractionGradingGraphRunner, LeadExtractionGradingGraphState
 from app.graphs.source_discovery import SourceDiscoveryGraphRunner, SourceDiscoveryGraphState
 from app.schemas.agent_run import AgentRunAudit, AgentRunError, AgentRunRequest, AgentRunResponse
 from app.security import require_internal_api_key
-from app.services.agent_service_runs import AgentServiceRunService
+from app.services.agent_service_runs import AgentRunNotFound, AgentServiceRunService
 
 
 router = APIRouter(
@@ -272,6 +274,74 @@ def run_lead_extraction_grading(
     )
 
 
+@router.post("/email-reply", response_model=AgentRunResponse)
+def run_email_reply(
+    request: AgentRunRequest,
+    session: Session = Depends(get_db_session),
+) -> AgentRunResponse:
+    service = AgentServiceRunService(session)
+    input_payload = dict(request.input)
+    run = service.create_run(
+        request_id=request.request_id,
+        agent_type="email_reply",
+        agent_mode=request.agent_mode,
+        trigger_source=request.trigger_source,
+        input_json=input_payload,
+        max_retries=request.options.max_retries,
+    )
+    service.mark_running(run.id)
+
+    try:
+        graph_result = EmailReplyGraphRunner().run(
+            EmailReplyGraphState(
+                request_id=request.request_id,
+                thread_id=UUID(str(input_payload["thread_id"])),
+                message_id=UUID(str(input_payload["message_id"])),
+                customer_id=UUID(str(input_payload["customer_id"])) if input_payload.get("customer_id") else None,
+                draft_id=UUID(str(input_payload["draft_id"])) if input_payload.get("draft_id") else None,
+                context=dict(input_payload.get("context") or {}),
+                prompt=dict(input_payload.get("prompt") or {}),
+                options={**dict(input_payload.get("options") or {}), "dry_run": request.options.dry_run},
+            )
+        )
+    except Exception as exc:
+        error_type = _classify_email_reply_error(exc)
+        failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
+        return _failed_response(
+            failed,
+            agent_type="email_reply",
+            error_type=error_type,
+            error_message=str(exc),
+        )
+
+    output = graph_result.output.model_dump(mode="json")
+    audit = _response_audit(output.get("audit") or {}, executed_nodes=graph_result.executed_nodes)
+    succeeded = service.mark_succeeded(
+        run.id,
+        output_json=output,
+        output_summary_json=_email_reply_output_summary(output, audit),
+    )
+    succeeded.audit_json = audit
+    session.add(succeeded)
+    session.commit()
+    session.refresh(succeeded)
+
+    return _response_from_run(succeeded, agent_type="email_reply")
+
+
+@router.get("/{run_id}", response_model=AgentRunResponse)
+def get_agent_run(
+    run_id: UUID,
+    session: Session = Depends(get_db_session),
+) -> AgentRunResponse:
+    service = AgentServiceRunService(session)
+    try:
+        run = service.get_run(run_id)
+    except AgentRunNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _response_from_run(run, agent_type=run.agent_type)
+
+
 def _classify_deep_enrichment_error(exc: Exception) -> str:
     message = str(exc)
     if "不允许自动私信" in message or "反爬规避" in message:
@@ -302,6 +372,15 @@ def _classify_lead_extraction_grading_error(exc: Exception) -> str:
     return "schema_validation_error"
 
 
+def _classify_email_reply_error(exc: Exception) -> str:
+    message = str(exc)
+    if "auto-send check" in message or "内部" in message:
+        return "internal_api_error"
+    if "schema_validation" in message:
+        return "schema_validation_error"
+    return "email_reply_agent_error"
+
+
 def _failed_response(
     run,
     *,
@@ -318,6 +397,26 @@ def _failed_response(
         output=None,
         audit=AgentRunAudit(writes_core_tables=False, executed_nodes=[]),
         error=AgentRunError(error_type=error_type, message=error_message, retryable=False),
+    )
+
+
+def _response_from_run(run, *, agent_type: str) -> AgentRunResponse:
+    error = None
+    if run.error_type or run.error_message:
+        error = AgentRunError(
+            error_type=run.error_type or "unknown_error",
+            message=run.error_message or "Unknown agent run error.",
+            retryable=False,
+        )
+    return AgentRunResponse(
+        agent_service_run_id=run.id,
+        request_id=run.request_id,
+        status=run.status,
+        agent_type=agent_type,
+        agent_mode=run.agent_mode,
+        output=run.output_json,
+        audit=AgentRunAudit(**(run.audit_json or {"writes_core_tables": False, "executed_nodes": []})),
+        error=error,
     )
 
 
@@ -380,5 +479,15 @@ def _lead_extraction_grading_output_summary(output: dict[str, Any], audit: dict[
         "extracted_candidate_count": len(extraction.get("candidates") or []),
         "grading_suggestion_count": len(grading.get("suggestions") or []),
         "hard_rules_applied": bool(hard_rule_summary.get("hard_rules_applied")),
+        "risk_flags": list(audit.get("risk_flags") or []),
+    }
+
+
+def _email_reply_output_summary(output: dict[str, Any], audit: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "knowledge_hit_count": len(output.get("knowledge_hits") or []),
+        "route_decision": (output.get("audit") or {}).get("route_decision"),
+        "auto_send_allowed": bool(output.get("auto_send_allowed")),
+        "manual_review_required": bool(output.get("manual_review_required", True)),
         "risk_flags": list(audit.get("risk_flags") or []),
     }
