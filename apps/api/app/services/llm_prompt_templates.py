@@ -3,12 +3,14 @@ from datetime import UTC, datetime
 
 from app.models.enums import LLMPromptTaskType, LLMPromptTemplateStatus
 from app.models.llm_prompt_template import LLMPromptTemplate
+from app.models.review_log import ReviewLog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 
 class LLMPromptTemplateService:
     DRAFT_EDITOR_ROLES = {"admin", "tech_admin"}
+    SCHEMA_EDITOR_ROLES = {"tech_admin"}
     EMAIL_REPLY_RISK_BOUNDARIES = ("不自动发送", "不编造")
 
     def __init__(self, session: Session | None = None) -> None:
@@ -38,6 +40,18 @@ class LLMPromptTemplateService:
             raise ValueError("查询 prompt template 需要传入数据库 session")
         return self.session.get(LLMPromptTemplate, template_id)
 
+    def list_audit_logs(self, template_id) -> list[ReviewLog]:
+        if self.session is None:
+            raise ValueError("查询 prompt 审计日志需要传入数据库 session")
+        return list(
+            self.session.scalars(
+                select(ReviewLog)
+                .where(ReviewLog.task_id == str(template_id))
+                .where(ReviewLog.agent_name == "llm_prompt_governance")
+                .order_by(ReviewLog.created_at.desc(), ReviewLog.id.desc())
+            ).all()
+        )
+
     def create_draft(self, *, actor: str, actor_role: str, payload: dict) -> LLMPromptTemplate:
         if self.session is None:
             raise ValueError("创建 prompt 草稿需要传入数据库 session")
@@ -61,6 +75,8 @@ class LLMPromptTemplateService:
             raise ValueError("Prompt template 不存在")
         if template.status != LLMPromptTemplateStatus.DRAFT:
             raise PermissionError("只能编辑 draft 状态的 Prompt template")
+        if "output_schema_json" in payload and payload.get("output_schema_json") is not None:
+            self.ensure_schema_editor(actor_role)
 
         for field_name, value in payload.items():
             if field_name in {"actor", "actor_role"}:
@@ -136,6 +152,14 @@ class LLMPromptTemplateService:
         template.published_by = actor
         template.published_at = datetime.now(UTC)
         template.change_summary = change_summary
+        self._write_audit_log(
+            template=template,
+            action="prompt_publish",
+            reviewer=actor,
+            result="success",
+            input_ref=change_summary,
+            output_ref=f"status={template.status.value};is_default={template.is_default}",
+        )
         self.session.flush()
         return template
 
@@ -155,6 +179,14 @@ class LLMPromptTemplateService:
         template.published_by = actor
         template.published_at = datetime.now(UTC)
         template.change_summary = change_summary
+        self._write_audit_log(
+            template=template,
+            action="prompt_set_default",
+            reviewer=actor,
+            result="success",
+            input_ref=change_summary,
+            output_ref=f"status={template.status.value};is_default={template.is_default}",
+        )
         self.session.flush()
         return template
 
@@ -200,6 +232,15 @@ class LLMPromptTemplateService:
         )
         self.session.add(rollback_draft)
         self.session.flush()
+        self._write_audit_log(
+            template=current,
+            action="prompt_rollback",
+            reviewer=actor,
+            result="success",
+            input_ref=change_summary,
+            output_ref=f"rollback_draft_id={rollback_draft.id};rollback_to_template_id={target.id}",
+        )
+        self.session.flush()
         return rollback_draft
 
     def _clear_default_active_for_same_scope(self, template: LLMPromptTemplate) -> None:
@@ -223,6 +264,36 @@ class LLMPromptTemplateService:
         role = str(actor_role or "").strip().lower()
         if role not in cls.DRAFT_EDITOR_ROLES:
             raise PermissionError("只有 admin 或 tech_admin 可以创建和编辑 Prompt 草稿")
+
+    @classmethod
+    def ensure_schema_editor(cls, actor_role: str | None) -> None:
+        role = str(actor_role or "").strip().lower()
+        if role not in cls.SCHEMA_EDITOR_ROLES:
+            raise PermissionError("只有 tech_admin 可以编辑 Prompt output_schema_json")
+
+    def _write_audit_log(
+        self,
+        *,
+        template: LLMPromptTemplate,
+        action: str,
+        reviewer: str,
+        result: str,
+        input_ref: str | None,
+        output_ref: str | None,
+    ) -> None:
+        if self.session is None:
+            raise ValueError("写入 prompt 审计日志需要传入数据库 session")
+        self.session.add(
+            ReviewLog(
+                task_id=str(template.id),
+                agent_name="llm_prompt_governance",
+                action=action,
+                reviewer=reviewer,
+                input_ref=input_ref,
+                output_ref=output_ref,
+                result=result,
+            )
+        )
 
     @staticmethod
     def extract_template_variables(template: str) -> list[str]:

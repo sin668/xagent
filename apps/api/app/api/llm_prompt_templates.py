@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import AsyncSessionLocal
 from app.models.enums import LLMPromptTaskType, LLMPromptTemplateStatus
 from app.schemas.llm_prompt_template import (
+    LLMPromptTemplateAuditLogListResponse,
+    LLMPromptTemplateAuditLogResponse,
     LLMPromptTemplateDraftCreate,
     LLMPromptTemplateDraftDetailResponse,
     LLMPromptTemplateDraftUpdate,
@@ -47,6 +49,20 @@ def serialize_draft_detail(template) -> LLMPromptTemplateDraftDetailResponse:
         "validation_status": template.validation_status,
     }
     return response
+
+
+def serialize_audit_log(log) -> LLMPromptTemplateAuditLogResponse:
+    return LLMPromptTemplateAuditLogResponse(
+        id=log.id,
+        template_id=log.task_id,
+        action=log.action,
+        reviewer=log.reviewer,
+        input_ref=log.input_ref,
+        output_ref=log.output_ref,
+        result=log.result,
+        error_message=log.error_message,
+        created_at=log.created_at,
+    )
 
 
 @router.get("", response_model=LLMPromptTemplateListResponse)
@@ -218,6 +234,22 @@ async def rollback_llm_prompt_template(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         sync_session.commit()
         return serialize_draft_detail(template)
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/{template_id:uuid}/audit-logs", response_model=LLMPromptTemplateAuditLogListResponse)
+async def list_llm_prompt_template_audit_logs(
+    template_id: UUID,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> LLMPromptTemplateAuditLogListResponse:
+    def run(sync_session):
+        service = LLMPromptTemplateService(sync_session)
+        template = service.get_template(template_id)
+        if template is None:
+            raise HTTPException(status_code=404, detail="Prompt template 不存在")
+        items = [serialize_audit_log(log) for log in service.list_audit_logs(template_id)]
+        return LLMPromptTemplateAuditLogListResponse(items=items, total=len(items))
 
     return await async_session.run_sync(run)
 

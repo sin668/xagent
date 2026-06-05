@@ -164,3 +164,20 @@ class LLMPromptTemplateListResponse(BaseModel):
 
 class LLMPromptTemplateDraftDetailResponse(LLMPromptTemplateResponse):
     audit_summary: dict = Field(default_factory=dict)
+
+
+class LLMPromptTemplateAuditLogResponse(BaseModel):
+    id: UUID
+    template_id: str | None
+    action: str
+    reviewer: str | None
+    input_ref: str | None
+    output_ref: str | None
+    result: str
+    error_message: str | None
+    created_at: datetime
+
+
+class LLMPromptTemplateAuditLogListResponse(BaseModel):
+    items: list[LLMPromptTemplateAuditLogResponse]
+    total: int
