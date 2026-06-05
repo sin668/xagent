@@ -11,6 +11,7 @@ from app.schemas.dashboard import (
     ChannelLeadDashboardResponse,
     ChannelQualityDashboardResponse,
     EmailDeliveryQualityResponse,
+    EmailReplyQualityResponse,
     Phase5QualityFoundationResponse,
     PhaseOneFunnelDashboardResponse,
     RiskEventDashboardResponse,
@@ -59,6 +60,28 @@ async def get_email_delivery_quality(
     def run(sync_session):
         service = DashboardService(sync_session)
         return EmailDeliveryQualityResponse(**service.email_delivery_quality_metrics())
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/email-reply-quality", response_model=EmailReplyQualityResponse)
+async def get_email_reply_quality(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    language: str | None = Query(default=None),
+    business_scene: str | None = Query(default=None),
+    async_session: AsyncSession = Depends(get_async_session),
+) -> EmailReplyQualityResponse:
+    def run(sync_session):
+        service = DashboardService(sync_session)
+        return EmailReplyQualityResponse(
+            **service.email_reply_quality_metrics(
+                date_from=date_from,
+                date_to=date_to,
+                language=language,
+                business_scene=business_scene,
+            )
+        )
 
     return await async_session.run_sync(run)
 

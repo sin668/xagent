@@ -12,7 +12,10 @@ from app.models import (
     ChannelRiskRule,
     ComplianceReview,
     Customer,
+    EmailMessage,
+    EmailReplyDraft,
     EmailSendAttempt,
+    EmailThread,
     KnowledgeCollection,
     KnowledgeEmbedding,
     KnowledgeItem,
@@ -30,6 +33,7 @@ from app.models.enums import (
     ContactMethodType,
     CustomerGrade,
     CustomerStatus,
+    EmailMessageDirection,
     EmailSendAttemptStatus,
     KnowledgeEmbeddingStatus,
     KnowledgeItemStatus,
@@ -42,6 +46,7 @@ from app.models.enums import (
     StagingReviewStatus,
 )
 from app.services.prompt_file_parser import PromptFileParserService
+from app.services.email_reply_audit import EmailReplyAuditService
 
 
 DISPLAY_NAMES = {
@@ -291,6 +296,114 @@ class DashboardService:
             "bounce_rate": round(bounced_count / total, 4) if total else 0.0,
         }
 
+    def email_reply_quality_metrics(
+        self,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        language: str | None = None,
+        business_scene: str | None = None,
+    ) -> dict[str, object]:
+        start = parse_date_boundary(date_from)
+        end = parse_date_boundary(date_to, end_of_day=True)
+        drafts = list(
+            self.session.scalars(
+                select(EmailReplyDraft).options(
+                    selectinload(EmailReplyDraft.send_attempts),
+                    selectinload(EmailReplyDraft.thread).selectinload(EmailThread.messages),
+                )
+            ).all()
+        )
+        filtered_drafts = [
+            draft
+            for draft in drafts
+            if self._email_reply_draft_matches(
+                draft,
+                start=start,
+                end=end,
+                language=language,
+                business_scene=business_scene,
+            )
+        ]
+        draft_count = len(filtered_drafts)
+        ai_generation_success_count = sum(1 for draft in filtered_drafts if bool(draft.final_body))
+        ai_generation_failed_count = draft_count - ai_generation_success_count
+        manual_review_drafts = [draft for draft in filtered_drafts if draft.manual_review_required]
+        manual_review_count = len(manual_review_drafts)
+        manual_review_with_final = [draft for draft in manual_review_drafts if bool(draft.final_body)]
+        manual_adopted_count = sum(
+            1
+            for draft in manual_review_with_final
+            if not bool(
+                EmailReplyAuditService.calculate_edit_metrics(
+                    ai_subject=draft.ai_suggested_subject,
+                    ai_body=draft.ai_suggested_body,
+                    final_subject=draft.final_subject,
+                    final_body=draft.final_body,
+                )["body_changed"]
+            )
+        )
+        edit_distance_ratios = [
+            1
+            - float(
+                EmailReplyAuditService.calculate_edit_metrics(
+                    ai_subject=draft.ai_suggested_subject,
+                    ai_body=draft.ai_suggested_body,
+                    final_subject=draft.final_subject,
+                    final_body=draft.final_body,
+                )["body_similarity_ratio"]
+            )
+            for draft in manual_review_with_final
+        ]
+        auto_send_candidates = [draft for draft in filtered_drafts if draft.auto_send_allowed]
+        attempts = [attempt for draft in filtered_drafts for attempt in draft.send_attempts]
+        sent_attempts = [attempt for attempt in attempts if attempt.status == EmailSendAttemptStatus.SENT]
+        failed_attempts = [attempt for attempt in attempts if attempt.status == EmailSendAttemptStatus.FAILED]
+        bounced_attempts = [attempt for attempt in attempts if attempt.status == EmailSendAttemptStatus.BOUNCED]
+        sent_drafts = [
+            draft for draft in filtered_drafts if any(attempt.status == EmailSendAttemptStatus.SENT for attempt in draft.send_attempts)
+        ]
+        auto_send_success_count = sum(
+            1
+            for draft in auto_send_candidates
+            if any(attempt.status == EmailSendAttemptStatus.SENT for attempt in draft.send_attempts)
+        )
+        customer_reply_count = sum(1 for draft in sent_drafts if self._draft_has_customer_reply(draft))
+
+        return {
+            "filters": {
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+                "language": language,
+                "business_scene": business_scene,
+            },
+            "draft_count": draft_count,
+            "ai_generation_success_count": ai_generation_success_count,
+            "ai_generation_failed_count": ai_generation_failed_count,
+            "ai_generation_success_rate": ai_generation_success_count / draft_count if draft_count else 0.0,
+            "manual_review_count": manual_review_count,
+            "manual_adopted_count": manual_adopted_count,
+            "manual_adoption_rate": manual_adopted_count / manual_review_count if manual_review_count else 0.0,
+            "average_edit_distance_ratio": (
+                sum(edit_distance_ratios) / len(edit_distance_ratios) if edit_distance_ratios else 0.0
+            ),
+            "auto_send_candidate_count": len(auto_send_candidates),
+            "auto_send_success_count": auto_send_success_count,
+            "auto_send_success_rate": (
+                auto_send_success_count / len(auto_send_candidates)
+                if auto_send_candidates
+                else 0.0
+            ),
+            "send_attempt_count": len(attempts),
+            "sent_count": len(sent_attempts),
+            "failed_count": len(failed_attempts),
+            "bounced_count": len(bounced_attempts),
+            "send_failure_rate": len(failed_attempts) / len(attempts) if attempts else 0.0,
+            "bounce_rate": len(bounced_attempts) / len(attempts) if attempts else 0.0,
+            "customer_reply_count": customer_reply_count,
+            "customer_reply_rate": customer_reply_count / len(sent_drafts) if sent_drafts else 0.0,
+        }
+
     @staticmethod
     def _knowledge_content_type_counts(items: list[KnowledgeItem]) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -298,6 +411,36 @@ class DashboardService:
             content_type = str((item.metadata_json or {}).get("content_type") or "unknown")
             counts[content_type] = counts.get(content_type, 0) + 1
         return counts
+
+    @staticmethod
+    def _email_reply_draft_matches(
+        draft: EmailReplyDraft,
+        *,
+        start: datetime | None,
+        end: datetime | None,
+        language: str | None,
+        business_scene: str | None,
+    ) -> bool:
+        if not within_date_range(draft.created_at, start=start, end=end):
+            return False
+        if language and draft.reply_language != language:
+            return False
+        if business_scene and (draft.auto_send_decision_json or {}).get("business_scene") != business_scene:
+            return False
+        return True
+
+    @staticmethod
+    def _draft_has_customer_reply(draft: EmailReplyDraft) -> bool:
+        sent_times = [attempt.sent_at for attempt in draft.send_attempts if attempt.status == EmailSendAttemptStatus.SENT and attempt.sent_at]
+        if not sent_times or draft.thread is None:
+            return False
+        first_sent_at = min(sent_times)
+        return any(
+            message.direction == EmailMessageDirection.INBOUND
+            and message.id != draft.message_id
+            and message.created_at > first_sent_at
+            for message in draft.thread.messages
+        )
 
     @staticmethod
     def _empty_funnel_bucket(date_label: str | None = None, channel_name: str | None = None, risk_level: str | None = None) -> dict:

@@ -109,6 +109,7 @@ export function buildEmailQualityDashboardView({
   drafts = {},
   riskEvents = {},
   knowledgeQuality = {},
+  emailReplyQuality = {},
 } = {}) {
   const draftItems = Array.isArray(drafts.items) ? drafts.items : [];
   const autoSendDrafts = draftItems.filter((draft) => routeFromDraft(draft) === 'auto_send' || Boolean(draft.auto_send_allowed ?? draft.autoSendAllowed));
@@ -123,13 +124,13 @@ export function buildEmailQualityDashboardView({
   const deGradeBlockedCount = draftItems.filter(isDeGradeBlocked).length;
   const promptCoverageRate = promptCoverage(promptTemplates);
   const embeddingReadyRate = toNumber(embeddingMetrics.ready_rate ?? embeddingMetrics.readyRate);
-  const aiSuccessRate = aiGenerationSuccessRate(aiAudit);
-  const manualAdoptionRate = rate(adoptedManualDrafts.length, successfulDrafts.length);
-  const autoSendSuccessRate = rate(
+  const aiSuccessRate = emailReplyQuality.ai_generation_success_rate ?? emailReplyQuality.aiGenerationSuccessRate ?? aiGenerationSuccessRate(aiAudit);
+  const manualAdoptionRate = emailReplyQuality.manual_adoption_rate ?? emailReplyQuality.manualAdoptionRate ?? rate(adoptedManualDrafts.length, successfulDrafts.length);
+  const autoSendSuccessRate = emailReplyQuality.auto_send_success_rate ?? emailReplyQuality.autoSendSuccessRate ?? rate(
     autoSendDrafts.filter((draft) => sendAttempts(draft).some((attempt) => attempt.status === 'sent')).length,
     autoSendDrafts.length,
   );
-  const bounceRate = rate(bouncedAttempts.length, sentAttempts.length);
+  const bounceRate = emailReplyQuality.bounce_rate ?? emailReplyQuality.bounceRate ?? rate(bouncedAttempts.length, sentAttempts.length);
   const hardRiskClear = openRiskCount === 0;
   const qualityReady = promptCoverageRate >= 1 && embeddingReadyRate >= 0.95 && aiSuccessRate >= 0.9 && bounceRate <= 0.02;
   const goCandidate = hardRiskClear && qualityReady;
@@ -159,7 +160,7 @@ export function buildEmailQualityDashboardView({
       dncBlockedCount,
       deGradeBlockedCount,
       riskEventCount: openRiskCount,
-      bounceCount: bouncedAttempts.length,
+      bounceCount: toNumber(emailReplyQuality.bounced_count ?? emailReplyQuality.bouncedCount ?? bouncedAttempts.length),
       statusLabel: hardRiskClear ? '硬风险门禁通过' : '需暂停自动发送',
       statusClass: hardRiskClear ? 'green' : 'red',
       riskEvents: riskEvents.items || [],
@@ -190,8 +191,9 @@ export async function fetchEmailQualityDashboard({
     throw new Error('fetcher is required to load email quality dashboard');
   }
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-  const [qualityFoundationResponse, promptResponse, embeddingResponse, aiAuditResponse, draftsResponse, riskEventsResponse] = await Promise.all([
+  const [qualityFoundationResponse, emailReplyQualityResponse, promptResponse, embeddingResponse, aiAuditResponse, draftsResponse, riskEventsResponse] = await Promise.all([
     fetcher(`${normalizedBaseUrl}/dashboard/phase5-quality-foundation`),
+    fetcher(`${normalizedBaseUrl}/dashboard/email-reply-quality`),
     fetcher(`${normalizedBaseUrl}/llm-prompt-templates`),
     fetcher(`${normalizedBaseUrl}/knowledge/embeddings/metrics`),
     fetcher(`${normalizedBaseUrl}/sync/audit-dashboard`),
@@ -200,6 +202,7 @@ export async function fetchEmailQualityDashboard({
   ]);
   return {
     qualityFoundation: await parseJsonResponse(qualityFoundationResponse, 'Failed to load phase5 quality foundation metrics'),
+    emailReplyQuality: await parseJsonResponse(emailReplyQualityResponse, 'Failed to load email reply quality metrics'),
     promptTemplates: await parseJsonResponse(promptResponse, 'Failed to load prompt templates'),
     embeddingMetrics: await parseJsonResponse(embeddingResponse, 'Failed to load embedding metrics'),
     aiAudit: await parseJsonResponse(aiAuditResponse, 'Failed to load AI audit metrics'),

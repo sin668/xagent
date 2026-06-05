@@ -325,6 +325,36 @@ class EmailDeliveryQualityResponse(BaseModel):
     bounce_rate: float
 
 
+class EmailReplyQualityFilters(BaseModel):
+    date_from: str | None = None
+    date_to: str | None = None
+    language: str | None = None
+    business_scene: str | None = None
+
+
+class EmailReplyQualityResponse(BaseModel):
+    filters: EmailReplyQualityFilters
+    draft_count: int
+    ai_generation_success_count: int
+    ai_generation_failed_count: int
+    ai_generation_success_rate: float
+    manual_review_count: int
+    manual_adopted_count: int
+    manual_adoption_rate: float
+    average_edit_distance_ratio: float
+    auto_send_candidate_count: int
+    auto_send_success_count: int
+    auto_send_success_rate: float
+    send_attempt_count: int
+    sent_count: int
+    failed_count: int
+    bounced_count: int
+    send_failure_rate: float
+    bounce_rate: float
+    customer_reply_count: int
+    customer_reply_rate: float
+
+
 class Phase5PromptMetrics(BaseModel):
     expected_prompt_file_count: int
     covered_prompt_file_count: int

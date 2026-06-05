@@ -84,6 +84,14 @@ const draftsPayload = {
   ],
 };
 
+const emailReplyQualityPayload = {
+  ai_generation_success_rate: 0.91,
+  manual_adoption_rate: 0.42,
+  auto_send_success_rate: 0.73,
+  bounce_rate: 0.015,
+  bounced_count: 2,
+};
+
 const riskEventsPayload = {
   summary: {
     total_count: 1,
@@ -162,6 +170,7 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
           }),
         };
       }
+      if (url.endsWith('/dashboard/email-reply-quality')) return { ok: true, json: async () => emailReplyQualityPayload };
       if (url.endsWith('/llm-prompt-templates')) return { ok: true, json: async () => promptTemplatesPayload };
       if (url.endsWith('/knowledge/embeddings/metrics')) return { ok: true, json: async () => embeddingMetricsPayload };
       if (url.endsWith('/sync/audit-dashboard')) return { ok: true, json: async () => aiAuditPayload };
@@ -173,6 +182,7 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
 
   assert.deepEqual(requestedUrls, [
     'https://api.example.test/dashboard/phase5-quality-foundation',
+    'https://api.example.test/dashboard/email-reply-quality',
     'https://api.example.test/llm-prompt-templates',
     'https://api.example.test/knowledge/embeddings/metrics',
     'https://api.example.test/sync/audit-dashboard',
@@ -180,6 +190,7 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
     'https://api.example.test/dashboard/risk-events',
   ]);
   assert.equal(payload.qualityFoundation.prompt_metrics.prompt_coverage_rate, 1);
+  assert.equal(payload.emailReplyQuality.ai_generation_success_rate, 0.91);
   assert.equal(payload.embeddingMetrics.ready_rate, 0.96);
   assert.equal(payload.riskEvents.items.length, 1);
 });
