@@ -257,6 +257,7 @@ body {
 .prompt-governance-card,
 .knowledge-governance-card,
 .email-reply-card,
+.email-quality-card,
 .llm-card {
   margin-top: 18px;
 }
@@ -752,6 +753,98 @@ body {
 
 .email-action-list strong {
   font-size: 13px;
+}
+
+.email-quality-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.email-quality-summary article {
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.email-quality-summary strong {
+  display: block;
+  font-size: 24px;
+}
+
+.email-quality-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.email-quality-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.quality-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-tile-grid article,
+.quality-risk-list article,
+.quality-flow-board article {
+  padding: 13px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.quality-tile-grid strong {
+  display: block;
+  font-size: 22px;
+}
+
+.quality-tile-grid span,
+.quality-risk-list span {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.quality-risk-list {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-risk-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.quality-risk-list strong {
+  font-size: 13px;
+}
+
+.quality-flow-card {
+  margin-top: 16px;
+}
+
+.quality-flow-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-flow-board strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
 }
 
 .fallback-list {

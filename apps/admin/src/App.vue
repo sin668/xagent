@@ -14,6 +14,7 @@
         <a href="#prompt-governance">Prompt 治理</a>
         <a href="#knowledge-governance">知识库</a>
         <a href="#email-reply-review">邮件审核</a>
+        <a href="#email-quality">质量指标</a>
         <a href="#llm-governance">LLM 治理</a>
       </nav>
     </aside>
@@ -731,6 +732,98 @@
         </div>
       </section>
 
+      <section id="email-quality" class="admin-card email-quality-card">
+        <div class="card-head">
+          <div>
+            <h3>第五阶段 Go/No-Go 质量看板</h3>
+            <span>同时观察 Prompt、embedding、Agent、风险和业务结果；任一硬风险触发即暂停自动发送</span>
+          </div>
+          <span :class="['tag', emailQualityDashboard.goNoGo.statusClass]">{{ emailQualityDashboard.goNoGo.statusLabel }}</span>
+        </div>
+
+        <p v-if="emailQualityError" class="guardrail">{{ emailQualityError }}</p>
+
+        <div class="email-quality-summary">
+          <article>
+            <strong>{{ emailQualityDashboard.summary.promptCoverageText }}</strong>
+            <span>Prompt 入库覆盖</span>
+          </article>
+          <article>
+            <strong>{{ emailQualityDashboard.summary.embeddingReadyText }}</strong>
+            <span>embedding ready</span>
+          </article>
+          <article>
+            <strong>{{ emailQualityDashboard.summary.aiGenerationSuccessText }}</strong>
+            <span>AI 生成成功</span>
+          </article>
+          <article>
+            <strong>{{ emailQualityDashboard.summary.manualAdoptionText }}</strong>
+            <span>人工采纳率</span>
+          </article>
+        </div>
+
+        <div class="email-quality-grid">
+          <section>
+            <div class="card-head compact-head">
+              <h4>邮件业务指标</h4>
+              <span>发送成功与退信来自真实邮件发送尝试</span>
+            </div>
+            <div class="quality-tile-grid">
+              <article>
+                <strong>{{ emailQualityDashboard.summary.autoSendSuccessText }}</strong>
+                <span>自动发送成功率</span>
+              </article>
+              <article>
+                <strong>{{ emailQualityDashboard.summary.bounceRateText }}</strong>
+                <span>退信率</span>
+              </article>
+              <article>
+                <strong>{{ emailQualityDashboard.riskGate.dncBlockedCount }}</strong>
+                <span>DNC 阻断</span>
+              </article>
+              <article>
+                <strong>{{ emailQualityDashboard.riskGate.deGradeBlockedCount }}</strong>
+                <span>D/E 阻断</span>
+              </article>
+            </div>
+          </section>
+
+          <section>
+            <div class="card-head compact-head">
+              <h4>硬风险门禁</h4>
+              <span :class="['tag', emailQualityDashboard.riskGate.statusClass]">{{ emailQualityDashboard.riskGate.statusLabel }}</span>
+            </div>
+            <div class="quality-risk-list">
+              <article>
+                <strong>风险事件</strong>
+                <span>{{ emailQualityDashboard.riskGate.riskEventCount }}</span>
+              </article>
+              <article>
+                <strong>退信数量</strong>
+                <span>{{ emailQualityDashboard.riskGate.bounceCount }}</span>
+              </article>
+              <article>
+                <strong>Go/No-Go 原因</strong>
+                <span>{{ emailQualityReasonsText }}</span>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <section class="quality-flow-card">
+          <div class="card-head compact-head">
+            <h4>Go / 重跑 / 暂停判断</h4>
+            <span :class="['tag', emailQualityDashboard.goNoGo.statusClass]">{{ emailQualityDashboard.goNoGo.statusLabel }}</span>
+          </div>
+          <div class="quality-flow-board">
+            <article v-for="node in emailQualityDashboard.flowNodes" :key="node.title">
+              <strong>{{ node.title }}</strong>
+              <span :class="['tag', node.className]">{{ node.metricText }}</span>
+            </article>
+          </div>
+        </section>
+      </section>
+
       <section id="llm-governance" class="admin-card llm-card">
         <div class="card-head">
           <div>
@@ -840,6 +933,7 @@ import { channelRiskConfigSeed } from './data/channelRiskConfigSeed.js';
 import { syncAiAuditSeed } from './data/syncAiAuditSeed.js';
 import { buildAdminOverviewView } from './services/adminOverview.js';
 import { buildChannelRiskConfigView } from './services/channelRiskConfig.js';
+import { buildEmailQualityDashboardView, fetchEmailQualityDashboard } from './services/emailQualityDashboard.js';
 import { buildEmailReplyReviewView, fetchEmailReplyReview } from './services/emailReplyReview.js';
 import { buildKnowledgeGovernanceView, fetchKnowledgeGovernance } from './services/knowledgeGovernance.js';
 import { buildLlmGovernanceView, buildPromptGovernanceView, fetchLlmGovernance, fetchPromptGovernance } from './services/llmGovernance.js';
@@ -868,6 +962,9 @@ const knowledgeGovernanceError = ref('');
 const emailReplyReviewPayload = ref(null);
 const emailReplyReviewLoading = ref(true);
 const emailReplyReviewError = ref('');
+const emailQualityPayload = ref(null);
+const emailQualityLoading = ref(true);
+const emailQualityError = ref('');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
 const adminActorRole = import.meta.env.VITE_ADMIN_ACTOR_ROLE || 'operator';
 
@@ -913,6 +1010,11 @@ const emailReplyContextText = computed(() => JSON.stringify({
   inbound: emailReplyReview.value.selectedDraft.inbound,
   ai_suggestion: emailReplyReview.value.selectedDraft.aiSuggestion,
 }, null, 2));
+const emailQualityDashboard = computed(() => buildEmailQualityDashboardView(emailQualityPayload.value || {}));
+const emailQualityReasonsText = computed(() => {
+  const reasons = emailQualityDashboard.value.goNoGo.reasons;
+  return reasons.length > 0 ? reasons.join(' / ') : '暂无暂停或重跑原因';
+});
 const phase2PauseThresholds = computed(() => Object.values(phase2.value.pauseThresholds));
 const phase2StatusText = computed(() => {
   if (phase2Loading.value) return '加载中';
@@ -953,6 +1055,7 @@ onMounted(async () => {
     promptGovernanceResult,
     knowledgeGovernanceResult,
     emailReplyReviewResult,
+    emailQualityResult,
     llmGovernanceResult,
   ] = await Promise.allSettled([
     fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
@@ -960,6 +1063,7 @@ onMounted(async () => {
     fetchPromptGovernance({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchKnowledgeGovernance({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchEmailReplyReview({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
+    fetchEmailQualityDashboard({ baseUrl: apiBaseUrl }),
     fetchLlmGovernance({ baseUrl: apiBaseUrl }),
   ]);
 
@@ -993,6 +1097,12 @@ onMounted(async () => {
     emailReplyReviewError.value = `无法加载邮件回复审核真实 API：${emailReplyReviewResult.reason.message}`;
   }
 
+  if (emailQualityResult.status === 'fulfilled') {
+    emailQualityPayload.value = emailQualityResult.value;
+  } else {
+    emailQualityError.value = `无法加载第五阶段质量指标真实 API：${emailQualityResult.reason.message}`;
+  }
+
   if (llmGovernanceResult.status === 'fulfilled') {
     llmGovernancePayload.value = llmGovernanceResult.value;
   } else {
@@ -1004,6 +1114,7 @@ onMounted(async () => {
   promptGovernanceLoading.value = false;
   knowledgeGovernanceLoading.value = false;
   emailReplyReviewLoading.value = false;
+  emailQualityLoading.value = false;
   llmLoading.value = false;
 });
 </script>

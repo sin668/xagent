@@ -1,8 +1,8 @@
 # Story P5-E5-S4：apps/admin 邮件质量指标页面
 
-状态：未开始  
-Sprint：Sprint 5  
-优先级：P1  
+状态：已完成
+Sprint：Sprint 5
+优先级：P1
 Epic：P5-E5（apps/admin 后台管理页面）
 
 ## 用户故事
@@ -69,3 +69,38 @@ Epic：P5-E5（apps/admin 后台管理页面）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## TDD 执行记录
+
+### 红灯
+
+- 新增测试：`apps/admin/tests/emailQualityDashboard.test.mjs`。
+- 红灯命令：`npm --prefix apps/admin test`。
+- 红灯结果：测试首次运行失败，原因是 `apps/admin/src/services/emailQualityDashboard.js` 模块不存在，证明测试覆盖的是本 Story 新增能力。
+
+### 绿灯
+
+- 新增 `apps/admin/src/services/emailQualityDashboard.js`，聚合真实 API 返回的 Prompt、embedding、AI 审计、邮件草稿和风险事件数据。
+- 更新 `apps/admin/src/App.vue`，新增「质量指标」导航和第五阶段 Go/No-Go 质量看板。
+- 更新 `apps/admin/src/styles/admin.css`，补齐质量指标卡片、硬风险门禁、业务指标和流程节点样式。
+- 更新 `apps/admin/package.json`，将 `emailQualityDashboard.js` 纳入语法检查。
+
+## 验收记录
+
+- `npm --prefix apps/admin test`：40 项测试通过。
+- `npm --prefix apps/admin run check:syntax`：通过。
+- `npm --prefix apps/admin run build`：通过。
+
+## 两轮独立多维度评审
+
+### 第一轮评审
+
+- 结论：功能范围符合 P5-E5-S4，页面已展示 Prompt 覆盖率、embedding ready、AI 生成成功率、人工采纳率、自动发送成功率、退信率、DNC/D/E 阻断和风险事件。
+- 发现项：人工采纳率和发送成功率不能只依赖草稿 `status` 字段，否则会把 `status=sent` 但 `send_attempts=bounced` 的草稿误判为成功。
+- 修正结果：服务层按真实 `send_attempts` 计算发送成功、退信和人工采纳率；测试用例覆盖了「草稿状态为 sent 但发送尝试退信」场景，当前口径保持正确。
+
+### 第二轮评审
+
+- 结论：以真实 API 契约为边界，`fetchEmailQualityDashboard` 调用 `/llm-prompt-templates`、`/knowledge/embeddings/metrics`、`/sync/audit-dashboard`、`/email-reply/drafts?limit=500`、`/dashboard/risk-events`，未引入 seed 静态验收。
+- 发现项：硬风险门禁需要优先于普通质量不足；存在未关闭风险事件时应直接显示「暂停」，而不是仅显示「重跑 PoC」。
+- 修正结果：Go/No-Go 逻辑已将未关闭风险事件作为硬门禁；有风险事件时显示「暂停」，无硬风险但质量不足时显示「重跑 PoC」，两轮复核未发现新的实质阻塞问题。
