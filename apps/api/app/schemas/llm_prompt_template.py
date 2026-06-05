@@ -91,6 +91,24 @@ class LLMPromptTemplateDraftUpdate(BaseModel):
     validation_errors_json: dict | None = None
 
 
+class LLMPromptTemplateValidationPreviewRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    sample_variables: dict[str, object] = Field(default_factory=dict)
+
+
+class LLMPromptTemplateValidationPreviewResponse(BaseModel):
+    template_id: UUID
+    passed: bool
+    validation_status: str
+    errors: dict
+    warnings: list[str]
+    required_variables: list[str]
+    missing_variables: list[str]
+    rendered_user_prompt: str
+    would_publish: bool = False
+
+
 class LLMPromptTemplateResponse(BaseModel):
     id: UUID
     name: str

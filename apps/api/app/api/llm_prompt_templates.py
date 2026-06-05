@@ -12,6 +12,8 @@ from app.schemas.llm_prompt_template import (
     LLMPromptTemplateDraftUpdate,
     LLMPromptTemplateListResponse,
     LLMPromptTemplateResponse,
+    LLMPromptTemplateValidationPreviewRequest,
+    LLMPromptTemplateValidationPreviewResponse,
 )
 from app.services.llm_prompt_templates import LLMPromptTemplateService
 
@@ -113,6 +115,30 @@ async def update_llm_prompt_template_draft(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         sync_session.commit()
         return serialize_draft_detail(template)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/drafts/{template_id:uuid}/validation-preview", response_model=LLMPromptTemplateValidationPreviewResponse)
+async def validate_llm_prompt_template_draft(
+    template_id: UUID,
+    request: LLMPromptTemplateValidationPreviewRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> LLMPromptTemplateValidationPreviewResponse:
+    def run(sync_session):
+        service = LLMPromptTemplateService(sync_session)
+        try:
+            result = service.validate_draft_preview(
+                template_id,
+                actor_role=request.actor_role,
+                sample_variables=request.sample_variables,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=409 if "draft" in str(exc) else 403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return LLMPromptTemplateValidationPreviewResponse(**result)
 
     return await async_session.run_sync(run)
 

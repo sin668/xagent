@@ -69,3 +69,124 @@ Epic：P5-E2（Prompt 入库治理）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 执行记录
+
+执行日期：2026-06-05
+执行分支：`codex/phase-5-small-run`
+执行目录：`.worktrees/phase-5-small-run`
+执行方式：按 `docs/superpowers/plans/2026-06-05-海外车辆采购AI获客系统-第五阶段小范围运行Codex推进计划.md` 执行当前 Story。
+
+### TDD 记录
+
+红灯：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_validation_preview_api.py -q
+```
+
+结果：失败，失败原因为当前 Story 缺失校验预览 API：
+
+```text
+POST /llm-prompt-templates/drafts/{template_id}/validation-preview 返回 404
+```
+
+绿灯：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_validation_preview_api.py -q
+```
+
+结果：`4 passed in 6.93s`。
+
+相关回归：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_validation_preview_api.py tests/test_phase5_prompt_draft_edit_api.py tests/test_llm_prompt_templates_api.py tests/test_llm_prompt_template_model.py tests/test_phase5_prompt_import_service.py tests/test_phase5_prompt_file_parser.py tests/test_phase5_prompt_template_governance.py -q
+```
+
+结果：`30 passed, 1 warning in 16.73s`。
+
+说明：warning 为既有知识库双路由兼容造成的 FastAPI duplicate operation ID warning，与本 Story 的 Prompt 校验预览 API 无直接关系。
+
+### 实现摘要
+
+- 新增 `LLMPromptTemplateValidationPreviewRequest`。
+- 新增 `LLMPromptTemplateValidationPreviewResponse`。
+- 新增 `LLMPromptTemplateService.validate_draft_preview()`。
+- 新增 API：
+  - `POST /llm-prompt-templates/drafts/{template_id}/validation-preview`
+- 校验内容：
+  - 从 `user_prompt_template` 提取 `{{variable}}` 必填变量。
+  - 校验 `sample_variables` 是否覆盖全部必填变量。
+  - 校验 `output_schema_json` 是包含 `type` 的 JSON Schema object。
+  - 校验任务类型合法。
+  - `EMAIL_REPLY_*` Prompt 必须包含风险边界关键词：`不自动发送`、`不编造`。
+- 校验预览会渲染测试样例中的 user prompt，返回 `rendered_user_prompt`。
+- 校验结果会回写草稿：
+  - 通过：`validation_status = validation_passed`，`validation_errors_json = null`
+  - 失败：`validation_status = validation_failed`，`validation_errors_json = errors`
+- `would_publish` 固定为 `false`，本 Story 不执行发布。
+- 权限边界沿用草稿治理：
+  - `admin` / `tech_admin` 可校验。
+  - 其他角色返回 403。
+
+### 真实 PostgreSQL / API 验证
+
+测试通过 FastAPI `TestClient` 调用真实 API，并通过 `AsyncSessionLocal` 连接真实 PostgreSQL 创建和清理测试数据。
+
+验证覆盖：
+
+- 合法 EMAIL_REPLY Prompt 校验通过并回写 `validation_passed`。
+- 缺少必填变量时校验失败，不发布，草稿仍为 `draft`。
+- EMAIL_REPLY Prompt 缺少风险边界时校验失败。
+- `customer_service` 角色校验返回 403。
+
+真实库残留检查：
+
+```text
+leftover_phase5_validation_api_rows=0
+```
+
+## 两轮独立评审记录
+
+### 第一轮评审：需求覆盖、校验逻辑、API 行为和回归范围
+
+结论：
+
+- 通过。当前实现只覆盖 P5-E2-S4，未实现发布、回滚或默认版本切换。
+- 通过。校验必填变量、JSON Schema 基本结构和任务类型。
+- 通过。EMAIL_REPLY Prompt 必须包含输出契约和风险边界。
+- 通过。校验失败不会发布，`would_publish=false`，草稿状态保持 `draft`。
+- 通过。校验结果回写 `validation_status` 和 `validation_errors_json`，便于后台展示。
+
+发现项：
+
+- 当前 JSON Schema 校验为基础结构校验，未引入完整 JSON Schema validator；后续可在校验增强 Story 中升级。
+- 新增测试文件位于 `apps/api/tests/`，仓库 `.gitignore` 会忽略 `tests/`，提交时需要使用 `git add -f` 纳入。
+
+修正结果：
+
+- 保持本 Story 范围为发布前预览校验，不混入发布逻辑。
+- 提交时强制纳入新增测试文件。
+
+### 第二轮评审：架构边界、风控和可执行性
+
+结论：
+
+- 通过。`apps/api` 仍是业务数据权威，校验预览由 API service 控制。
+- 通过。本 Story 未新增任何 LLM 调用、自动触达、自动发送或社交平台动作。
+- 通过。`apps/agents` 未直接写业务 core 表。
+- 通过。EMAIL_REPLY 风险边界校验强化了“不自动发送、不编造”的发布前约束。
+- 通过。Prompt 相关测试 `30 passed`，未发现新增阻塞回归。
+
+发现项：
+
+- 未发现新增实质阻塞问题。
+
+修正结果：
+
+- 无需修正。
