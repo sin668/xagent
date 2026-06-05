@@ -32,3 +32,4 @@ class OutreachRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     customer = relationship("Customer", back_populates="outreach_records")
+    email_send_attempts = relationship("EmailSendAttempt", back_populates="outreach_record")

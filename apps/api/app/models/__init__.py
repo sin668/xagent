@@ -12,6 +12,7 @@ from app.models.customer_followup import CustomerFollowup
 from app.models.customer_vehicle_intent import CustomerVehicleIntent
 from app.models.email_message import EmailMessage
 from app.models.email_reply_draft import EmailReplyDraft
+from app.models.email_send_attempt import EmailSendAttempt
 from app.models.email_thread import EmailThread
 from app.models.enums import (
     AITaskType,
@@ -32,6 +33,7 @@ from app.models.enums import (
     CustomerVehicleIntentStatus,
     EmailMessageDirection,
     EmailReplyDraftStatus,
+    EmailSendAttemptStatus,
     EmailMessageSourceType,
     EmailMessageStatus,
     EmailThreadStatus,
@@ -113,6 +115,8 @@ __all__ = [
     "EmailMessageDirection",
     "EmailReplyDraft",
     "EmailReplyDraftStatus",
+    "EmailSendAttempt",
+    "EmailSendAttemptStatus",
     "EmailMessageSourceType",
     "EmailMessageStatus",
     "EmailThread",

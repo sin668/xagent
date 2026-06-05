@@ -73,3 +73,4 @@ class EmailReplyDraft(Base):
     agent_task_run = relationship("AgentTaskRun")
     prompt_template = relationship("LLMPromptTemplate")
     sent_record = relationship("OutreachRecord")
+    send_attempts = relationship("EmailSendAttempt", back_populates="reply_draft")

@@ -69,3 +69,162 @@ Epic：P5-E1（数据底座）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 执行记录
+
+执行日期：2026-06-05
+执行分支：`codex/phase-5-small-run`
+执行目录：`.worktrees/phase-5-small-run`
+执行方式：按 `docs/superpowers/plans/2026-06-05-海外车辆采购AI获客系统-第五阶段小范围运行Codex推进计划.md` 执行当前 Story。
+
+### TDD 记录
+
+红灯：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_send_attempt_model.py -q
+```
+
+结果：失败，失败原因为当前 Story 缺失能力：
+
+```text
+ImportError: cannot import name 'EmailSendAttemptStatus' from 'app.models.enums'
+```
+
+绿灯：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_send_attempt_model.py -q
+```
+
+结果：`3 passed in 0.36s`。
+
+相关回归：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_send_attempt_model.py tests/test_phase5_email_reply_draft_model.py tests/test_phase5_email_thread_message_model.py tests/test_phase5_prompt_template_governance.py -q
+```
+
+结果：`12 passed in 0.37s`。
+
+### 实现摘要
+
+- 新增 `EmailSendAttemptStatus` 枚举，支持：
+  - `pending`
+  - `sending`
+  - `sent`
+  - `failed`
+  - `retry_pending`
+  - `bounced`
+  - `blocked`
+- 新增模型 `EmailSendAttempt`，落表 `email_send_attempts`。
+- 字段覆盖：
+  - 关联关系：`reply_draft_id`、`outreach_record_id`
+  - 服务商审计：`provider`、`provider_message_id`
+  - 收发件人快照：`from_email`、`to_emails`、`cc_emails`、`bcc_emails`
+  - 内容快照：`subject_snapshot`、`body_text_snapshot`、`body_html_snapshot`
+  - 发送状态与重试：`status`、`attempt_count`
+  - 失败和退信：`error_code`、`error_message`、`bounce_reason`
+  - 时间审计：`sent_at`、`created_at`、`updated_at`
+- 更新 ORM 关系：
+  - `EmailReplyDraft.send_attempts`
+  - `OutreachRecord.email_send_attempts`
+- 新增 migration：`apps/api/alembic/versions/20260605_0032_create_email_send_attempts.py`。
+- 未实现邮件服务商发送、发送 API、退信回调处理或自动发送准入；这些属于后续 Story。
+
+### 真实 PostgreSQL migration 验证
+
+当前真实数据库：
+
+```text
+postgresql+asyncpg://postgres:***@8.129.17.71:5432/xagent
+```
+
+升级：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m alembic current
+/opt/miniconda3/envs/booking-room/bin/python -m alembic upgrade head
+/opt/miniconda3/envs/booking-room/bin/python -m alembic current
+```
+
+结果：
+
+```text
+20260605_0031
+Running upgrade 20260605_0031 -> 20260605_0032, Create email send attempts.
+20260605_0032 (head)
+```
+
+回滚与再升级：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m alembic downgrade 20260605_0031
+/opt/miniconda3/envs/booking-room/bin/python -m alembic current
+/opt/miniconda3/envs/booking-room/bin/python -m alembic upgrade head
+/opt/miniconda3/envs/booking-room/bin/python -m alembic current
+```
+
+结果：
+
+```text
+Running downgrade 20260605_0032 -> 20260605_0031, Create email send attempts.
+20260605_0031
+Running upgrade 20260605_0031 -> 20260605_0032, Create email send attempts.
+20260605_0032 (head)
+```
+
+数据库 introspection 结果：
+
+```text
+columns= 20
+['id', 'reply_draft_id', 'outreach_record_id', 'provider', 'provider_message_id', 'from_email', 'to_emails', 'cc_emails', 'bcc_emails', 'subject_snapshot', 'body_text_snapshot', 'body_html_snapshot', 'status', 'attempt_count', 'error_code', 'error_message', 'bounce_reason', 'sent_at', 'created_at', 'updated_at']
+enum_values= ['pending', 'sending', 'sent', 'failed', 'retry_pending', 'bounced', 'blocked']
+foreign_keys= [('email_send_attempts_outreach_record_id_fkey', 'outreach_records'), ('email_send_attempts_reply_draft_id_fkey', 'email_reply_drafts')]
+indexes= ['email_send_attempts_pkey', 'ix_email_send_attempts_error_code', 'ix_email_send_attempts_from_email', 'ix_email_send_attempts_outreach_record_id', 'ix_email_send_attempts_provider', 'ix_email_send_attempts_provider_message_id', 'ix_email_send_attempts_reply_draft_id', 'ix_email_send_attempts_sent_at', 'ix_email_send_attempts_status']
+```
+
+## 两轮独立评审记录
+
+### 第一轮评审：需求覆盖、数据模型、migration 与回归范围
+
+结论：
+
+- 通过。当前实现只覆盖 P5-E1-S4，未实现邮件真实发送、服务商适配、发送 API、退信回调或自动发送规则。
+- 通过。`email_send_attempts` 已记录 provider、from/to、subject/body 快照、status、attempt_count、provider_message_id、error_message、sent_at。
+- 通过。可关联 `email_reply_drafts` 和 `outreach_records`。
+- 通过。失败、重试、退信、拦截状态已进入枚举，`status`、`error_code`、`provider_message_id`、`sent_at` 已建索引，支持后续查询与统计。
+- 通过。migration 已在真实 PostgreSQL 上完成升级、回滚和再升级验证。
+
+发现项：
+
+- 新增测试文件位于 `apps/api/tests/`，仓库 `.gitignore` 会忽略 `tests/`，提交时需要使用 `git add -f` 纳入。
+- 当前 Story 只建数据底座，不会触发任何真实邮件发送。
+
+修正结果：
+
+- 保留新增测试文件，提交时强制纳入版本控制。
+- 邮件发送和退信处理能力留给后续 Story，不混入当前 Story。
+
+### 第二轮评审：架构边界、风控和可执行性
+
+结论：
+
+- 通过。`apps/api` 仍是业务数据权威，本 Story 未让 `apps/agents` 直接写业务 core 表。
+- 通过。本 Story 未新增任何自动触达、自动发送、邮箱发送动作或社交平台动作。
+- 通过。发送尝试表只记录审计快照和状态，不代表可绕过后续硬拦截服务。
+- 通过。`reply_draft_id` 和 `outreach_record_id` 使用 `SET NULL`，兼容审计记录保留和上游记录删除/归档场景。
+- 通过。未发现与 P5-E1-S1/P5-E1-S2/P5-E1-S3 的回归冲突，相关测试 `12 passed`。
+
+发现项：
+
+- 未发现新增实质阻塞问题。
+
+修正结果：
+
+- 无需修正。

@@ -184,6 +184,16 @@ class EmailReplyDraftStatus(StrEnum):
     FAILED = "failed"
 
 
+class EmailSendAttemptStatus(StrEnum):
+    PENDING = "pending"
+    SENDING = "sending"
+    SENT = "sent"
+    FAILED = "failed"
+    RETRY_PENDING = "retry_pending"
+    BOUNCED = "bounced"
+    BLOCKED = "blocked"
+
+
 class AITaskType(StrEnum):
     LEAD_EXTRACTION = "lead_extraction"
     LEAD_GRADING = "lead_grading"
