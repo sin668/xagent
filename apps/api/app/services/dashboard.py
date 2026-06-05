@@ -108,6 +108,45 @@ RISK_EVENT_STATUS_ORDER = {
     "resolved": 2,
     "dismissed": 3,
 }
+PHASE5_GO_NO_GO_THRESHOLDS = {
+    "prompt_coverage_rate": 1.0,
+    "embedding_ready_rate": 0.95,
+    "ai_generation_success_rate": 0.9,
+    "manual_adoption_rate": 0.5,
+    "hard_block_accuracy_rate": 1.0,
+    "dnc_no_auto_send_rate": 1.0,
+    "de_grade_no_auto_send_rate": 1.0,
+    "knowledge_guardrail_no_auto_send_rate": 1.0,
+    "complaint_block_violation_count": 0,
+}
+PHASE5_DATA_SOURCES = [
+    "llm_prompt_templates",
+    "knowledge_items",
+    "knowledge_embeddings",
+    "email_reply_drafts",
+    "email_send_attempts",
+    "risk_events",
+]
+PHASE5_DNC_BLOCK_CODES = {"customer_do_not_contact"}
+PHASE5_DE_GRADE_BLOCK_CODES = {"customer_de_grade"}
+PHASE5_KNOWLEDGE_BLOCK_CODES = {
+    "reply_language_uncertain",
+    "missing_same_language_knowledge",
+    "missing_knowledge_evidence",
+    "knowledge_retrieval_uncertain",
+}
+PHASE5_PAUSE_EVENT_TYPES = {
+    "complaint",
+    "blocked_account",
+    "ban",
+    "violation",
+    "dnc_misfire",
+    "de_grade_misfire",
+    "hard_block_misfire",
+    "language_misfire",
+    "missing_knowledge_auto_send",
+    "sensitive_commitment",
+}
 
 
 @dataclass
@@ -163,6 +202,16 @@ def record_day(value: datetime) -> str:
 
 
 def within_date_range(value: datetime, *, start: datetime | None, end: datetime | None) -> bool:
+    if value.tzinfo is not None:
+        if start is not None and start.tzinfo is None:
+            start = start.replace(tzinfo=value.tzinfo)
+        if end is not None and end.tzinfo is None:
+            end = end.replace(tzinfo=value.tzinfo)
+    elif value.tzinfo is None:
+        if start is not None and start.tzinfo is not None:
+            start = start.replace(tzinfo=None)
+        if end is not None and end.tzinfo is not None:
+            end = end.replace(tzinfo=None)
     if start is not None and value < start:
         return False
     if end is not None and value > end:
@@ -404,6 +453,151 @@ class DashboardService:
             "customer_reply_rate": customer_reply_count / len(sent_drafts) if sent_drafts else 0.0,
         }
 
+    def phase5_go_no_go_report(
+        self,
+        *,
+        repo_root: Path,
+        knowledge_collection_prefix: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        language: str | None = None,
+        business_scene: str | None = None,
+    ) -> dict[str, object]:
+        foundation = self.phase5_quality_foundation_metrics(
+            repo_root=repo_root,
+            knowledge_collection_prefix=knowledge_collection_prefix,
+        )
+        reply_quality = self.email_reply_quality_metrics(
+            date_from=date_from,
+            date_to=date_to,
+            language=language,
+            business_scene=business_scene,
+        )
+        report_reply_quality = self._phase5_report_reply_quality_metrics(
+            date_from=date_from,
+            date_to=date_to,
+            language=language,
+            business_scene=business_scene,
+        )
+        guardrail_metrics = self._phase5_guardrail_metrics(date_from=date_from, date_to=date_to)
+        metrics = {
+            "prompt_coverage_rate": float(foundation["prompt_metrics"]["prompt_coverage_rate"]),
+            "embedding_ready_rate": float(foundation["embedding_metrics"]["ready_rate"]),
+            "ai_generation_success_rate": float(report_reply_quality["ai_generation_success_rate"]),
+            "manual_adoption_rate": float(report_reply_quality["manual_adoption_rate"]),
+            "average_edit_distance_ratio": float(report_reply_quality["average_edit_distance_ratio"]),
+            "auto_send_success_rate": float(reply_quality["auto_send_success_rate"]),
+            "send_failure_rate": float(reply_quality["send_failure_rate"]),
+            **guardrail_metrics,
+        }
+        criteria = self._phase5_go_no_go_criteria(metrics)
+        failed_criteria = [criterion for criterion in criteria if not criterion["passed"]]
+        hard_pause_reasons = [
+            criterion["reason"]
+            for criterion in failed_criteria
+            if criterion["key"]
+            in {
+                "hard_block_accuracy_rate",
+                "dnc_no_auto_send_rate",
+                "de_grade_no_auto_send_rate",
+                "knowledge_guardrail_no_auto_send_rate",
+                "complaint_violation_zero",
+            }
+            and criterion.get("reason")
+        ]
+        quality_reasons = [criterion["reason"] for criterion in failed_criteria if criterion.get("reason")]
+        if hard_pause_reasons:
+            conclusion = "pause_auto_send"
+            conclusion_label = "暂停自动发送"
+        elif failed_criteria:
+            conclusion = "rerun_small_scope"
+            conclusion_label = "重跑小范围"
+        else:
+            conclusion = "go"
+            conclusion_label = "Go"
+        recommended_actions = self._phase5_recommended_actions(
+            conclusion=conclusion,
+            metrics=metrics,
+            reasons=quality_reasons,
+        )
+        return {
+            "conclusion": conclusion,
+            "summary": {
+                "go_ready": conclusion == "go",
+                "conclusion_label": conclusion_label,
+                "criteria_passed_count": len(criteria) - len(failed_criteria),
+                "criteria_total_count": len(criteria),
+            },
+            "time_window": {
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+            },
+            "thresholds": dict(PHASE5_GO_NO_GO_THRESHOLDS),
+            "metrics": metrics,
+            "criteria": criteria,
+            "reasons": quality_reasons,
+            "recommended_actions": recommended_actions,
+            "data_sources": list(PHASE5_DATA_SOURCES),
+        }
+
+    def _phase5_report_reply_quality_metrics(
+        self,
+        *,
+        date_from: date | None,
+        date_to: date | None,
+        language: str | None,
+        business_scene: str | None,
+    ) -> dict[str, float]:
+        start = parse_date_boundary(date_from)
+        end = parse_date_boundary(date_to, end_of_day=True)
+        drafts = list(self.session.scalars(select(EmailReplyDraft)).all())
+        reportable_drafts = [
+            draft
+            for draft in drafts
+            if self._email_reply_draft_matches(
+                draft,
+                start=start,
+                end=end,
+                language=language,
+                business_scene=business_scene,
+            )
+            and not bool((draft.auto_send_decision_json or {}).get("hard_blocked"))
+        ]
+        success_count = sum(1 for draft in reportable_drafts if bool(draft.final_body))
+        manual_review_drafts = [draft for draft in reportable_drafts if draft.manual_review_required]
+        manual_review_with_final = [draft for draft in manual_review_drafts if bool(draft.final_body)]
+        manual_adopted_count = sum(
+            1
+            for draft in manual_review_with_final
+            if not bool(
+                EmailReplyAuditService.calculate_edit_metrics(
+                    ai_subject=draft.ai_suggested_subject,
+                    ai_body=draft.ai_suggested_body,
+                    final_subject=draft.final_subject,
+                    final_body=draft.final_body,
+                )["body_changed"]
+            )
+        )
+        edit_distance_ratios = [
+            1
+            - float(
+                EmailReplyAuditService.calculate_edit_metrics(
+                    ai_subject=draft.ai_suggested_subject,
+                    ai_body=draft.ai_suggested_body,
+                    final_subject=draft.final_subject,
+                    final_body=draft.final_body,
+                )["body_similarity_ratio"]
+            )
+            for draft in manual_review_with_final
+        ]
+        return {
+            "ai_generation_success_rate": success_count / len(reportable_drafts) if reportable_drafts else 0.0,
+            "manual_adoption_rate": manual_adopted_count / len(manual_review_drafts) if manual_review_drafts else 0.0,
+            "average_edit_distance_ratio": (
+                sum(edit_distance_ratios) / len(edit_distance_ratios) if edit_distance_ratios else 0.0
+            ),
+        }
+
     @staticmethod
     def _knowledge_content_type_counts(items: list[KnowledgeItem]) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -441,6 +635,212 @@ class DashboardService:
             and message.created_at > first_sent_at
             for message in draft.thread.messages
         )
+
+    def _phase5_guardrail_metrics(
+        self,
+        *,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> dict[str, float | int]:
+        start = parse_date_boundary(date_from)
+        end = parse_date_boundary(date_to, end_of_day=True)
+        drafts = list(
+            self.session.scalars(
+                select(EmailReplyDraft).options(selectinload(EmailReplyDraft.send_attempts))
+            ).all()
+        )
+        filtered_drafts = [
+            draft for draft in drafts if within_date_range(draft.created_at, start=start, end=end)
+        ]
+        code_groups = {
+            "dnc_no_auto_send_rate": PHASE5_DNC_BLOCK_CODES,
+            "de_grade_no_auto_send_rate": PHASE5_DE_GRADE_BLOCK_CODES,
+            "knowledge_guardrail_no_auto_send_rate": PHASE5_KNOWLEDGE_BLOCK_CODES,
+        }
+        metrics: dict[str, float | int] = {}
+        block_totals: list[tuple[int, int]] = []
+        for metric_key, codes in code_groups.items():
+            matching = [
+                draft
+                for draft in filtered_drafts
+                if set(self._phase5_block_reason_codes(draft)) & codes
+            ]
+            blocked_count = sum(1 for draft in matching if not self._phase5_draft_has_sent_attempt(draft))
+            metrics[metric_key] = blocked_count / len(matching) if matching else 1.0
+            block_totals.append((blocked_count, len(matching)))
+        total_blocked = sum(item[0] for item in block_totals)
+        total_expected = sum(item[1] for item in block_totals)
+        metrics["hard_block_accuracy_rate"] = total_blocked / total_expected if total_expected else 1.0
+        risk_events = list(self.session.scalars(select(RiskEvent)).all())
+        pause_events = [
+            event
+            for event in risk_events
+            if within_date_range(event.created_at, start=start, end=end)
+            and (
+                bool(event.pause_suggested)
+                or enum_value(event.severity) in {"high", "critical"}
+                or str(event.event_type).strip().lower() in PHASE5_PAUSE_EVENT_TYPES
+            )
+            and enum_value(event.resolution_status) != RiskEventStatus.DISMISSED.value
+        ]
+        metrics["complaint_block_violation_count"] = len(pause_events)
+        return metrics
+
+    @staticmethod
+    def _phase5_block_reason_codes(draft: EmailReplyDraft) -> list[str]:
+        decision_json = draft.auto_send_decision_json or {}
+        codes: list[str] = []
+        for reason in decision_json.get("block_reasons") or []:
+            if isinstance(reason, dict):
+                code = reason.get("code")
+                if isinstance(code, str) and code.strip():
+                    codes.append(code.strip())
+            elif isinstance(reason, str) and reason.strip():
+                codes.append(reason.strip())
+        return codes
+
+    @staticmethod
+    def _phase5_draft_has_sent_attempt(draft: EmailReplyDraft) -> bool:
+        return any(attempt.status == EmailSendAttemptStatus.SENT for attempt in draft.send_attempts)
+
+    @staticmethod
+    def _phase5_go_no_go_criteria(metrics: dict[str, float | int]) -> list[dict[str, object]]:
+        return [
+            DashboardService._phase5_rate_criterion(
+                key="prompt_coverage_rate",
+                label="Prompt 入库覆盖率 100%",
+                actual=metrics["prompt_coverage_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["prompt_coverage_rate"],
+                data_source="llm_prompt_templates",
+                reason="Prompt 入库覆盖率未达到 100%。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="embedding_ready_rate",
+                label="已发布知识 embedding ready 率 ≥ 95%",
+                actual=metrics["embedding_ready_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["embedding_ready_rate"],
+                data_source="knowledge_embeddings",
+                reason="embedding ready 率低于 95%。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="ai_generation_success_rate",
+                label="AI 回复建议生成成功率 ≥ 90%",
+                actual=metrics["ai_generation_success_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["ai_generation_success_rate"],
+                data_source="email_reply_drafts",
+                reason="AI 回复建议生成成功率低于 90%。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="manual_adoption_rate",
+                label="人工采纳率 ≥ 50%",
+                actual=metrics["manual_adoption_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["manual_adoption_rate"],
+                data_source="email_reply_drafts",
+                reason="人工采纳率低于 50%。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="hard_block_accuracy_rate",
+                label="自动发送硬拦截准确执行率 100%",
+                actual=metrics["hard_block_accuracy_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["hard_block_accuracy_rate"],
+                data_source="email_reply_drafts",
+                reason="硬拦截命中后仍存在自动发送记录。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="dnc_no_auto_send_rate",
+                label="DNC/勿扰客户不自动发送 100%",
+                actual=metrics["dnc_no_auto_send_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["dnc_no_auto_send_rate"],
+                data_source="email_reply_drafts",
+                reason="DNC/勿扰客户存在自动发送风险。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="de_grade_no_auto_send_rate",
+                label="D/E 客户不自动发送 100%",
+                actual=metrics["de_grade_no_auto_send_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["de_grade_no_auto_send_rate"],
+                data_source="email_reply_drafts",
+                reason="D/E 客户存在自动发送风险。",
+            ),
+            DashboardService._phase5_rate_criterion(
+                key="knowledge_guardrail_no_auto_send_rate",
+                label="语言不确定、缺少同语言知识、知识召回不足时不自动发送 100%",
+                actual=metrics["knowledge_guardrail_no_auto_send_rate"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["knowledge_guardrail_no_auto_send_rate"],
+                data_source="email_reply_drafts",
+                reason="知识或语言硬拦截命中后存在自动发送风险。",
+            ),
+            DashboardService._phase5_zero_criterion(
+                key="complaint_violation_zero",
+                label="投诉、封禁、违规事件为 0",
+                actual=metrics["complaint_block_violation_count"],
+                threshold=PHASE5_GO_NO_GO_THRESHOLDS["complaint_block_violation_count"],
+                data_source="risk_events",
+                reason="存在投诉、封禁、违规或建议暂停风险事件。",
+            ),
+        ]
+
+    @staticmethod
+    def _phase5_rate_criterion(
+        *,
+        key: str,
+        label: str,
+        actual: float | int,
+        threshold: float | int,
+        data_source: str,
+        reason: str,
+    ) -> dict[str, object]:
+        passed = float(actual) >= float(threshold)
+        return {
+            "key": key,
+            "label": label,
+            "actual": actual,
+            "threshold": threshold,
+            "operator": ">=",
+            "passed": passed,
+            "data_source": data_source,
+            "reason": None if passed else reason,
+        }
+
+    @staticmethod
+    def _phase5_zero_criterion(
+        *,
+        key: str,
+        label: str,
+        actual: float | int,
+        threshold: float | int,
+        data_source: str,
+        reason: str,
+    ) -> dict[str, object]:
+        passed = float(actual) <= float(threshold)
+        return {
+            "key": key,
+            "label": label,
+            "actual": actual,
+            "threshold": threshold,
+            "operator": "<=",
+            "passed": passed,
+            "data_source": data_source,
+            "reason": None if passed else reason,
+        }
+
+    @staticmethod
+    def _phase5_recommended_actions(
+        *,
+        conclusion: str,
+        metrics: dict[str, float | int],
+        reasons: list[str],
+    ) -> list[str]:
+        if conclusion == "go":
+            return ["满足第五阶段 Go 条件，可以进入受控扩大运行。"]
+        if conclusion == "pause_auto_send":
+            return ["存在投诉、封禁、违规或建议暂停风险事件，必须暂停自动发送。", *reasons]
+        actions = ["未满足 Go 条件，建议重跑小范围并复盘 Prompt、知识库和人工编辑差异。", *reasons]
+        if float(metrics.get("send_failure_rate") or 0.0) > 0:
+            actions.append("邮件发送失败率偏高但无风险事件，建议重跑小范围。")
+        if float(metrics.get("average_edit_distance_ratio") or 0.0) > 0.5:
+            actions.append("人工修改幅度高，建议复盘邮件回复知识库质量。")
+        return actions
 
     @staticmethod
     def _empty_funnel_bucket(date_label: str | None = None, channel_name: str | None = None, risk_level: str | None = None) -> dict:

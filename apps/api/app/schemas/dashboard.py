@@ -387,3 +387,53 @@ class Phase5QualityFoundationResponse(BaseModel):
     embedding_metrics: Phase5EmbeddingMetrics
     go_no_go_ready: bool
     go_no_go_reasons: list[str]
+
+
+class Phase5GoNoGoTimeWindow(BaseModel):
+    date_from: str | None = None
+    date_to: str | None = None
+
+
+class Phase5GoNoGoSummary(BaseModel):
+    go_ready: bool
+    conclusion_label: str
+    criteria_passed_count: int
+    criteria_total_count: int
+
+
+class Phase5GoNoGoMetrics(BaseModel):
+    prompt_coverage_rate: float
+    embedding_ready_rate: float
+    ai_generation_success_rate: float
+    manual_adoption_rate: float
+    average_edit_distance_ratio: float
+    auto_send_success_rate: float
+    send_failure_rate: float
+    hard_block_accuracy_rate: float
+    dnc_no_auto_send_rate: float
+    de_grade_no_auto_send_rate: float
+    knowledge_guardrail_no_auto_send_rate: float
+    complaint_block_violation_count: int
+
+
+class Phase5GoNoGoCriterion(BaseModel):
+    key: str
+    label: str
+    actual: float | int
+    threshold: float | int
+    operator: str
+    passed: bool
+    data_source: str
+    reason: str | None = None
+
+
+class Phase5GoNoGoReportResponse(BaseModel):
+    conclusion: str
+    summary: Phase5GoNoGoSummary
+    time_window: Phase5GoNoGoTimeWindow
+    thresholds: dict[str, float | int]
+    metrics: Phase5GoNoGoMetrics
+    criteria: list[Phase5GoNoGoCriterion]
+    reasons: list[str]
+    recommended_actions: list[str]
+    data_sources: list[str]

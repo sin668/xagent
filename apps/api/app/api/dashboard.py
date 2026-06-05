@@ -12,6 +12,7 @@ from app.schemas.dashboard import (
     ChannelQualityDashboardResponse,
     EmailDeliveryQualityResponse,
     EmailReplyQualityResponse,
+    Phase5GoNoGoReportResponse,
     Phase5QualityFoundationResponse,
     PhaseOneFunnelDashboardResponse,
     RiskEventDashboardResponse,
@@ -97,6 +98,31 @@ async def get_phase5_quality_foundation(
             **service.phase5_quality_foundation_metrics(
                 repo_root=REPO_ROOT,
                 knowledge_collection_prefix=knowledge_collection_prefix,
+            )
+        )
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/phase5-go-no-go-report", response_model=Phase5GoNoGoReportResponse)
+async def get_phase5_go_no_go_report(
+    knowledge_collection_prefix: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    language: str | None = Query(default=None),
+    business_scene: str | None = Query(default=None),
+    async_session: AsyncSession = Depends(get_async_session),
+) -> Phase5GoNoGoReportResponse:
+    def run(sync_session):
+        service = DashboardService(sync_session)
+        return Phase5GoNoGoReportResponse(
+            **service.phase5_go_no_go_report(
+                repo_root=REPO_ROOT,
+                knowledge_collection_prefix=knowledge_collection_prefix,
+                date_from=date_from,
+                date_to=date_to,
+                language=language,
+                business_scene=business_scene,
             )
         )
 
