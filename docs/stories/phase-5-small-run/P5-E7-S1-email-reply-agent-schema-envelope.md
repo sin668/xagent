@@ -1,6 +1,6 @@
 # Story P5-E7-S1：apps/agents EMAIL_REPLY schema 与 envelope
 
-状态：未开始  
+状态：已完成
 Sprint：Sprint 7  
 优先级：P0  
 Epic：P5-E7（EMAIL_REPLY Agent）
@@ -68,3 +68,61 @@ Epic：P5-E7（EMAIL_REPLY Agent）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 执行记录
+
+### TDD 红灯
+
+- 新增测试文件：`apps/agents/tests/test_email_reply_schema.py`。
+- 红灯命令：
+  - `cd apps/agents && /opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_email_reply_schema.py -q`
+- 红灯结果：
+  - 失败原因符合预期：`ModuleNotFoundError: No module named 'app.schemas.email_reply'`，说明 EMAIL_REPLY schema 与 envelope 尚未定义。
+
+### TDD 绿灯
+
+- 新增 schema 文件：`apps/agents/app/schemas/email_reply.py`。
+- 实现内容：
+  - `EMAIL_REPLY_SCHEMA_VERSION = "email-reply-v1"`。
+  - `EmailReplyRequestEnvelope` 请求 envelope，包含 request、draft/thread/message/customer、context、prompt 和 options。
+  - `EmailReplyAgentOutput` 输出 schema，包含语言、建议主题/正文、knowledge hits、risk flags、auto_send_allowed、manual_review_required、next_action 和 audit。
+  - 校验 `audit.writes_core_tables` 必须为 `False`，并校验自动发送与人工复核状态一致性。
+- 绿灯命令：
+  - `cd apps/agents && /opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_email_reply_schema.py -q`
+- 绿灯结果：
+  - `4 passed in 0.03s`
+
+### 验证记录
+
+- 回归验证命令：
+  - `cd apps/agents && /opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_email_reply_schema.py -q`
+- 回归验证结果：
+  - `4 passed in 0.03s`
+- 格式验证命令：
+  - `git diff --check`
+- 格式验证结果：
+  - 通过，无尾随空格或 patch 格式问题。
+
+## 两轮独立多维度评审
+
+### 第一轮评审：schema 契约与安全边界
+
+- 结论：
+  - 通过。EMAIL_REPLY 请求和输出 schema 已固定 `schema_version=email-reply-v1`，输出字段满足 Story 验收。
+- 发现项：
+  - 输出包含 `reply_language`、`detected_language`、`suggested_subject`、`suggested_body`、`knowledge_hits`、`risk_flags`、`auto_send_allowed`、`manual_review_required`、`next_action` 和 `audit`。
+  - `audit.writes_core_tables=True` 会触发 Pydantic 校验失败，符合 `apps/agents` 不写业务 core 表边界。
+  - `auto_send_allowed=False` 时必须 `manual_review_required=True`，避免无人工复核的静默通过。
+- 修正结果：
+  - 未发现需要修正的实质阻塞问题。
+
+### 第二轮评审：工程复用与后续节点衔接
+
+- 结论：
+  - 通过。新增 schema 为后续 `load_context`、`retrieve_knowledge`、`draft_reply`、`schema_validation`、`auto_send_check` 节点提供统一输入输出契约。
+- 发现项：
+  - 当前 Story 只定义 schema/envelope，不实现 Agent 路由、不调用 LLM、不写运行状态之外的业务表。
+  - 测试覆盖合法 envelope、合法输出、无效 schema_version、违规 core table 写入和自动发送/人工复核不一致。
+  - 新增文件遵循 `apps/agents` 现有 Pydantic `extra="forbid"` 风格。
+- 修正结果：
+  - 未发现新增实质阻塞问题。
