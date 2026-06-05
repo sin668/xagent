@@ -1,8 +1,8 @@
 # Story P3-E3-S3：客户晋级审计和勿扰硬门禁
 
-状态：Draft  
-Sprint：Sprint 3  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL 写库联调待复跑
+Sprint：Sprint 3
+优先级：P0
 Epic：P3-E3
 
 ## 用户故事
@@ -83,3 +83,18 @@ Epic：P3-E3
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e3-s3-执行结果.md`
+
+验收结果：
+
+- 晋级审计事件已统一为 `lead_promoted_to_customer`。
+- 晋级审计记录已包含 reviewer、review_note、accepted_fields_json。
+- 勿扰客户名称匹配已支持 `customers.normalized_name` 和 `lower(customers.name)`。
+- 勿扰联系方式匹配已支持 `lower(contact_methods.value)`，避免大小写绕过。
+- 手动准入无法通过 accepted_fields 绕过勿扰硬门禁。
+- 已运行当前 Story 测试、客户晋级回归测试、线索退出和深挖触发相关回归测试。
+- 真实 PostgreSQL 连接验证因当前沙箱网络权限被阻断，错误为 `PermissionError: [Errno 1] Operation not permitted`，需在外部环境复跑。

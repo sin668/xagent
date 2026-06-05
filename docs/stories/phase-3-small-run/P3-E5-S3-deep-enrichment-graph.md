@@ -1,8 +1,8 @@
 # Story P3-E5-S3：实现 Deep Enrichment LangGraph 图流程
 
-状态：Draft  
-Sprint：Sprint 5  
-优先级：P1  
+状态：实现完成
+Sprint：Sprint 5
+优先级：P1
 Epic：P3-E5
 
 ## 用户故事
@@ -84,3 +84,21 @@ Epic：P3-E5
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e5-s3-执行结果.md`
+
+验收结果：
+
+- 已创建 `apps/agents/app/graphs/deep_enrichment.py`。
+- 已创建 `apps/agents/app/tools/public_search.py`。
+- 已创建 `apps/agents/app/tools/evidence_validator.py`。
+- 已创建 `apps/agents/tests/test_deep_enrichment_graph.py`。
+- Deep Enrichment 图节点包含 `load_lead`、`build_keywords`、`search_public_sources`、`read_public_pages`、`extract_candidates`、`validate_evidence`、`write_enrichment_candidates`、`recommend_action`。
+- 单元测试使用 mock search 和 mock LLM extractor，不依赖真实网络搜索。
+- 输出使用 `DeepEnrichmentAgentOutput`，只写入 `lead_enrichment_field_candidates` 协议，不直接写 `customers`。
+- 缺失字段候选支持 `Unknown` 和 `[]`，并且 `Unknown/null/[]` 不会被视为已补全字段。
+- 已阻断 `auto_dm`、`friend_request`、`login_collection`、`anti_scraping_bypass` 等违规动作。
+- 已运行当前 Story 测试、`apps/agents` 全量测试、Agent 编译检查、`apps/api` 轻量回归和 API 编译检查。

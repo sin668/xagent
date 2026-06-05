@@ -1,8 +1,8 @@
 # Story P3-E2-S5：实现线索调整等级、Watch/Invalid 和放弃动作 API
 
-状态：Draft  
-Sprint：Sprint 2  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 写库联调待复跑
+Sprint：Sprint 2
+优先级：P0
 Epic：P3-E2
 
 ## 用户故事
@@ -82,4 +82,3 @@ Epic：P3-E2
 - C 级客户报价、合同、付款、物流、清关、交付周期等动作前必须合规复核。
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
-

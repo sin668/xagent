@@ -83,6 +83,9 @@ export function createApiClient({ baseUrl = getApiBaseUrl(), request = resolveRe
     post(endpoint, body) {
       return send(endpoint, { method: 'POST', body });
     },
+    patch(endpoint, body) {
+      return send(endpoint, { method: 'PATCH', body });
+    },
   };
 }
 

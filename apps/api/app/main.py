@@ -10,10 +10,15 @@ from app.api.channel_risk import router as channel_risk_router
 from app.api.channel_plans import router as channel_plans_router
 from app.api.compliance import router as compliance_router
 from app.api.customers import router as customers_router
+from app.api.customer_followups import router as customer_followups_router
+from app.api.customer_vehicle_intents import router as customer_vehicle_intents_router
 from app.api.dashboard import router as dashboard_router
 from app.api.failed_cases import router as failed_cases_router
 from app.api.inventory import router as inventory_router
 from app.api.knowledge import router as knowledge_router
+from app.api.lead_enrichment import field_candidate_router as lead_enrichment_field_candidate_router
+from app.api.lead_enrichment import router as lead_enrichment_router
+from app.api.lead_cleanup import router as lead_cleanup_router
 from app.api.lead_extraction_from_sources import router as lead_extraction_from_sources_router
 from app.api.lead_source_candidates import router as lead_source_candidates_router
 from app.api.llm_health import router as llm_health_router
@@ -22,6 +27,7 @@ from app.api.llm_lead_grading import router as llm_lead_grading_router
 from app.api.llm_prompt_templates import router as llm_prompt_templates_router
 from app.api.outreach_drafts import router as outreach_drafts_router
 from app.api.phase2_dashboard import router as phase2_dashboard_router
+from app.api.phase3_dashboard import router as phase3_dashboard_router
 from app.api.public_page_read import router as public_page_read_router
 from app.api.raw_collection import router as raw_collection_router
 from app.api.risk_events import router as risk_events_router
@@ -60,10 +66,15 @@ app.include_router(channel_risk_router)
 app.include_router(channel_plans_router)
 app.include_router(compliance_router)
 app.include_router(customers_router)
+app.include_router(customer_followups_router)
+app.include_router(customer_vehicle_intents_router)
 app.include_router(dashboard_router)
 app.include_router(failed_cases_router)
 app.include_router(inventory_router)
 app.include_router(knowledge_router)
+app.include_router(lead_enrichment_field_candidate_router)
+app.include_router(lead_enrichment_router)
+app.include_router(lead_cleanup_router)
 app.include_router(lead_extraction_from_sources_router)
 app.include_router(lead_source_candidates_router)
 app.include_router(llm_health_router)
@@ -72,6 +83,7 @@ app.include_router(llm_lead_grading_router)
 app.include_router(llm_prompt_templates_router)
 app.include_router(outreach_drafts_router)
 app.include_router(phase2_dashboard_router)
+app.include_router(phase3_dashboard_router)
 app.include_router(public_page_read_router)
 app.include_router(raw_collection_router)
 app.include_router(risk_events_router)

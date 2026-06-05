@@ -2,6 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.enums import CustomerGrade, StagingQueueStatus, StagingReviewStatus
+
 
 class StagingLeadCreate(BaseModel):
     candidate_url_id: UUID
@@ -167,4 +169,35 @@ class StagingPromoteResponse(BaseModel):
     do_not_contact: bool
     requires_compliance_review: bool
     compliance_review_id: UUID | None = None
+    review_log_id: UUID
+
+
+class StagingLeadExitActionBaseRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=1)
+
+
+class StagingLeadMarkWatchRequest(StagingLeadExitActionBaseRequest):
+    pass
+
+
+class StagingLeadMarkInvalidRequest(StagingLeadExitActionBaseRequest):
+    pass
+
+
+class StagingLeadAbandonRequest(StagingLeadExitActionBaseRequest):
+    pass
+
+
+class StagingLeadGradeUpdateRequest(StagingLeadExitActionBaseRequest):
+    recommended_grade: CustomerGrade
+
+
+class StagingLeadExitActionResponse(BaseModel):
+    staging_lead_id: UUID
+    action: str
+    recommended_grade: CustomerGrade
+    review_status: StagingReviewStatus
+    queue_status: StagingQueueStatus
+    reason: str
     review_log_id: UUID

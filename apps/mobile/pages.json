@@ -31,6 +31,30 @@
       }
     },
     {
+      "path": "src/pages/lead-cleanup/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/customers/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/customers/detail",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "src/pages/customers/followups",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "src/pages/agent-run/index",
       "style": {
         "navigationStyle": "custom"

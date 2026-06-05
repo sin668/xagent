@@ -1,8 +1,8 @@
 # Story P3-E4-S1：实现清洗建议列表、详情和筛选 API
 
-状态：Draft  
-Sprint：Sprint 4  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 查询联调待复跑
+Sprint：Sprint 4
+优先级：P0
 Epic：P3-E4
 
 ## 用户故事
@@ -82,3 +82,19 @@ Epic：P3-E4
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e4-s1-执行结果.md`
+
+验收结果：
+
+- 已新增 `GET /lead-cleanup/suggestions`。
+- 已新增 `GET /lead-cleanup/suggestions/{suggestion_id}`。
+- 列表接口支持 `suggestion_type`、`review_status`、`confidence`、`max_confidence`、`lead`、`limit` 筛选。
+- 默认只展示 pending 建议。
+- 详情返回 `reason`、`evidence_json`、`recommended_action`、`target_lead_id`。
+- 未实现 approve/reject/execute 路由，符合本 Story 非目标“不执行归并”。
+- 已运行当前 Story 测试、清洗模型测试、第三阶段模型契约测试和编译检查。
+- 真实 PostgreSQL 连接验证因当前沙箱网络权限被阻断，错误为 `PermissionError: [Errno 1] Operation not permitted`，需在外部环境复跑。

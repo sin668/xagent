@@ -21,6 +21,7 @@ from app.models.enums import (
     StagingQueueStatus,
     StagingReviewStatus,
 )
+from app.services.compliance_guards import Phase3ComplianceGuardService
 
 
 class StagingLeadService:
@@ -249,6 +250,8 @@ class StagingLeadService:
             reasons.append("缺少来源链接")
         if not has_evidence:
             reasons.append("缺少来源证据")
+        if risk == ChannelRiskLevel.FORBIDDEN:
+            reasons.append("Forbidden 来源不得作为客户晋级关键来源")
         if (
             review == StagingReviewStatus.NEEDS_SECONDARY_VERIFICATION
             or (risk == ChannelRiskLevel.HIGH and review != StagingReviewStatus.APPROVED)
@@ -623,6 +626,13 @@ class StagingLeadService:
         if lead is None:
             raise ValueError("staging lead not found")
         candidate = lead.candidate_url
+        if candidate is not None:
+            Phase3ComplianceGuardService.ensure_source_can_be_promotion_key_evidence(
+                candidate.source_risk_level,
+                session=self.session,
+                actor=actor,
+                target_ref=f"staging:{lead.id}",
+            )
         latest_snapshot = self.latest_page_snapshot_for_lead(lead)
         source_url = candidate.url if candidate is not None else ""
         evidence_note = (lead.source_evidence or "").strip() or (

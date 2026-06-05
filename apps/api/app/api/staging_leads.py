@@ -14,13 +14,21 @@ from app.schemas.staging_leads import (
     CoreGateResponse,
     PageSnapshotEvidenceResponse,
     StagingLeadCreate,
+    StagingLeadAbandonRequest,
     StagingLeadDetailResponse,
+    StagingLeadExitActionResponse,
+    StagingLeadGradeUpdateRequest,
     StagingLeadListResponse,
+    StagingLeadMarkInvalidRequest,
+    StagingLeadMarkWatchRequest,
     StagingPromoteRequest,
     StagingPromoteResponse,
     StagingLeadResponse,
     StagingLeadUpdate,
 )
+from app.schemas.customer_promotion import PromoteStagingLeadToCustomerRequest, PromoteStagingLeadToCustomerResponse
+from app.services.customer_promotion import CustomerPromotionService
+from app.services.staging_lead_actions import StagingLeadActionService
 from app.services.staging_leads import StagingLeadService
 
 router = APIRouter(prefix="/staging-leads", tags=["staging-leads"])
@@ -154,6 +162,20 @@ def serialize_staging_lead_detail(lead, latest_snapshot=None, latest_ai_audit=No
         latest_page_snapshot=serialize_page_snapshot(latest_snapshot),
         ai_audit_summary=serialize_ai_audit_summary(latest_ai_audit),
         core_gate=CoreGateResponse(**gate),
+    )
+
+
+def serialize_exit_action_result(result: dict) -> StagingLeadExitActionResponse:
+    lead = result["lead"]
+    review_log = result["review_log"]
+    return StagingLeadExitActionResponse(
+        staging_lead_id=lead.id,
+        action=result["action"],
+        recommended_grade=lead.recommended_grade,
+        review_status=lead.review_status,
+        queue_status=lead.queue_status,
+        reason=result["reason"],
+        review_log_id=review_log.id,
     )
 
 
@@ -319,6 +341,117 @@ async def promote_staging_lead(
             compliance_review_id=compliance_review.id if compliance_review is not None else None,
             review_log_id=review_log.id,
         )
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/{lead_id:uuid}/promote-to-customer", response_model=PromoteStagingLeadToCustomerResponse)
+async def promote_staging_lead_to_customer(
+    lead_id: UUID,
+    request: PromoteStagingLeadToCustomerRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> PromoteStagingLeadToCustomerResponse:
+    def run(sync_session):
+        service = CustomerPromotionService(sync_session)
+        lead = service.get_staging_lead(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="staging lead not found")
+        try:
+            result = service.promote_to_customer(lead, request=request)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        sync_session.commit()
+        customer = result["customer"]
+        lead_source = result["lead_source"]
+        compliance_review = result["compliance_review"]
+        review_log = result["review_log"]
+        return PromoteStagingLeadToCustomerResponse(
+            staging_lead_id=lead_id,
+            customer_id=customer.id,
+            customer_external_id=customer.external_id,
+            lead_source_id=lead_source.id,
+            contact_method_ids=[contact.id for contact in result["contact_methods"]],
+            customer_status=customer.status,
+            do_not_contact=customer.do_not_contact,
+            requires_compliance_review=result["requires_compliance_review"],
+            compliance_review_id=compliance_review.id if compliance_review is not None else None,
+            review_log_id=review_log.id,
+        )
+
+    return await async_session.run_sync(run)
+
+
+@router.patch("/{lead_id:uuid}/mark-watch", response_model=StagingLeadExitActionResponse)
+async def mark_staging_lead_watch(
+    lead_id: UUID,
+    request: StagingLeadMarkWatchRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> StagingLeadExitActionResponse:
+    def run(sync_session):
+        service = StagingLeadActionService(sync_session)
+        lead = service.get_staging_lead(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="staging lead not found")
+        result = service.mark_watch(lead, request=request)
+        sync_session.commit()
+        return serialize_exit_action_result(result)
+
+    return await async_session.run_sync(run)
+
+
+@router.patch("/{lead_id:uuid}/mark-invalid", response_model=StagingLeadExitActionResponse)
+async def mark_staging_lead_invalid(
+    lead_id: UUID,
+    request: StagingLeadMarkInvalidRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> StagingLeadExitActionResponse:
+    def run(sync_session):
+        service = StagingLeadActionService(sync_session)
+        lead = service.get_staging_lead(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="staging lead not found")
+        result = service.mark_invalid(lead, request=request)
+        sync_session.commit()
+        return serialize_exit_action_result(result)
+
+    return await async_session.run_sync(run)
+
+
+@router.patch("/{lead_id:uuid}/abandon", response_model=StagingLeadExitActionResponse)
+async def abandon_staging_lead(
+    lead_id: UUID,
+    request: StagingLeadAbandonRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> StagingLeadExitActionResponse:
+    def run(sync_session):
+        service = StagingLeadActionService(sync_session)
+        lead = service.get_staging_lead(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="staging lead not found")
+        result = service.abandon(lead, request=request)
+        sync_session.commit()
+        return serialize_exit_action_result(result)
+
+    return await async_session.run_sync(run)
+
+
+@router.patch("/{lead_id:uuid}/grade", response_model=StagingLeadExitActionResponse)
+async def update_staging_lead_grade(
+    lead_id: UUID,
+    request: StagingLeadGradeUpdateRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> StagingLeadExitActionResponse:
+    def run(sync_session):
+        service = StagingLeadActionService(sync_session)
+        lead = service.get_staging_lead(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="staging lead not found")
+        try:
+            result = service.update_grade(lead, request=request)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_exit_action_result(result)
 
     return await async_session.run_sync(run)
 

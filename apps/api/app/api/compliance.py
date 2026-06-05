@@ -119,7 +119,13 @@ async def mark_customer_quoted(
     def run(sync_session):
         service = ComplianceService(sync_session)
         try:
-            customer = service.mark_quoted(customer_id=customer_id, actor=request.actor)
+            customer = service.mark_quoted(
+                customer_id=customer_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         sync_session.commit()

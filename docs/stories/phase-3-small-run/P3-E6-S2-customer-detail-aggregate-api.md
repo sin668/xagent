@@ -1,8 +1,8 @@
 # Story P3-E6-S2：实现客户详情聚合 API
 
-状态：Draft  
-Sprint：Sprint 6  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 联调待外部环境复跑
+Sprint：Sprint 6
+优先级：P0
 Epic：P3-E6
 
 ## 用户故事
@@ -83,3 +83,46 @@ Epic：P3-E6
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行时间：2026-06-04
+执行者：Codex
+执行方式：`superpowers:executing-plans` + `superpowers:test-driven-development`
+
+### 实现内容
+
+- 更新 `apps/api/app/schemas/customer.py`，新增 `CustomerDetailResponse`。
+- 更新 `apps/api/app/services/customers.py`，新增 `get_customer_detail` 和客户详情聚合序列化方法。
+- 更新 `apps/api/app/api/customers.py`，将 `GET /customers/{id}` 响应模型切换为客户详情聚合响应。
+- 新增 `apps/api/tests/test_customer_detail_aggregate_api.py`，覆盖详情聚合、待补全字段、勿扰状态、C级合规状态和来源追溯。
+
+### 验收结果
+
+- `GET /customers/{id}` 已返回完整聚合信息。
+- 已显示待补全字段：从 `customers.missing_fields` 拆分为 `pending_fields`。
+- 勿扰状态明确返回：`do_not_contact.enabled/reason/marked_by/marked_at`。
+- C 级合规状态明确返回：`compliance_status.requires_review/latest_status/latest_reason/latest_risk_note`。
+- 来源证据可追溯到 `lead_sources` 和联系方式证据：`source_traceability`、`sources`、`contacts.evidence_note`。
+- 未生成触达草稿，符合非目标。
+
+### 测试记录
+
+- 红灯验证：`python -m pytest tests/test_customer_detail_aggregate_api.py -q`，失败原因为 `ImportError: cannot import name 'CustomerDetailResponse'`。
+- 绿灯验证：`python -m pytest tests/test_customer_detail_aggregate_api.py -q`，结果 `4 passed in 2.52s`。
+- 离线关联回归：`python -m pytest tests/test_customer_detail_aggregate_api.py tests/test_customers_workbench_list_api.py tests/test_customer_assignment_status.py tests/test_promote_staging_lead_to_customer_phase3.py -q`，结果 `25 passed in 2.69s`。
+- 编译检查：`python -m compileall app/api app/services app/schemas app/models`，退出码 0。
+- 真实 PostgreSQL API 联调：当前沙箱网络对真实 PostgreSQL 连接受限，需在外部环境复跑。
+
+### 两轮独立评审
+
+第一轮评审：
+
+- 结论：通过。
+- 发现项：详情接口必须覆盖客户详情页所需的七类信息，不能只返回列表摘要。
+- 修正结果：`CustomerDetailResponse` 聚合客户画像、联系方式、来源证据、意向车型、触达历史、跟进记录、合规状态。
+
+第二轮评审：
+
+- 结论：通过，真实 PostgreSQL API 联调待外部环境复跑。
+- 发现项：勿扰客户和 C 级客户必须在详情中给出硬边界提示。
+- 修正结果：勿扰客户 `next_action` 返回“勿扰客户，不得触达”；C 级客户通过 `compliance_status.requires_review=true` 和最新合规状态明确提示。

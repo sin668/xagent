@@ -1,0 +1,257 @@
+.customer-followups-page {
+  position: relative;
+  width: 100%;
+  max-width: var(--phone-width, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow-x: hidden;
+  background: #eef3f8;
+  color: #132033;
+}
+
+.customer-followups-content {
+  overflow-x: hidden;
+  padding: 0 16px calc(112px + var(--safe-bottom, 0px));
+}
+
+.followup-panel {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.followup-card-top,
+.followup-step-row,
+.followup-feed-item,
+.followup-switch-row {
+  display: flex;
+  gap: 12px;
+}
+
+.followup-card-top,
+.followup-switch-row {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.followup-customer-name {
+  overflow: hidden;
+  color: #132033;
+  font-size: 18px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.followup-meta,
+.followup-row-note {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.followup-meta {
+  margin-top: 5px;
+}
+
+.followup-tag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 13px;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 26px;
+}
+
+.followup-tag-green {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.followup-tag-red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.followup-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 21px 2px 10px;
+}
+
+.followup-section-title {
+  color: #132033;
+  font-size: 17px;
+  font-weight: 950;
+}
+
+.followup-section-note {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.followup-stepper,
+.followup-feed,
+.followup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.followup-step-dot,
+.followup-feed-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.followup-dot-green,
+.followup-feed-icon-green {
+  background: #047857;
+}
+
+.followup-dot-amber {
+  background: #92400e;
+}
+
+.followup-feed-icon-blue {
+  background: #1d4ed8;
+}
+
+.followup-feed-main {
+  min-width: 0;
+}
+
+.followup-row-title {
+  display: block;
+  color: #132033;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.followup-row-note {
+  display: block;
+  margin-top: 4px;
+}
+
+.followup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.followup-label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.followup-input,
+.followup-textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #132033;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.followup-input {
+  height: 42px;
+  padding: 0 12px;
+}
+
+.followup-textarea {
+  min-height: 78px;
+  padding: 11px 12px;
+  line-height: 1.5;
+}
+
+.followup-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.followup-alert,
+.followup-empty {
+  padding: 16px;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.followup-alert {
+  border: 1px solid rgba(239, 68, 68, 0.26);
+  color: #b91c1c;
+}
+
+.followup-action-bar {
+  position: fixed;
+  right: auto;
+  bottom: 0;
+  left: 50%;
+  width: min(100vw, var(--phone-width, 430px));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 10px;
+  padding: 12px 16px calc(24px + var(--safe-bottom, 0px));
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  z-index: 25;
+}
+
+.followup-action-bar-above-safe-area {
+  bottom: 0;
+}
+
+.followup-button {
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 22px;
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 44px;
+}
+
+.followup-button-primary {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.followup-button-secondary {
+  background: #e2e8f0;
+  color: #334155;
+}

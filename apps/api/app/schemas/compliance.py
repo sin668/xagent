@@ -47,6 +47,7 @@ class ComplianceReviewResponse(BaseModel):
 
 class MarkQuotedRequest(BaseModel):
     actor: str = Field(min_length=1)
+    actor_role: str = Field(default="sales", min_length=1)
 
 
 class MarkQuotedResponse(BaseModel):

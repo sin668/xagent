@@ -25,8 +25,8 @@ def test_dedupe_api_contract_and_response_fields_exist() -> None:
     api_text = (API_ROOT / "app" / "api" / "staging_leads.py").read_text(encoding="utf-8")
     schema_text = (API_ROOT / "app" / "schemas" / "staging_leads.py").read_text(encoding="utf-8")
 
-    assert '@router.get("/{lead_id}/duplicates"' in api_text
-    assert '@router.post("/{lead_id}/duplicates/resolve"' in api_text
+    assert '@router.get("/{lead_id:uuid}/duplicates"' in api_text
+    assert '@router.post("/{lead_id:uuid}/duplicates/resolve"' in api_text
     assert "duplicate_signals" in schema_text
     assert "DuplicateSignalResponse" in schema_text
 

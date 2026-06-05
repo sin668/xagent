@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.models import Customer, OutreachRecord
 from app.models.enums import ContactMethodType, CustomerGrade, CustomerStatus, OutreachStatus
+from app.services.audit_events import Phase3AuditEventService
+from app.services.compliance_guards import Phase3ComplianceGuardService
+from app.services.permissions import Phase3Action, Phase3PermissionService
 
 
 class CustomerDncService:
@@ -27,11 +30,26 @@ class CustomerDncService:
         customer.do_not_contact_marked_by = marked_by
         customer.do_not_contact_marked_at = datetime.utcnow()
         customer.status = CustomerStatus.DO_NOT_CONTACT
+        Phase3AuditEventService.record_event(
+            self.session,
+            event_name="customer_do_not_contact_marked",
+            actor=marked_by,
+            entity_type="customer",
+            entity_id=customer.id,
+            reason=reason,
+            evidence={
+                "status": CustomerStatus.DO_NOT_CONTACT.value,
+                "customer_name": customer.name,
+                "marked_by": marked_by,
+            },
+            occurred_at=customer.do_not_contact_marked_at,
+        )
         return customer
 
-    def unmark_do_not_contact(self, *, customer_id: UUID, unmarked_by: str, reason: str) -> Customer:
+    def unmark_do_not_contact(self, *, customer_id: UUID, unmarked_by: str, reason: str, actor_role: str = "operations") -> Customer:
         if not reason.strip():
             raise ValueError("取消勿扰需要记录原因。")
+        Phase3PermissionService.ensure_allowed(Phase3Action.CANCEL_DO_NOT_CONTACT, actor_role=actor_role)
         customer = self.get_customer(customer_id)
         customer.do_not_contact = False
         customer.do_not_contact_reason = f"取消勿扰：{reason}"
@@ -89,11 +107,20 @@ class CustomerDncService:
         script_version: str | None = None,
     ) -> OutreachRecord:
         customer = self.get_customer(customer_id)
-        if customer.do_not_contact:
-            raise ValueError("勿扰客户无法新增触达记录。")
+        Phase3ComplianceGuardService.ensure_customer_can_receive_outreach(
+            customer,
+            session=self.session,
+            actor=sent_by or owner,
+            action="outreach_record_create",
+        )
         outreach_status = OutreachStatus(status)
-        if outreach_status == OutreachStatus.SENT and not manual_confirmed:
-            raise ValueError("已发送必须对应人工确认动作。")
+        Phase3ComplianceGuardService.ensure_outreach_is_not_automatic(
+            outreach_status,
+            manual_confirmed=manual_confirmed,
+            session=self.session,
+            actor=sent_by or owner,
+            target_ref=f"customer:{customer.id}",
+        )
         outreach = OutreachRecord(
             external_id=external_id,
             customer_id=customer.id,

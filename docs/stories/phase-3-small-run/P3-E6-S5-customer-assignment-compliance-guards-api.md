@@ -1,8 +1,8 @@
 # Story P3-E6-S5：客户分配、状态流转和合规硬门禁 API
 
-状态：Draft  
-Sprint：Sprint 6  
-优先级：P1  
+状态：实现完成，真实 PostgreSQL API 联调待外部环境复跑
+Sprint：Sprint 6
+优先级：P1
 Epic：P3-E6
 
 ## 用户故事
@@ -83,3 +83,46 @@ Epic：P3-E6
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行时间：2026-06-04
+执行者：Codex
+执行方式：`superpowers:executing-plans` + `superpowers:test-driven-development`
+
+### 实现内容
+
+- 新增 `apps/api/app/schemas/customer_assignment.py`，定义客户分配和状态流转请求。
+- 更新 `apps/api/app/services/customer_status.py`，新增 `assign_owner_by_id` 和 `transition_status_by_id`。
+- 更新 `apps/api/app/api/customers.py`，新增 `PATCH /customers/{customer_id}/assign` 和 `PATCH /customers/{customer_id}/status`。
+- 新增 `apps/api/tests/test_customer_assignment_compliance_guards.py`，覆盖 API 路由、分配、状态流转、C 级合规阻断和勿扰硬门禁。
+
+### 验收结果
+
+- 支持分配运营/客服/销售负责人：`PATCH /customers/{customer_id}/assign`。
+- 支持客户状态流转：`PATCH /customers/{customer_id}/status`。
+- 状态流转复用 `CustomerAssignmentStatusService.ALLOWED_TRANSITIONS`。
+- C 级客户进入报价状态前必须合规复核；未通过时自动创建/复用 pending 合规复核并阻断状态变化。
+- 勿扰客户不能被分配，也不能进入触达队列。
+- 未实现报价合同模块，符合非目标。
+
+### 测试记录
+
+- 红灯验证：`python -m pytest tests/test_customer_assignment_compliance_guards.py -q`，失败原因为 `ModuleNotFoundError: No module named 'app.schemas.customer_assignment'`。
+- 绿灯验证：`python -m pytest tests/test_customer_assignment_compliance_guards.py -q`，结果 `7 passed in 2.41s`。
+- 离线关联回归：`python -m pytest tests/test_customer_assignment_compliance_guards.py tests/test_customer_assignment_status.py tests/test_customer_followups_api.py tests/test_customer_vehicle_intents_api.py tests/test_customer_detail_aggregate_api.py tests/test_customers_workbench_list_api.py tests/test_promote_staging_lead_to_customer_phase3.py -q`，结果 `42 passed in 1.91s`。
+- 编译检查：`python -m compileall app/api app/services app/schemas app/models`，退出码 0。
+- 真实 PostgreSQL API 联调：当前沙箱网络对真实 PostgreSQL 连接受限，需在外部环境复跑。
+
+### 两轮独立评审
+
+第一轮评审：
+
+- 结论：通过。
+- 发现项：API 不应绕过已有 Service 层硬门禁。
+- 修正结果：分配和状态流转 API 均调用 `CustomerAssignmentStatusService`，保留审计日志和状态机约束。
+
+第二轮评审：
+
+- 结论：通过，真实 PostgreSQL API 联调待外部环境复跑。
+- 发现项：C 级报价/合同边界和勿扰边界必须由后端阻断，而非依赖前端。
+- 修正结果：C 级进入 `quoted` 时校验合规复核；勿扰客户在分配和状态流转入口均被拒绝。

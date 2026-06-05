@@ -1,8 +1,8 @@
 # Story P3-E1-S5：第三阶段 migration 链路和模型契约测试
 
-状态：Draft  
-Sprint：Sprint 1  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL 验证待复跑
+Sprint：Sprint 1
+优先级：P0
 Epic：P3-E1
 
 ## 用户故事
@@ -83,3 +83,26 @@ Epic：P3-E1
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e1-s5-执行结果.md`
+
+实现完成项：
+
+- 已创建 `apps/api/tests/test_phase3_model_contract.py`。
+- 已创建 `apps/api/tests/test_phase3_migration_contract.py`。
+
+验收结果：
+
+- P3-E1-S5 单 Story 测试通过：`python -m pytest tests/test_phase3_model_contract.py tests/test_phase3_migration_contract.py -q`，结果 `10 passed`。
+- P3-E1 全量数据底座测试通过：`python -m pytest tests/test_lead_enrichment_result_model.py tests/test_lead_enrichment_field_candidate_model.py tests/test_lead_cleanup_models.py tests/test_customer_intents_followups_models.py tests/test_phase3_model_contract.py tests/test_phase3_migration_contract.py -q`，结果 `40 passed`。
+- 语法编译通过：`python -m compileall app/models app/schemas`。
+- Alembic 离线 SQL 验证通过，当前 head 为 `20260604_0027`。
+- 当前沙箱网络阻断 `.env` 中真实 PostgreSQL 连接，错误为 `PermissionError: [Errno 1] Operation not permitted`；本机无 `psql`、`pg_ctl`、`initdb`、`docker` 可替代验证，因此真实 PostgreSQL migration apply 待外部环境复跑。
+
+两轮评审结论：
+
+- 第一轮评审：通过，第三阶段新增 migration 链路、模型导入、枚举、外键和基础约束均有契约测试覆盖；真实库验证为环境限制项。
+- 第二轮评审：通过，本 Story 未新增业务 API 或高风险动作，未发现新增实质阻塞问题。

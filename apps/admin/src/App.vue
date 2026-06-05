@@ -10,6 +10,7 @@
         <a href="#risk-audit">审计</a>
         <a href="#sync-audit">同步</a>
         <a href="#phase2">第二阶段</a>
+        <a href="#phase3">第三阶段</a>
         <a href="#llm-governance">LLM 治理</a>
       </nav>
     </aside>
@@ -318,6 +319,114 @@
         <p class="guardrail">{{ phase2.guardrail }}</p>
       </section>
 
+      <section id="phase3" class="admin-card phase3-card">
+        <div class="card-head">
+          <div>
+            <h3>第三阶段指标与风控</h3>
+            <span>客户承接、线索深挖补全、清洗治理和风险违规目标 0</span>
+          </div>
+          <span :class="['tag', phase3StatusClass]">{{ phase3StatusText }}</span>
+        </div>
+
+        <p v-if="phase3Error" class="guardrail">{{ phase3Error }}</p>
+
+        <div class="phase3-summary">
+          <article>
+            <strong>{{ phase3.customerAcceptance.effectiveCustomerAcceptanceRateText }}</strong>
+            <span>有效客户承接率</span>
+            <small>{{ phase3.customerAcceptance.acceptedFirstFollowupCount }} / {{ phase3.customerAcceptance.promotedCustomerCount }} 已首次跟进</small>
+          </article>
+          <article>
+            <strong>{{ phase3.enrichment.enrichmentSuccessRateText }}</strong>
+            <span>深挖补全成功率</span>
+            <small>{{ phase3.enrichment.succeededEnrichmentCount }} / {{ phase3.enrichment.enrichmentResultCount }} AI 补全成功</small>
+          </article>
+          <article>
+            <strong>{{ phase3.enrichment.promotionRateText }}</strong>
+            <span>客户晋级率</span>
+            <small>{{ phase3.enrichment.promotedCustomerCount }} / {{ phase3.enrichment.stagingLeadCount }} staging 晋级</small>
+          </article>
+          <article :class="['risk-target-card', phase3.risk.statusClass]">
+            <strong>{{ phase3.risk.riskViolationCount }}</strong>
+            <span>风险违规目标 0</span>
+            <small>{{ phase3.risk.targetText }} · {{ phase3.risk.statusText }}</small>
+          </article>
+        </div>
+
+        <div class="phase3-split">
+          <section>
+            <div class="card-head compact-head">
+              <h4>线索完善与客户管理</h4>
+              <span>从 staging 完善区人工确认后进入客户管理</span>
+            </div>
+            <div class="phase3-metric-grid">
+              <article>
+                <strong>{{ phase3.enrichment.fieldAdoptionRateText }}</strong>
+                <span>字段采纳率</span>
+                <p>{{ phase3.enrichment.acceptedFieldCount }} / {{ phase3.enrichment.fieldCandidateCount }} 个字段候选被人工采纳</p>
+              </article>
+              <article>
+                <strong>{{ phase3.enrichment.contactCompletenessRateText }}</strong>
+                <span>联系方式完整率</span>
+                <p>{{ phase3.enrichment.contactCompleteCustomerCount }} 个客户具备有效联系方式</p>
+              </article>
+              <article>
+                <strong>{{ phase3.enrichment.vehicleIntentRateText }}</strong>
+                <span>意向车型覆盖率</span>
+                <p>{{ phase3.enrichment.vehicleIntentCustomerCount }} 个客户已有意向车型记录</p>
+              </article>
+            </div>
+          </section>
+
+          <section>
+            <div class="card-head compact-head">
+              <h4>清洗治理</h4>
+              <span>建议不等于执行，必须人工确认</span>
+            </div>
+            <div class="phase3-cleanup-list">
+              <article>
+                <strong>{{ phase3.cleanup.adoptionRateText }}</strong>
+                <span>建议采纳率</span>
+                <p>{{ phase3.cleanup.approvedCount }} / {{ phase3.cleanup.createdCount }} 条建议已通过</p>
+              </article>
+              <article>
+                <strong>{{ phase3.cleanup.duplicateMergeRateText }}</strong>
+                <span>重复归并率</span>
+                <p>{{ phase3.cleanup.duplicateMergeCount }} 条重复线索由人工执行归并</p>
+              </article>
+              <article>
+                <strong>{{ phase3.cleanup.watchRestoreRateText }}</strong>
+                <span>D 级恢复率</span>
+                <p>{{ phase3.cleanup.watchRestoreCount }} 条 Watch 线索经人工恢复</p>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <div class="phase3-guardrail-grid">
+          <article>
+            <strong>客户触达</strong>
+            <span :class="['tag', phase3.guardrails.autoOutreachAllowed ? 'red' : 'green']">
+              {{ phase3.guardrails.autoOutreachAllowed ? '异常开启' : '仅人工' }}
+            </span>
+          </article>
+          <article>
+            <strong>好友请求</strong>
+            <span :class="['tag', phase3.guardrails.autoFriendRequestAllowed ? 'red' : 'green']">
+              {{ phase3.guardrails.autoFriendRequestAllowed ? '异常开启' : '禁止' }}
+            </span>
+          </article>
+          <article>
+            <strong>登录批量采集禁用</strong>
+            <span :class="['tag', phase3.guardrails.loginBatchCollectionAllowed ? 'red' : 'green']">
+              {{ phase3.guardrails.loginBatchCollectionAllowed ? '异常开启' : '已禁用' }}
+            </span>
+          </article>
+        </div>
+
+        <p class="guardrail">第三阶段只展示指标和风控状态；AI 不得自动晋级客户、自动归并客户、自动恢复 Invalid，客户触达必须人工确认。</p>
+      </section>
+
       <section id="llm-governance" class="admin-card llm-card">
         <div class="card-head">
           <div>
@@ -429,6 +538,7 @@ import { buildAdminOverviewView } from './services/adminOverview.js';
 import { buildChannelRiskConfigView } from './services/channelRiskConfig.js';
 import { buildLlmGovernanceView, fetchLlmGovernance } from './services/llmGovernance.js';
 import { buildPhase2DashboardView, fetchPhase2Dashboard } from './services/phase2Dashboard.js';
+import { buildPhase3DashboardView, fetchPhase3Dashboard } from './services/phase3Dashboard.js';
 import { buildSyncAiAuditView } from './services/syncAiAudit.js';
 
 const overview = computed(() => buildAdminOverviewView(adminOverviewSeed));
@@ -437,12 +547,16 @@ const syncAudit = computed(() => buildSyncAiAuditView(syncAiAuditSeed));
 const phase2Payload = ref(null);
 const phase2Loading = ref(true);
 const phase2Error = ref('');
+const phase3Payload = ref(null);
+const phase3Loading = ref(true);
+const phase3Error = ref('');
 const llmGovernancePayload = ref(null);
 const llmLoading = ref(true);
 const llmError = ref('');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
 
 const phase2 = computed(() => buildPhase2DashboardView(phase2Payload.value || {}));
+const phase3 = computed(() => buildPhase3DashboardView(phase3Payload.value || {}));
 const llmGovernance = computed(() => buildLlmGovernanceView(llmGovernancePayload.value || {}));
 const phase2PauseThresholds = computed(() => Object.values(phase2.value.pauseThresholds));
 const phase2StatusText = computed(() => {
@@ -454,6 +568,16 @@ const phase2StatusText = computed(() => {
 const phase2StatusClass = computed(() => {
   if (phase2Error.value || phase2.value.summary.highForbiddenRiskEventCount > 0) return 'red';
   if (phase2Loading.value) return 'amber';
+  return 'green';
+});
+const phase3StatusText = computed(() => {
+  if (phase3Loading.value) return '加载中';
+  if (phase3Error.value) return 'API 异常';
+  return phase3.value.risk.riskViolationTargetZero ? '风险达标' : '需处理';
+});
+const phase3StatusClass = computed(() => {
+  if (phase3Loading.value) return 'amber';
+  if (phase3Error.value || !phase3.value.risk.riskViolationTargetZero) return 'red';
   return 'green';
 });
 const llmStatusText = computed(() => {
@@ -468,19 +592,32 @@ const llmStatusClass = computed(() => {
 });
 
 onMounted(async () => {
-  try {
-    const [phase2Result, llmGovernanceResult] = await Promise.all([
-      fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
-      fetchLlmGovernance({ baseUrl: apiBaseUrl }),
-    ]);
-    phase2Payload.value = phase2Result;
-    llmGovernancePayload.value = llmGovernanceResult;
-  } catch (error) {
-    phase2Error.value = `无法加载第二阶段真实 API 指标：${error.message}`;
-    llmError.value = `无法加载 LLM/Prompt 治理真实 API：${error.message}`;
-  } finally {
-    phase2Loading.value = false;
-    llmLoading.value = false;
+  const [phase2Result, phase3Result, llmGovernanceResult] = await Promise.allSettled([
+    fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
+    fetchPhase3Dashboard({ baseUrl: apiBaseUrl }),
+    fetchLlmGovernance({ baseUrl: apiBaseUrl }),
+  ]);
+
+  if (phase2Result.status === 'fulfilled') {
+    phase2Payload.value = phase2Result.value;
+  } else {
+    phase2Error.value = `无法加载第二阶段真实 API 指标：${phase2Result.reason.message}`;
   }
+
+  if (phase3Result.status === 'fulfilled') {
+    phase3Payload.value = phase3Result.value;
+  } else {
+    phase3Error.value = `无法加载第三阶段真实 API 指标：${phase3Result.reason.message}`;
+  }
+
+  if (llmGovernanceResult.status === 'fulfilled') {
+    llmGovernancePayload.value = llmGovernanceResult.value;
+  } else {
+    llmError.value = `无法加载 LLM/Prompt 治理真实 API：${llmGovernanceResult.reason.message}`;
+  }
+
+  phase2Loading.value = false;
+  phase3Loading.value = false;
+  llmLoading.value = false;
 });
 </script>

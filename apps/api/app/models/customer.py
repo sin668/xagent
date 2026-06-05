@@ -36,6 +36,7 @@ class Customer(Base):
         index=True,
     )
     owner: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    owner_team: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     do_not_contact: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     do_not_contact_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     do_not_contact_marked_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -59,3 +60,5 @@ class Customer(Base):
     outreach_records = relationship("OutreachRecord", back_populates="customer", cascade="all, delete-orphan")
     ai_audit_logs = relationship("AIAuditLog", back_populates="customer", cascade="all, delete-orphan")
     compliance_reviews = relationship("ComplianceReview", back_populates="customer", cascade="all, delete-orphan")
+    vehicle_intents = relationship("CustomerVehicleIntent", back_populates="customer", cascade="all, delete-orphan")
+    followups = relationship("CustomerFollowup", back_populates="customer", cascade="all, delete-orphan")

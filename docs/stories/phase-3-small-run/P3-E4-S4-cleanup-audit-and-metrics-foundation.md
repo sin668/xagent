@@ -1,8 +1,8 @@
 # Story P3-E4-S4：清洗审计和基础指标口径
 
-状态：Draft  
-Sprint：Sprint 4  
-优先级：P1  
+状态：实现完成，真实 PostgreSQL 指标查询待复跑
+Sprint：Sprint 4
+优先级：P1
 Epic：P3-E4
 
 ## 用户故事
@@ -82,3 +82,22 @@ Epic：P3-E4
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e4-s4-执行结果.md`
+
+验收结果：
+
+- 已新增 `LeadCleanupSuggestionService.audit_suggestion_created`，记录 `lead_cleanup_suggestion_created`。
+- 既有 approve/reject 继续记录 `lead_cleanup_suggestion_approved` / `lead_cleanup_suggestion_rejected`。
+- 既有 execute 继续记录 `lead_cleanup_suggestion_executed`。
+- 已新增 `apps/api/app/services/phase3_metrics.py`，提供 `Phase3CleanupMetricsService.cleanup_metrics`。
+- 已支持统计清洗建议生成数、确认数、执行数、拒绝数、待处理数。
+- 已支持统计清洗建议采纳率、执行率、重复归并率、Watch 恢复率、Invalid 确认率。
+- 指标口径明确以 `executed` 才计入重复归并、Watch 恢复和 Invalid 确认，不把自动建议或仅 approved 建议等同于已执行清洗。
+- 未新增管理后台页面。
+- 未新增自动社交私信、自动加好友、自动触达客户能力。
+- 已运行当前 Story 测试、清洗建议查询/审核/执行/模型/第三阶段契约关联测试和编译检查。
+- 真实 PostgreSQL 连接验证因当前沙箱网络权限被阻断，错误为 `PermissionError: [Errno 1] Operation not permitted`，需在外部环境复跑。

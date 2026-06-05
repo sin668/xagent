@@ -1,8 +1,8 @@
 # Story P3-E6-S3：实现客户意向车型 CRUD API
 
-状态：Draft  
-Sprint：Sprint 6  
-优先级：P1  
+状态：实现完成，真实 PostgreSQL API 联调待外部环境复跑
+Sprint：Sprint 6
+优先级：P1
 Epic：P3-E6
 
 ## 用户故事
@@ -83,3 +83,46 @@ Epic：P3-E6
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行时间：2026-06-04
+执行者：Codex
+执行方式：`superpowers:executing-plans` + `superpowers:test-driven-development`
+
+### 实现内容
+
+- 新增 `apps/api/app/services/customer_vehicle_intents.py`，实现客户意向车型列表、新增、修改和状态更新服务。
+- 新增 `apps/api/app/api/customer_vehicle_intents.py`，提供客户意向车型 API。
+- 更新 `apps/api/app/main.py`，挂载客户意向车型路由。
+- 新增 `apps/api/tests/test_customer_vehicle_intents_api.py`，覆盖路由、列表、新增、修改、状态更新、source_type/source_note 和非报价合同边界。
+
+### 验收结果
+
+- 支持列表：`GET /customers/{customer_id}/vehicle-intents`。
+- 支持新增：`POST /customers/{customer_id}/vehicle-intents`。
+- 支持修改和状态更新：`PATCH /customer-vehicle-intents/{intent_id}`。
+- 已记录 `source_type` 和 `source_note`。
+- C 级客户意向车型可通过 `is_sales_candidate_customer` 参与销售候选判断。
+- 未触发报价或合同流程，符合非目标。
+
+### 测试记录
+
+- 红灯验证：`python -m pytest tests/test_customer_vehicle_intents_api.py -q`，失败原因为 `ModuleNotFoundError: No module named 'app.services.customer_vehicle_intents'`。
+- 绿灯验证：`python -m pytest tests/test_customer_vehicle_intents_api.py -q`，结果 `5 passed in 1.57s`。
+- 离线关联回归：`python -m pytest tests/test_customer_vehicle_intents_api.py tests/test_customer_intents_followups_models.py tests/test_customer_detail_aggregate_api.py tests/test_customers_workbench_list_api.py tests/test_customer_assignment_status.py -q`，结果 `31 passed in 1.51s`。
+- 编译检查：`python -m compileall app/api app/services app/schemas app/models`，退出码 0。
+- 真实 PostgreSQL API 联调：当前沙箱网络对真实 PostgreSQL 连接受限，需在外部环境复跑。
+
+### 两轮独立评审
+
+第一轮评审：
+
+- 结论：通过。
+- 发现项：客户意向车型 API 必须保留来源字段，避免销售判断脱离证据。
+- 修正结果：新增和修改均支持 `source_type`、`source_note`，测试覆盖字段保留。
+
+第二轮评审：
+
+- 结论：通过，真实 PostgreSQL API 联调待外部环境复跑。
+- 发现项：本 Story 不得引入报价、合同或车源自动报价流程。
+- 修正结果：新增路由仅包含列表、新增、修改；测试确认意向车型路由和实现文件不包含报价/合同动作。

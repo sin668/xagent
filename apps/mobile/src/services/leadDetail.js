@@ -46,7 +46,11 @@ export function markLeadDoNotContact(lead, { actor, reason, markedAt } = {}) {
 export function buildPromoteStagingPayload({ actor, reviewNote } = {}) {
   return {
     actor: actor || '当前用户',
-    review_result: 'approved',
+    accepted_fields_json: {
+      customer_name: { source: 'mobile_manual_review' },
+      contacts_json: { source: 'mobile_manual_review' },
+      source_evidence: { source: 'mobile_manual_review' },
+    },
     review_note: reviewNote || '人工复核通过，准入闸门允许晋级 core。',
   };
 }

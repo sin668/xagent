@@ -1,8 +1,8 @@
 # Story P3-E5-S5：Agent 项目与 apps/api 任务审计联调验证
 
-状态：Draft  
-Sprint：Sprint 5  
-优先级：P1  
+状态：实现完成
+Sprint：Sprint 5
+优先级：P1
 Epic：P3-E5
 
 ## 用户故事
@@ -84,3 +84,52 @@ Epic：P3-E5
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行时间：2026-06-04
+执行者：Codex
+执行方式：`superpowers:executing-plans` + `superpowers:test-driven-development`
+
+### 实现内容
+
+- 新增 `apps/agents/app/runtime/mock_runtime.py` 和 `apps/agents/app/runtime/__init__.py`，统一封装 Deep Enrichment 与 Lead Cleanup mock Agent runtime。
+- 更新 `apps/api/app/services/lead_enrichment.py`，新增 `run_deep_enrichment_agent`，支持触发 mock Agent、写入 `agent_task_runs`、校验结构化输出并写入 `lead_enrichment_field_candidates`。
+- 更新 `apps/api/app/services/lead_cleanup.py`，新增 `run_cleanup_agent`，支持触发 mock Agent、写入 `agent_task_runs`、校验结构化输出并写入 `lead_cleanup_suggestions`。
+- 新增 `apps/api/tests/test_phase3_agent_runtime_integration.py`，覆盖 API 服务层 runtime 联调契约。
+- 新增 `apps/agents/tests/test_agent_runtime_integration.py`，覆盖 Agent 项目 runtime 统一调用契约。
+
+### 验收结果
+
+- apps/api 可触发 mock Agent：已通过 `LeadEnrichmentService.run_deep_enrichment_agent` 和 `LeadCleanupSuggestionService.run_cleanup_agent` 验证。
+- 任务状态写入 `agent_task_runs`：成功路径写入 `succeeded`，失败路径写入 `failed`，并保留 `output_summary_json` / `error_message`。
+- Agent 失败不会阻塞 API 主线程：`run_deep_enrichment_agent` 捕获 runtime 异常并标记任务失败，不向调用方抛出异常。
+- 结果经 apps/api Service 校验后写入候选/建议表：Deep Enrichment 写 `lead_enrichment_field_candidates`，Lead Cleanup 写 `lead_cleanup_suggestions`。
+- 未迁移 Source Discovery / Lead Extraction，符合非目标。
+
+### 测试记录
+
+- 红灯验证：
+  - `python -m pytest tests/test_phase3_agent_runtime_integration.py -q`，失败原因为缺少 `run_deep_enrichment_agent` / `run_cleanup_agent`。
+  - `python -m pytest tests/test_agent_runtime_integration.py -q`，失败原因为缺少 `app.runtime`。
+- 绿灯验证：
+  - `apps/api` 当前 Story 测试：`3 passed in 0.39s`。
+  - `apps/agents` 当前 Story 测试：`2 passed in 0.04s`。
+- 关联回归：
+  - `apps/api` P3-E5 相关回归：`48 passed in 2.56s`。
+  - `apps/agents` 全量测试：`17 passed in 0.05s`。
+  - `apps/api` 编译检查：`python -m compileall app/api app/services app/schemas app/models`，退出码 0。
+  - `apps/agents` 编译检查：`python -m compileall app`，退出码 0。
+
+### 两轮独立评审
+
+第一轮评审：
+
+- 结论：通过。
+- 发现项：需确认 Agent runtime 输出不会直接污染 core 表。
+- 修正结果：API 服务层仅写 `lead_enrichment_field_candidates` 与 `lead_cleanup_suggestions`，并要求 runtime 输出 `audit.writes_core_tables=false`。
+
+第二轮评审：
+
+- 结论：通过。
+- 发现项：需确认 Agent 失败不会阻塞 API 主线程，且状态可审计。
+- 修正结果：Deep Enrichment 失败路径捕获异常并标记 `LeadEnrichmentResult=failed`、`AgentTaskRun=failed`；Cleanup 失败路径标记 `LeadCleanupRun=failed`、`AgentTaskRun=failed`，保留错误摘要。

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ComplianceReview, Customer
 from app.models.enums import ComplianceReviewStatus, CustomerGrade, CustomerStatus
+from app.services.permissions import Phase3PermissionService
 
 
 AI_RISK_TIP = "AI仅提示风险，不能替代合规复核结论或法律意见。"
@@ -90,9 +91,13 @@ class ComplianceService:
         review.reviewed_at = datetime.utcnow()
         return review
 
-    def mark_quoted(self, *, customer_id: UUID, actor: str) -> Customer:
+    def mark_quoted(self, *, customer_id: UUID, actor: str, actor_role: str = "sales") -> Customer:
         customer, review = self.status_for_customer(customer_id)
         if customer.grade == CustomerGrade.C and review.status != ComplianceReviewStatus.APPROVED:
+            Phase3PermissionService.ensure_c_grade_compliance_ready(
+                actor_role=actor_role,
+                compliance_approved=False,
+            )
             raise ValueError("C级线索报价前必须完成合规复核。")
         customer.status = CustomerStatus.QUOTED
         customer.owner = actor

@@ -252,3 +252,89 @@ class LeadSourceCandidateExtractionStatus(StrEnum):
     FAILED = "failed"
     RETRY = "retry"
     BLOCKED = "blocked"
+
+
+class LeadEnrichmentType(StrEnum):
+    AI_DEEP_RESEARCH = "ai_deep_research"
+    MANUAL_SUPPLEMENT = "manual_supplement"
+
+
+class LeadEnrichmentResultStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class LeadEnrichmentFieldSourceType(StrEnum):
+    AI_PUBLIC_SOURCE = "ai_public_source"
+    MANUAL_PUBLIC_INFO = "manual_public_info"
+    MANUAL_CUSTOMER_REPLY = "manual_customer_reply"
+    MANUAL_BUSINESS_NOTE = "manual_business_note"
+    UNKNOWN = "unknown"
+
+
+class LeadEnrichmentFieldReviewStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    NEEDS_REVIEW = "needs_review"
+
+
+class LeadCleanupRunStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class LeadCleanupSuggestionType(StrEnum):
+    STRONG_DUPLICATE = "strong_duplicate"
+    POSSIBLE_DUPLICATE = "possible_duplicate"
+    MERGE_CONTACT_METHOD = "merge_contact_method"
+    MERGE_SOURCE_EVIDENCE = "merge_source_evidence"
+    RESTORE_FROM_WATCH = "restore_from_watch"
+    CONFIRM_INVALID = "confirm_invalid"
+    MARK_ABANDONED = "mark_abandoned"
+    NEEDS_MANUAL_REVIEW = "needs_manual_review"
+
+
+class LeadCleanupSuggestionReviewStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXECUTED = "executed"
+
+
+class CustomerVehicleIntentSourceType(StrEnum):
+    MANUAL_CUSTOMER_REPLY = "manual_customer_reply"
+    MANUAL_BUSINESS_NOTE = "manual_business_note"
+    AI_ENRICHMENT_ACCEPTED = "ai_enrichment_accepted"
+    IMPORTED = "imported"
+    UNKNOWN = "unknown"
+
+
+class CustomerVehicleIntentStatus(StrEnum):
+    ACTIVE = "active"
+    PENDING_CONFIRMATION = "pending_confirmation"
+    FULFILLED = "fulfilled"
+    ARCHIVED = "archived"
+
+
+class CustomerFollowupTeam(StrEnum):
+    CUSTOMER_SERVICE = "customer_service"
+    SALES = "sales"
+    EXPORT = "export"
+    COMPLIANCE = "compliance"
+    OPERATIONS = "operations"
+
+
+class CustomerFollowupType(StrEnum):
+    MANUAL_CALL = "manual_call"
+    MANUAL_MESSAGE = "manual_message"
+    EMAIL = "email"
+    CUSTOMER_REPLY = "customer_reply"
+    INTERNAL_NOTE = "internal_note"
+    COMPLIANCE_REVIEW = "compliance_review"

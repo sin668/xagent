@@ -236,3 +236,108 @@
   line-height: 1.55;
   font-weight: 800;
 }
+
+.enrichment-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.enrichment-action-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.enrichment-action-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.enrichment-button-primary,
+.enrichment-button-secondary {
+  flex: 0 0 auto;
+  min-width: 78px;
+  max-width: 128px;
+  height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 18px;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 36px;
+  white-space: nowrap;
+}
+
+.enrichment-button-primary {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.enrichment-button-secondary {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.enrichment-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.enrichment-candidate-card {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.enrichment-candidate-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.enrichment-candidate-head > view {
+  min-width: 0;
+}
+
+.enrichment-candidate-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.manual-enrichment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgba(14, 165, 233, 0.24);
+  border-radius: 14px;
+  background: #f0f9ff;
+}
+
+.manual-enrichment-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #132033;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.manual-enrichment-submit {
+  width: 100%;
+  max-width: none;
+}

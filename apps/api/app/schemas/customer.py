@@ -24,15 +24,46 @@ class CustomerSummary(BaseModel):
     do_not_contact_reason: str | None = None
     do_not_contact_marked_by: str | None = None
     do_not_contact_marked_at: str | None = None
+    owner: str | None = None
+    owner_team: str | None = None
+    contact_summary: dict = Field(default_factory=dict)
+    source_completeness: dict = Field(default_factory=dict)
+    completeness_score: int | None = None
+    followup_status: str | None = None
+    vehicle_intent_summary: dict = Field(default_factory=dict)
+    next_action: str | None = None
+    next_action_priority: int | None = None
 
 
 class CustomerListResponse(BaseModel):
     items: list[CustomerSummary]
 
 
+class CustomerDetailResponse(BaseModel):
+    id: str
+    profile: dict = Field(default_factory=dict)
+    contacts: list[dict] = Field(default_factory=list)
+    sources: list[dict] = Field(default_factory=list)
+    vehicle_intents: list[dict] = Field(default_factory=list)
+    outreach_history: list[dict] = Field(default_factory=list)
+    followups: list[dict] = Field(default_factory=list)
+    compliance_status: dict = Field(default_factory=dict)
+    do_not_contact: dict = Field(default_factory=dict)
+    pending_fields: list[str] = Field(default_factory=list)
+    source_traceability: dict = Field(default_factory=dict)
+    contact_summary: dict = Field(default_factory=dict)
+    source_completeness: dict = Field(default_factory=dict)
+    completeness_score: int | None = None
+    vehicle_intent_summary: dict = Field(default_factory=dict)
+    followup_status: str | None = None
+    next_action: str | None = None
+    next_action_priority: int | None = None
+
+
 class DoNotContactRequest(BaseModel):
     actor: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    actor_role: str = Field(default="operations", min_length=1)
 
 
 class OutreachRecordCreate(BaseModel):

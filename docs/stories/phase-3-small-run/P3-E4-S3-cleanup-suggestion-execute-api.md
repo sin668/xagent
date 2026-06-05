@@ -1,8 +1,8 @@
 # Story P3-E4-S3：实现清洗建议执行 API
 
-状态：Draft  
-Sprint：Sprint 4  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 写库联调待复跑
+Sprint：Sprint 4
+优先级：P0
 Epic：P3-E4
 
 ## 用户故事
@@ -83,3 +83,24 @@ Epic：P3-E4
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e4-s3-执行结果.md`
+
+验收结果：
+
+- 已新增 `POST /lead-cleanup/suggestions/{suggestion_id}/execute`。
+- 已新增 `LeadCleanupSuggestionExecuteRequest`，要求 `actor`、`actor_role`、`execution_note`。
+- 未 approve 的清洗建议会被阻断，不能执行。
+- `strong_duplicate` / `possible_duplicate` 执行后会将来源 staging 线索标记为 `duplicate` / `not_eligible`，并用 `dedupe_key=duplicate_of:{target_id}` 保留等效重复关系。
+- 执行重复归并时不会物理删除 staging 线索。
+- 已支持将来源线索联系方式合并到目标线索，并按联系方式类型和值去重。
+- 已支持将来源证据追加到目标线索，不覆盖原证据。
+- `evidence_json.do_not_contact=true` 时会传播勿扰边界到目标线索，将目标线索调整为 `Watch` 和 `not_eligible`，并追加勿扰证据说明。
+- 执行后写入 `executed_by`、`executed_at`、`execution_note`。
+- 执行后写入 `ReviewLog` 审计事件 `lead_cleanup_suggestion_executed`。
+- 未实现 Agent 生成建议，未自动社交私信、未自动加好友、未自动触达客户。
+- 已运行当前 Story 测试、清洗建议查询/审核/模型/第三阶段契约关联测试和编译检查。
+- 真实 PostgreSQL 连接验证因当前沙箱网络权限被阻断，错误为 `PermissionError: [Errno 1] Operation not permitted`，需在外部环境复跑。

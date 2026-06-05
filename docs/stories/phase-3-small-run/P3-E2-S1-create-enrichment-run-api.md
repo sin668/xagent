@@ -1,8 +1,8 @@
 # Story P3-E2-S1：实现触发深挖线索任务 API 和配额校验
 
-状态：Draft  
-Sprint：Sprint 2  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 写库联调待复跑
+Sprint：Sprint 2
+优先级：P0
 Epic：P3-E2
 
 ## 用户故事
@@ -83,3 +83,30 @@ Epic：P3-E2
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e2-s1-执行结果.md`
+
+实现完成项：
+
+- 已创建 `apps/api/app/api/lead_enrichment.py`。
+- 已创建 `apps/api/app/services/lead_enrichment.py`。
+- 已创建 `apps/api/app/schemas/lead_enrichment.py`。
+- 已更新 `apps/api/app/main.py` 注册路由。
+- 已更新 `apps/api/app/settings.py` 增加每日深挖配额配置。
+- 已创建 `apps/api/tests/test_lead_enrichment_run_api.py`。
+
+验收结果：
+
+- 单 Story 测试通过：`python -m pytest tests/test_lead_enrichment_run_api.py -q`，结果 `5 passed`。
+- 相关回归通过：`python -m pytest tests/test_lead_enrichment_run_api.py tests/test_lead_enrichment_result_model.py tests/test_phase3_model_contract.py -q`，结果 `17 passed`。
+- 语法编译通过：`python -m compileall app/api app/services app/schemas`。
+- OpenAPI 验证通过，确认存在 `POST /staging-leads/{lead_id}/enrichment-runs`。
+- 当前沙箱网络阻断 `.env` 中真实 PostgreSQL 连接，错误为 `PermissionError: [Errno 1] Operation not permitted`；本机无 `psql`、`pg_ctl`、`initdb`、`docker` 可替代验证，因此真实 PostgreSQL API 写库联调待外部环境复跑。
+
+两轮评审结论：
+
+- 第一轮评审：通过，人工触发、Watch/Invalid/Forbidden/勿扰阻断、每日配额和 pending run 创建规则均满足；真实库联调为环境限制项。
+- 第二轮评审：通过，API/service/schema 与现有 FastAPI + SQLAlchemy 模式一致，未新增自动触达或后台全量深挖入口；未发现新增实质阻塞问题。

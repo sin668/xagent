@@ -74,6 +74,13 @@ class Settings(BaseSettings):
             "AGENT_RETRY_WORKER_INTERVAL_SECONDS",
         ),
     )
+    lead_enrichment_daily_quota_per_lead: int = Field(
+        default=2,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_LEAD_ENRICHMENT_DAILY_QUOTA_PER_LEAD",
+            "LEAD_ENRICHMENT_DAILY_QUOTA_PER_LEAD",
+        ),
+    )
     feishu_app_id: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_FEISHU_APP_ID", "FEISHU_APP_ID"))
     feishu_app_secret: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_FEISHU_APP_SECRET", "FEISHU_APP_SECRET"))
     feishu_bitable_app_token: str | None = Field(

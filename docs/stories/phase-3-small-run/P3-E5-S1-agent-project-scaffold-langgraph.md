@@ -1,8 +1,8 @@
 # Story P3-E5-S1：新建独立 Agent 项目并接入 LangGraph 基础结构
 
-状态：Draft  
-Sprint：Sprint 5  
-优先级：P0  
+状态：实现完成
+Sprint：Sprint 5
+优先级：P0
 Epic：P3-E5
 
 ## 用户故事
@@ -85,3 +85,22 @@ Epic：P3-E5
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e5-s1-执行结果.md`
+
+验收结果：
+
+- 已创建独立 Agent 项目目录 `apps/agents`。
+- 已创建 `apps/agents/pyproject.toml`，声明 `langgraph`、`pydantic` 和 `pytest` 依赖。
+- 已创建 `apps/agents/app/graphs/__init__.py`、`apps/agents/app/schemas/__init__.py`、`apps/agents/app/tools/__init__.py`。
+- 已创建 `apps/agents/app/adapters/__init__.py`，用于后续与 `apps/api` 服务契约对接。
+- 已创建 `apps/agents/tests/` 和基础测试 `tests/test_project_scaffold.py`。
+- 已创建 `apps/agents/README.md`，明确 Agent 项目不直接写 core 表，不自动触达、不自动归并、不自动恢复 Invalid。
+- 已提供 `build_placeholder_graph` 占位契约，明确当前不实现具体 graph。
+- 已验证 `apps/agents` 基础测试可运行。
+- 已验证当前环境可导入 `langgraph`。
+- 已使用可写 `PYTHONUSERBASE=/private/tmp/xagent-agents-userbase` 完成本地 editable 安装验证。
+- 已运行 `apps/api` 轻量回归和编译检查，确认不影响现有 API 启动相关导入。

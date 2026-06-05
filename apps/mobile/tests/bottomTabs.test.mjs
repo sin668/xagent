@@ -11,11 +11,21 @@ test('bottom tabs expose top-level mobile destinations with active state', () =>
     [
       'home:/pages/home/index:false',
       'leads:/pages/leads/index:true',
+      'customers:/pages/customers/index:false',
       'sources:/pages/sources/index:false',
       'ai:/pages/outreach/index:false',
       'insights:/pages/inventory/index:false',
     ],
   );
+});
+
+test('bottom tabs support customers workbench as a top-level active destination', () => {
+  const tabs = buildBottomTabs('customers');
+  const customers = tabs.find((tab) => tab.key === 'customers');
+
+  assert.equal(customers.path, '/pages/customers/index');
+  assert.equal(customers.label, '客户');
+  assert.equal(customers.active, true);
 });
 
 test('bottom tab navigation uses redirectTo and skips the active tab', () => {

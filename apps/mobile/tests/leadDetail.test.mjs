@@ -116,7 +116,7 @@ test('lead detail disables promotion when core gate blocks missing evidence or s
   assert.deepEqual(detail.coreGate.reasons, ['缺少来源证据']);
 });
 
-test('promote staging payload records actor, review result, and manual review note', () => {
+test('promote staging payload records actor, accepted fields, and manual review note', () => {
   const payload = buildPromoteStagingPayload({
     actor: 'ops-anna',
     reviewNote: '来源和证据完整，人工确认晋级。',
@@ -124,7 +124,11 @@ test('promote staging payload records actor, review result, and manual review no
 
   assert.deepEqual(payload, {
     actor: 'ops-anna',
-    review_result: 'approved',
+    accepted_fields_json: {
+      customer_name: { source: 'mobile_manual_review' },
+      contacts_json: { source: 'mobile_manual_review' },
+      source_evidence: { source: 'mobile_manual_review' },
+    },
     review_note: '来源和证据完整，人工确认晋级。',
   });
 });

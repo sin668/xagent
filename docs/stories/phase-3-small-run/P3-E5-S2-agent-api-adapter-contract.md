@@ -1,8 +1,8 @@
 # Story P3-E5-S2：定义 Agent 项目与 apps/api 的输入输出协议
 
-状态：Draft  
-Sprint：Sprint 5  
-优先级：P0  
+状态：实现完成
+Sprint：Sprint 5
+优先级：P0
 Epic：P3-E5
 
 ## 用户故事
@@ -84,3 +84,22 @@ Epic：P3-E5
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e5-s2-执行结果.md`
+
+验收结果：
+
+- 已创建 `apps/agents/app/schemas/deep_enrichment.py`。
+- 已创建 `apps/agents/app/schemas/lead_cleanup.py`。
+- 已创建 `apps/agents/app/adapters/api_contract.py`。
+- 已创建 `apps/agents/tests/test_api_contract.py`。
+- Deep Enrichment 输出协议只包含字段级候选 `field_candidates`，默认 `review_status=pending`，不包含 `customer_id`、`accepted_by` 等 core/人工采纳字段。
+- Cleanup 输出协议只包含清洗建议 `suggestions`，默认 `review_status=pending`，不包含 `reviewer_id`、`executed_by`、`customer_id` 等人工确认/执行/core 字段。
+- schema 使用 `extra="forbid"`，会拒绝 `auto_promote_customer`、`auto_execute_cleanup`、`send_outreach_message` 等自动晋级、自动执行、自动触达字段。
+- `ApiContractBoundary` 仅允许输出 `lead_enrichment_field_candidates` 和 `lead_cleanup_suggestions`。
+- `ApiContractBoundary` 明确禁止直接写 `customers`、`lead_sources`、`contact_methods` core 表。
+- 已运行 `apps/agents` 当前 Story 测试、全部 Agent 项目测试、Agent 项目编译检查、`apps/api` 轻量回归和 API 编译检查。
+- 未调用真实 LLM。

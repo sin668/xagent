@@ -1,6 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
+from app.models import Customer
+from app.models.enums import CustomerGrade, CustomerStatus, CustomerType
+from app.services.compliance_guards import Phase3ComplianceGuardService
+
 
 BLOCKED_RISK_LEVELS = {"High", "Forbidden"}
 FORBIDDEN_COMMITMENTS = (
@@ -28,7 +32,31 @@ class OutreachDraftService:
         risk_level: str = "Low",
         do_not_contact: bool = False,
         rag_context: dict | None = None,
+        session=None,
+        actor: str | None = None,
     ) -> dict:
+        if do_not_contact:
+            customer = Customer(
+                id=customer_id,
+                external_id=f"customer:{customer_id}",
+                name="Unknown",
+                normalized_name="unknown",
+                country="Unknown",
+                city=None,
+                customer_type=CustomerType.UNKNOWN,
+                grade=CustomerGrade.WATCH,
+                status=CustomerStatus.DO_NOT_CONTACT,
+                do_not_contact=True,
+            )
+            try:
+                Phase3ComplianceGuardService.ensure_customer_can_receive_outreach(
+                    customer,
+                    session=session,
+                    actor=actor,
+                    action="outreach_draft_generate",
+                )
+            except ValueError:
+                pass
         draft = {
             "draft_id": "draft-ru-b-001",
             "customer_id": customer_id,
@@ -108,8 +136,16 @@ class OutreachDraftService:
         channel: str,
         risk_level: str = "Low",
         do_not_contact: bool = False,
+        session=None,
+        actor: str | None = None,
     ) -> dict:
-        draft = self.get_existing_draft(customer_id=customer_id, risk_level=risk_level, do_not_contact=do_not_contact)
+        draft = self.get_existing_draft(
+            customer_id=customer_id,
+            risk_level=risk_level,
+            do_not_contact=do_not_contact,
+            session=session,
+            actor=actor or sender,
+        )
         if not human_confirmed or not draft["can_record_sent"]:
             raise ValueError("Manual confirmation and passing compliance checks are required before recording sent outreach.")
 

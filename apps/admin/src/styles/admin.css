@@ -253,6 +253,7 @@ body {
 .risk-config-card,
 .sync-audit-card,
 .phase2-card,
+.phase3-card,
 .llm-card {
   margin-top: 18px;
 }
@@ -281,6 +282,104 @@ body {
 
 .phase2-summary .danger-metric strong {
   color: #b91c1c;
+}
+
+.phase3-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.phase3-summary article {
+  min-height: 132px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.phase3-summary strong {
+  display: block;
+  font-size: 26px;
+}
+
+.phase3-summary small {
+  display: block;
+  margin-top: 8px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.risk-target-card.green {
+  background: #ecfdf5;
+}
+
+.risk-target-card.red {
+  background: #fff7ed;
+}
+
+.risk-target-card.red strong {
+  color: #b91c1c;
+}
+
+.phase3-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.phase3-metric-grid,
+.phase3-cleanup-list,
+.phase3-guardrail-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.phase3-metric-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.phase3-metric-grid article,
+.phase3-cleanup-list article,
+.phase3-guardrail-grid article {
+  padding: 13px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.phase3-metric-grid strong,
+.phase3-cleanup-list strong,
+.phase3-guardrail-grid strong {
+  display: block;
+  font-size: 20px;
+}
+
+.phase3-metric-grid p,
+.phase3-cleanup-list p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.phase3-guardrail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.phase3-guardrail-grid article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.phase3-guardrail-grid strong {
+  font-size: 13px;
 }
 
 .phase2-flow {

@@ -70,13 +70,31 @@ def test_customer_api_marks_and_unmarks_do_not_contact() -> None:
 
     unmark_response = client.post(
         f"/customers/{customer_id}/do-not-contact/cancel",
-        json={"actor": "主管B", "reason": "客户重新同意沟通"},
+        json={"actor": "主管B", "actor_role": "admin", "reason": "客户重新同意沟通"},
     )
     assert unmark_response.status_code == 200
     unmarked = unmark_response.json()
     assert unmarked["do_not_contact"] is False
     assert unmarked["do_not_contact_reason"] == "取消勿扰：客户重新同意沟通"
     assert unmarked["do_not_contact_marked_by"] == "主管B"
+
+
+def test_customer_api_cancel_do_not_contact_requires_compliance_or_admin_role() -> None:
+    client = TestClient(app)
+    customer_id = asyncio.run(create_customer(f"{TEST_PREFIX}LEAD-ROLE-001"))
+
+    client.post(
+        f"/customers/{customer_id}/do-not-contact",
+        json={"actor": "客服A", "reason": "客户明确拒绝继续联系"},
+    )
+
+    unmark_response = client.post(
+        f"/customers/{customer_id}/do-not-contact/cancel",
+        json={"actor": "客服A", "actor_role": "customer_service", "reason": "尝试取消勿扰"},
+    )
+
+    assert unmark_response.status_code == 403
+    assert "取消勿扰仅允许合规或管理员" in unmark_response.json()["detail"]
 
 
 def test_customer_api_excludes_do_not_contact_from_outreach_and_ai_script_candidates() -> None:

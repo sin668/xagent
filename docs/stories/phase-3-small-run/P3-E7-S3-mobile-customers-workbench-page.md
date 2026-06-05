@@ -1,8 +1,8 @@
 # Story P3-E7-S3：移动端客户工作台页面
 
-状态：Draft  
-Sprint：Sprint 7  
-优先级：P1  
+状态：实现完成
+Sprint：Sprint 7
+优先级：P1
 Epic：P3-E7
 
 ## 用户故事
@@ -83,3 +83,96 @@ Epic：P3-E7
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行时间：2026-06-04
+执行者：Codex
+执行方式：`superpowers:executing-plans` + `superpowers:test-driven-development` + `superpowers:verification-before-completion`
+
+### 本次变更
+
+- 新增 `apps/mobile/src/services/customers.js`，封装客户工作台列表查询、字段映射、默认排序、筛选和卡片视图模型。
+- 新增 `apps/mobile/src/pages/customers/index.vue`，实现移动端客户工作台页面。
+- 新增 `apps/mobile/src/styles/customers.css`，实现独立移动端样式和横向溢出约束。
+- 新增 `apps/mobile/tests/customersWorkbench.test.mjs` 和 `apps/mobile/tests/customersWorkbenchPage.test.mjs`，覆盖客户字段、排序、筛选、真实 API 调用和风控边界。
+- 更新 `apps/mobile/src/pages.json` 与 `apps/mobile/pages.json`，注册客户工作台页面。
+- 更新 `apps/mobile/src/services/bottomTabs.js` 和 `apps/mobile/tests/bottomTabs.test.mjs`，补充客户工作台顶层导航入口。
+
+### 验收结果
+
+- 显示客户名称、国家城市、等级、联系方式摘要、意向车型摘要、下一步动作：已通过。
+- 默认排序符合第三阶段方案：已按 `next_action_priority` 升序排序，并在无优先级时回退为客户名排序。
+- 筛选支持今日待跟进、C级待合规、有车型意向、待分配：已通过。
+- 不展示未晋级 staging 线索：已通过，页面和服务只调用 `/customers`，不读取 `staging_leads`、seed 或 mock 数据。
+- 非目标“完整 CRM”：未实现，符合 Story 边界。
+
+### 测试记录
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 || true
+nvm use v22.22.0 >/dev/null
+npm --prefix apps/mobile test
+```
+
+结果：`103 passed`
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 || true
+nvm use v22.22.0 >/dev/null
+npm --prefix apps/mobile run build:h5
+```
+
+结果：`DONE  Build complete.`
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 || true
+conda activate booking-room
+cd apps/api
+python -m pytest tests/test_customers_workbench_list_api.py -q
+```
+
+结果：`5 passed`
+
+```bash
+source ~/.zshrc >/dev/null 2>&1 || true
+conda activate booking-room
+cd apps/api
+python -m pytest tests -q -k "customer and workbench"
+```
+
+结果：`7 passed, 483 deselected`
+
+### 两轮独立评审
+
+#### 第一轮评审：数据边界与合规
+
+结论：通过，无新增阻塞问题。
+
+发现项：
+
+- 客户工作台必须只展示已晋级客户，不能混入 staging、seed 或 mock。
+- 页面不得包含自动私信、自动加好友、批量触达等动作。
+
+修正结果：
+
+- 已通过源码扫描和测试确认：页面只通过 `customersService.listCustomers({ limit: 100 })` 调用 `/customers`。
+- 页面未出现 `staging-leads`、seed、mock、自动私信、自动加好友、批量触达等动作。
+
+#### 第二轮评审：移动端可达性与原型一致性
+
+结论：通过，修正后无新增实质阻塞问题。
+
+发现项：
+
+- 客户工作台页面最初使用底部导航 `leads` 激活态，且底部导航服务缺少客户入口，与原型和当前 Story 的移动端工作台入口不一致。
+
+修正结果：
+
+- 新增 `customers` 底部导航项，路径为 `/pages/customers/index`。
+- 客户工作台页面使用 `buildBottomTabs('customers')` 激活客户入口。
+- 新增底部导航测试覆盖客户工作台顶层入口。
+
+### 后续衔接
+
+- 下一 Story：`P3-E7-S4-mobile-customer-detail-page.md`。
+- 本 Story 不实现客户详情、完整 CRM、自动触达或 Agent 自动晋级。

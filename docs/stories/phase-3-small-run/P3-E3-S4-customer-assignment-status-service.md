@@ -1,8 +1,8 @@
 # Story P3-E3-S4：实现客户分配和状态流转基础服务
 
-状态：Draft  
-Sprint：Sprint 3  
-优先级：P1  
+状态：实现完成，真实 PostgreSQL 写库联调待复跑
+Sprint：Sprint 3
+优先级：P1
 Epic：P3-E3
 
 ## 用户故事
@@ -83,3 +83,19 @@ Epic：P3-E3
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e3-s4-执行结果.md`
+
+验收结果：
+
+- 已新增 `customers.owner_team` 字段和 migration。
+- 已新增 `CustomerAssignmentStatusService`，支持 owner/team 分配。
+- 已支持客户状态流转校验。
+- 已支持客户工作台过滤 Watch/Invalid/勿扰客户。
+- 已支持 C 级客户进入报价状态前触发合规复核要求，并记录阻断审计。
+- 已记录 `customer_assigned`、`customer_status_changed`、`customer_compliance_review_requested` 审计事件。
+- 已运行当前 Story 测试、客户晋级/勿扰/模型契约关联回归测试和编译检查。
+- 真实 PostgreSQL 连接验证因当前沙箱网络权限被阻断，错误为 `PermissionError: [Errno 1] Operation not permitted`，需在外部环境复跑。

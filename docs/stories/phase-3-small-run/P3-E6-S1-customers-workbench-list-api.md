@@ -1,8 +1,8 @@
 # Story P3-E6-S1：实现客户工作台列表 API
 
-状态：Draft  
-Sprint：Sprint 6  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 联调待外部环境复跑
+Sprint：Sprint 6
+优先级：P0
 Epic：P3-E6
 
 ## 用户故事
@@ -83,3 +83,45 @@ Epic：P3-E6
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行时间：2026-06-04
+执行者：Codex
+执行方式：`superpowers:executing-plans` + `superpowers:test-driven-development`
+
+### 实现内容
+
+- 新增 `apps/api/app/services/customers.py`，实现客户工作台列表查询、筛选、默认优先级排序和摘要聚合。
+- 更新 `apps/api/app/api/customers.py`，让 `GET /customers` 支持 `status`、`grade`、`owner`、`country`、`city`、`limit` 筛选，并返回工作台增强字段。
+- 更新 `apps/api/app/schemas/customer.py`，为 `CustomerSummary` 增加联系方式摘要、来源完整度、完善度评分、跟进状态、意向车型摘要和下一步动作字段。
+- 新增 `apps/api/tests/test_customers_workbench_list_api.py`，覆盖筛选、Watch/Invalid/勿扰排除、默认下一步动作排序和摘要字段。
+
+### 验收结果
+
+- `GET /customers` 已支持状态、等级、负责人、国家、城市筛选。
+- 默认排序已按下一步动作优先级：今日待跟进、C级待合规、已回复待销售、待首次触达、待补全客户信息、销售跟进中、暂停/低优先级。
+- Watch/Invalid/勿扰客户不进入客户工作台列表。
+- 返回字段已包含联系方式摘要、来源完整度、完善度评分、跟进状态、意向车型摘要和下一步动作。
+- 未实现移动端页面，符合本 Story 非目标。
+
+### 测试记录
+
+- 红灯验证：`python -m pytest tests/test_customers_workbench_list_api.py -q`，失败原因为 `ModuleNotFoundError: No module named 'app.services.customers'`，确认缺少客户工作台 service。
+- 绿灯验证：`python -m pytest tests/test_customers_workbench_list_api.py -q`，结果 `5 passed in 1.65s`。
+- 离线关联回归：`python -m pytest tests/test_customers_workbench_list_api.py tests/test_customer_assignment_status.py tests/test_promote_staging_lead_to_customer_phase3.py -q`，结果 `21 passed in 1.55s`。
+- 编译检查：`python -m compileall app/api app/services app/schemas app/models`，退出码 0。
+- 真实 PostgreSQL API 回归：执行客户 DNC / outreach 相关 API 测试时，当前沙箱连接 `8.129.17.71:5432` 报 `PermissionError: [Errno 1] Operation not permitted`，需在允许数据库网络访问的外部环境复跑。
+
+### 两轮独立评审
+
+第一轮评审：
+
+- 结论：通过。
+- 发现项：需确认工作台列表不会展示 Watch/Invalid/勿扰客户。
+- 修正结果：查询层过滤 `do_not_contact=false`、排除 `Watch/Invalid/DO_NOT_CONTACT` 状态，并在 service 层复用 `CustomerAssignmentStatusService.filter_workbench_customers` 做二次过滤。
+
+第二轮评审：
+
+- 结论：通过，真实 PostgreSQL API 联调待外部环境复跑。
+- 发现项：需确认排序服务日常动作优先级，而不是静态更新时间。
+- 修正结果：新增 `next_action` 和 `next_action_priority`，列表按今日待跟进、C级待合规、已回复待销售、待首次触达、待补全客户信息等优先级排序。

@@ -8,6 +8,8 @@ from app.models.collection_task import CollectionTask
 from app.models.compliance_review import ComplianceReview
 from app.models.contact_method import ContactMethod
 from app.models.customer import Customer
+from app.models.customer_followup import CustomerFollowup
+from app.models.customer_vehicle_intent import CustomerVehicleIntent
 from app.models.enums import (
     AITaskType,
     AgentTaskRunStatus,
@@ -18,13 +20,24 @@ from app.models.enums import (
     CollectionTaskStatus,
     ComplianceReviewStatus,
     ContactMethodType,
+    CustomerFollowupTeam,
+    CustomerFollowupType,
     CustomerGrade,
     CustomerStatus,
     CustomerType,
+    CustomerVehicleIntentSourceType,
+    CustomerVehicleIntentStatus,
     FailedCaseType,
     KnowledgeEmbeddingStatus,
     KnowledgeItemStatus,
     KnowledgeReviewStatus,
+    LeadCleanupRunStatus,
+    LeadCleanupSuggestionReviewStatus,
+    LeadCleanupSuggestionType,
+    LeadEnrichmentFieldReviewStatus,
+    LeadEnrichmentFieldSourceType,
+    LeadEnrichmentResultStatus,
+    LeadEnrichmentType,
     LeadSourceCandidateExtractionStatus,
     LeadSourceCandidateReviewStatus,
     LLMPromptTaskType,
@@ -42,6 +55,10 @@ from app.models.enums import (
 from app.models.failed_case import FailedCase
 from app.models.inventory_item import InventoryItem
 from app.models.knowledge import KnowledgeCollection, KnowledgeEmbedding, KnowledgeItem
+from app.models.lead_cleanup_run import LeadCleanupRun
+from app.models.lead_cleanup_suggestion import LeadCleanupSuggestion
+from app.models.lead_enrichment_field_candidate import LeadEnrichmentFieldCandidate
+from app.models.lead_enrichment_result import LeadEnrichmentResult
 from app.models.lead_inventory_match import LeadInventoryMatch
 from app.models.lead_source import LeadSource
 from app.models.lead_source_candidate import LeadSourceCandidate
@@ -75,9 +92,15 @@ __all__ = [
     "ContactMethod",
     "ContactMethodType",
     "Customer",
+    "CustomerFollowup",
+    "CustomerFollowupTeam",
+    "CustomerFollowupType",
     "CustomerGrade",
     "CustomerStatus",
     "CustomerType",
+    "CustomerVehicleIntent",
+    "CustomerVehicleIntentSourceType",
+    "CustomerVehicleIntentStatus",
     "FailedCase",
     "FailedCaseType",
     "InventoryItem",
@@ -87,6 +110,17 @@ __all__ = [
     "KnowledgeItem",
     "KnowledgeItemStatus",
     "KnowledgeReviewStatus",
+    "LeadCleanupRun",
+    "LeadCleanupRunStatus",
+    "LeadCleanupSuggestion",
+    "LeadCleanupSuggestionReviewStatus",
+    "LeadCleanupSuggestionType",
+    "LeadEnrichmentFieldCandidate",
+    "LeadEnrichmentFieldReviewStatus",
+    "LeadEnrichmentFieldSourceType",
+    "LeadEnrichmentResult",
+    "LeadEnrichmentResultStatus",
+    "LeadEnrichmentType",
     "LeadInventoryMatch",
     "LeadSource",
     "LeadSourceCandidate",

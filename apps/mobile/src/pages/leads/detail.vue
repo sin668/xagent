@@ -80,6 +80,97 @@
         </text>
       </section>
 
+      <view class="detail-section-head">
+        <text class="detail-section-title">线索完善区</text>
+        <text class="detail-section-note">{{ enrichmentView.fieldCandidates.length }} 个候选</text>
+      </view>
+      <section class="detail-panel enrichment-panel">
+        <view class="enrichment-action-row">
+          <view class="enrichment-action-copy">
+            <text class="detail-copy-strong">AI 深挖与人工补录</text>
+            <text class="detail-copy">
+              深挖结果只进入 staging 完善区，字段采纳后仍需人工确认晋级客户。
+            </text>
+          </view>
+          <button
+            v-if="enrichmentView.canTriggerDeepEnrichment"
+            class="enrichment-button-primary"
+            @click="handleCreateEnrichmentRun"
+          >
+            {{ enrichmentLoading ? '处理中' : enrichmentView.triggerButtonLabel }}
+          </button>
+          <text v-else class="pool-tag pool-tag-red">{{ enrichmentView.blockReason }}</text>
+        </view>
+
+        <view class="detail-tag-row">
+          <button class="enrichment-button-secondary" @click="toggleManualEnrichmentForm">人工补录</button>
+          <text v-for="result in enrichmentView.results.slice(0, 2)" :key="result.id" class="pool-tag pool-tag-blue">
+            {{ result.typeLabel }} · {{ result.statusLabel }} · {{ result.confidenceText }}
+          </text>
+        </view>
+
+        <view v-if="manualEnrichmentVisible" class="manual-enrichment-form">
+          <input
+            v-model="manualFieldName"
+            class="manual-enrichment-input"
+            placeholder="字段名，例如 邮箱 / 意向车型"
+          />
+          <input
+            v-model="manualCandidateValue"
+            class="manual-enrichment-input"
+            placeholder="字段值"
+          />
+          <input
+            v-model="manualEvidenceNote"
+            class="manual-enrichment-input"
+            placeholder="证据说明或人工来源"
+          />
+          <button class="enrichment-button-primary manual-enrichment-submit" @click="handleCreateManualEnrichment">
+            提交补录
+          </button>
+        </view>
+
+        <text v-if="enrichmentView.emptyLabel" class="detail-copy">{{ enrichmentView.emptyLabel }}</text>
+        <view v-else class="enrichment-candidate-list">
+          <view
+            v-for="candidate in enrichmentView.fieldCandidates"
+            :key="candidate.id"
+            class="enrichment-candidate-card"
+          >
+            <view class="enrichment-candidate-head">
+              <view>
+                <text class="detail-timeline-title">{{ candidate.fieldName }}</text>
+                <text class="detail-copy-strong">{{ candidate.candidateValue }}</text>
+              </view>
+              <text
+                :class="[
+                  'pool-tag',
+                  candidate.reviewStatus === 'accepted'
+                    ? 'risk-low'
+                    : candidate.reviewStatus === 'rejected'
+                      ? 'pool-tag-red'
+                      : 'pool-tag-amber',
+                ]"
+              >
+                {{ candidate.reviewStatusLabel }}
+              </text>
+            </view>
+            <text class="detail-copy">证据：{{ candidate.evidenceNote }}</text>
+            <text v-if="candidate.sourceUrl" class="detail-link">{{ candidate.sourceUrl }}</text>
+            <view class="detail-tag-row">
+              <text class="pool-tag pool-tag-blue">置信度 {{ candidate.confidenceText }}</text>
+              <text class="pool-tag pool-tag-blue">来源 {{ candidate.sourceType }}</text>
+              <text v-if="candidate.acceptedBy" class="pool-tag risk-low">采纳人 {{ candidate.acceptedBy }}</text>
+              <text v-if="candidate.rejectedReason" class="pool-tag pool-tag-red">{{ candidate.rejectedReason }}</text>
+            </view>
+            <view v-if="candidate.reviewStatus === 'pending'" class="enrichment-candidate-actions">
+              <button class="enrichment-button-secondary" @click="handleRejectFieldCandidate(candidate.id)">拒绝</button>
+              <button class="enrichment-button-primary" @click="handleAcceptFieldCandidate(candidate.id)">采纳</button>
+            </view>
+          </view>
+        </view>
+      </section>
+
       <view v-if="detail.duplicateLabel" class="detail-section-head">
         <text class="detail-section-title">重复建议</text>
         <text class="detail-section-note">{{ detail.duplicateLabel }}</text>
@@ -256,6 +347,7 @@ import {
 } from '../../services/apiAdapters.js';
 import { apiClient } from '../../services/apiClient.js';
 import { buildComplianceReviewView } from '../../services/complianceReview.js';
+import { buildLeadEnrichmentViewModel, createLeadEnrichmentService } from '../../services/leadEnrichment.js';
 import { buildLeadDetailViewModel, buildPromoteStagingPayload, markLeadDoNotContact } from '../../services/leadDetail.js';
 import { buildInventoryMatchView } from '../../services/inventoryMatch.js';
 import { buildOutreachDraftViewModel } from '../../services/outreachDraft.js';
@@ -323,7 +415,24 @@ const outreachDraft = ref(emptyOutreachDraft);
 const complianceState = ref(null);
 const inventoryMatchItems = ref([]);
 const promotedCustomerId = ref('');
+const enrichmentResultsPayload = ref({ items: [] });
+const enrichmentLoading = ref(false);
+const manualEnrichmentVisible = ref(false);
+const manualFieldName = ref('');
+const manualCandidateValue = ref('');
+const manualEvidenceNote = ref('');
+const enrichmentService = createLeadEnrichmentService({ apiClient });
 const detail = computed(() => buildLeadDetailViewModel(leadState.value));
+const enrichmentView = computed(() =>
+  buildLeadEnrichmentViewModel({
+    lead: {
+      ...leadState.value,
+      status: leadState.value.status,
+      riskLevel: leadState.value.riskLevel,
+    },
+    resultsPayload: enrichmentResultsPayload.value,
+  }),
+);
 const duplicateItems = computed(() => [
   ...(detail.value.duplicateSignals.strongDuplicates || []),
   ...(detail.value.duplicateSignals.suspectedDuplicates || []),
@@ -416,7 +525,106 @@ onMounted(async () => {
   } catch (_error) {
     inventoryMatchItems.value = [];
   }
+
+  await refreshEnrichmentResults();
 });
+
+async function refreshEnrichmentResults() {
+  if (!detail.value.id) {
+    enrichmentResultsPayload.value = { items: [] };
+    return;
+  }
+
+  try {
+    enrichmentResultsPayload.value = await enrichmentService.listEnrichmentResults(detail.value.id);
+  } catch (_error) {
+    enrichmentResultsPayload.value = { items: [] };
+  }
+}
+
+function notify(message) {
+  if (globalThis.uni?.showToast) {
+    globalThis.uni.showToast({ title: message, icon: 'none' });
+  }
+}
+
+async function handleCreateEnrichmentRun() {
+  if (!enrichmentView.value.canTriggerDeepEnrichment || enrichmentLoading.value) {
+    return;
+  }
+
+  enrichmentLoading.value = true;
+  try {
+    await enrichmentService.createEnrichmentRun(detail.value.id, {
+      actor: '当前用户',
+      manualKeywords: [detail.value.customerName, detail.value.city].filter((item) => item && item !== 'Unknown'),
+      note: '移动端人工触发深挖线索。',
+    });
+    await refreshEnrichmentResults();
+    notify('已启动深挖');
+  } catch (_error) {
+    notify('深挖启动失败');
+  } finally {
+    enrichmentLoading.value = false;
+  }
+}
+
+async function handleAcceptFieldCandidate(candidateId) {
+  try {
+    await enrichmentService.acceptFieldCandidate(candidateId, { actor: '当前用户' });
+    await refreshEnrichmentResults();
+    notify('已采纳候选');
+  } catch (_error) {
+    notify('采纳失败');
+  }
+}
+
+async function handleRejectFieldCandidate(candidateId) {
+  try {
+    await enrichmentService.rejectFieldCandidate(candidateId, { reason: '移动端人工拒绝该候选字段' });
+    await refreshEnrichmentResults();
+    notify('已拒绝候选');
+  } catch (_error) {
+    notify('拒绝失败');
+  }
+}
+
+function toggleManualEnrichmentForm() {
+  manualEnrichmentVisible.value = !manualEnrichmentVisible.value;
+}
+
+async function handleCreateManualEnrichment() {
+  const fieldName = manualFieldName.value.trim();
+  const candidateValue = manualCandidateValue.value.trim();
+  const evidenceNote = manualEvidenceNote.value.trim();
+  if (!fieldName || !candidateValue || !evidenceNote) {
+    notify('请补齐字段名、字段值和证据');
+    return;
+  }
+
+  try {
+    await enrichmentService.createManualEnrichment(detail.value.id, {
+      operator: '当前用户',
+      note: '移动端人工补录。',
+      fields: [
+        {
+          fieldName,
+          candidateValue,
+          sourceType: 'manual_public_info',
+          evidenceNote,
+        },
+      ],
+    });
+    manualFieldName.value = '';
+    manualCandidateValue.value = '';
+    manualEvidenceNote.value = '';
+    manualEnrichmentVisible.value = false;
+    await refreshEnrichmentResults();
+    notify('已创建人工补录');
+  } catch (_error) {
+    notify('人工补录失败');
+  }
+}
 
 async function handleMarkDoNotContact() {
   if (detail.value.isDoNotContact) {
@@ -445,7 +653,7 @@ async function handlePromoteStaging() {
   }
 
   try {
-    const result = await apiClient.post(`/staging-leads/${encodeURIComponent(detail.value.id)}/promote`, buildPromoteStagingPayload({
+    const result = await apiClient.post(`/staging-leads/${encodeURIComponent(detail.value.id)}/promote-to-customer`, buildPromoteStagingPayload({
       actor: '当前用户',
       reviewNote: '移动端人工复核通过，准入闸门允许晋级 core。',
     }));

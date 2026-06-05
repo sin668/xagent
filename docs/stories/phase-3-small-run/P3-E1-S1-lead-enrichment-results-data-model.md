@@ -1,8 +1,8 @@
 # Story P3-E1-S1：创建 `lead_enrichment_results` 数据表、模型和 schema
 
-状态：Draft  
-Sprint：Sprint 1  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL 验证待复跑
+Sprint：Sprint 1
+优先级：P0
 Epic：P3-E1
 
 ## 用户故事
@@ -86,3 +86,28 @@ Epic：P3-E1
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e1-s1-执行结果.md`
+
+实现完成项：
+
+- 已创建 `apps/api/alembic/versions/20260604_0024_create_lead_enrichment_results.py`。
+- 已创建 `apps/api/app/models/lead_enrichment_result.py`。
+- 已创建 `apps/api/app/schemas/lead_enrichment_result.py`。
+- 已更新 `apps/api/app/models/__init__.py` 和 `apps/api/app/models/enums.py`。
+- 已创建 `apps/api/tests/test_lead_enrichment_result_model.py`。
+
+验收结果：
+
+- 单 Story 测试通过：`python -m pytest tests/test_lead_enrichment_result_model.py -q`，结果 `7 passed`。
+- 语法编译通过：`python -m compileall app/models app/schemas`。
+- Alembic 离线 SQL 验证通过，确认创建 `leadenrichmenttype`、`leadenrichmentresultstatus` 和 `lead_enrichment_results`。
+- 当前沙箱网络阻断 `.env` 中真实 PostgreSQL 连接，错误为 `PermissionError: [Errno 1] Operation not permitted`；本机无 `psql`、`pg_ctl`、`initdb`、`docker` 可替代验证，因此真实 PostgreSQL migration apply 待外部环境复跑。
+
+两轮评审结论：
+
+- 第一轮评审：通过，Story 字段、边界和非目标均满足；真实库验证为环境限制项。
+- 第二轮评审：通过，模型、枚举、schema、migration 与项目现有技术风格一致；未发现新增实质阻塞问题。

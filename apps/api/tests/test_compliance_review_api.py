@@ -67,9 +67,9 @@ def test_c_grade_customer_enters_pending_review_queue_and_blocks_quoted_until_ap
     assert payload["quote_contract_blocked"] is True
     assert "AI仅提示风险" in payload["ai_risk_tip"]
 
-    quoted = client.post(f"/compliance/customers/{customer_id}/mark-quoted", json={"actor": "sales"})
-    assert quoted.status_code == 400
-    assert "合规复核" in quoted.json()["detail"]
+    quoted = client.post(f"/compliance/customers/{customer_id}/mark-quoted", json={"actor": "sales", "actor_role": "sales"})
+    assert quoted.status_code == 403
+    assert "客服/销售不能绕过 C 级合规复核" in quoted.json()["detail"]
 
 
 def test_compliance_review_records_reviewer_time_decision_and_prevents_non_compliance_override() -> None:
@@ -106,6 +106,6 @@ def test_compliance_review_records_reviewer_time_decision_and_prevents_non_compl
     assert review["risk_note"] == "付款、物流、清关仍需人工确认"
     assert review["reviewed_at"]
 
-    quoted = client.post(f"/compliance/customers/{customer_id}/mark-quoted", json={"actor": "sales"})
+    quoted = client.post(f"/compliance/customers/{customer_id}/mark-quoted", json={"actor": "sales", "actor_role": "sales"})
     assert quoted.status_code == 200
     assert quoted.json()["quoted_status"] == "quoted"

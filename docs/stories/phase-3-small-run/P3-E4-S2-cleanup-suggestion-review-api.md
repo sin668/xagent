@@ -1,8 +1,8 @@
 # Story P3-E4-S2：实现清洗建议人工确认/拒绝 API
 
-状态：Draft  
-Sprint：Sprint 4  
-优先级：P0  
+状态：实现完成，真实 PostgreSQL API 写库联调待复跑
+Sprint：Sprint 4
+优先级：P0
 Epic：P3-E4
 
 ## 用户故事
@@ -83,3 +83,21 @@ Epic：P3-E4
 - 所有 AI 输出必须保存来源证据、prompt 版本、模型和审计记录。
 - Agent 不得自动晋级客户、自动归并客户、自动恢复 Invalid、自动触达客户。
 
+## 执行记录
+
+执行结果文件：
+
+- `_bmad-output/implementation-artifacts/codex-p3-e4-s2-执行结果.md`
+
+验收结果：
+
+- 已新增 `PATCH /lead-cleanup/suggestions/{suggestion_id}/approve`。
+- 已新增 `PATCH /lead-cleanup/suggestions/{suggestion_id}/reject`。
+- approve/reject 均记录 `reviewer_id` 和 `reviewed_at`。
+- approve/reject 均写入 `ReviewLog` 审计事件。
+- 恢复 Watch/Invalid 类型建议必须由合规或管理员角色确认。
+- 疑似重复和客户级归并类型建议必须由管理员确认。
+- 已执行的或非 pending 建议不得重新确认/拒绝。
+- 未实现 execute 路由，确认/拒绝不会自动执行建议。
+- 已运行当前 Story 测试、清洗建议查询测试、清洗模型测试、第三阶段模型契约测试和编译检查。
+- 真实 PostgreSQL 连接验证因当前沙箱网络权限被阻断，错误为 `PermissionError: [Errno 1] Operation not permitted`，需在外部环境复跑。
