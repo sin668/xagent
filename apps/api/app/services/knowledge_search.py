@@ -76,6 +76,8 @@ class KnowledgeSearchService:
         if KnowledgeItemStatus(item.status) == KnowledgeItemStatus.DEPRECATED:
             return False
         metadata = getattr(item, "metadata_json", None) or {}
+        if metadata.get("embedding_stale") is True:
+            return False
         item_risk_level = metadata.get("risk_level")
         if item_risk_level in cls.BLOCKED_RISK_LEVELS:
             return False
@@ -331,6 +333,8 @@ class KnowledgeSearchService:
         results: list[KnowledgeRetrievalFilterResult] = []
         for item in items:
             metadata = item.metadata_json or {}
+            if metadata.get("embedding_stale") is True:
+                continue
             if metadata.get("risk_level") in self.BLOCKED_RISK_LEVELS:
                 continue
             if auto_send_candidate and metadata.get("auto_reply_allowed") is not True:
@@ -356,4 +360,6 @@ class KnowledgeSearchService:
                 )
             )
 
+        if not results:
+            return [], self.MISSING_LANGUAGE_READY_REASON
         return sorted(results, key=lambda result: result.similarity_score, reverse=True)[:limit], None

@@ -518,6 +518,8 @@ class KnowledgeService:
         metadata = dict(item.metadata_json or {})
         metadata.update(payload.get("metadata_json") or {})
         metadata["parent_item_id"] = str(item.id)
+        metadata["embedding_stale"] = True
+        metadata["stale_reason"] = "new_version_pending_embedding"
         if payload.get("change_reason") is not None:
             metadata["change_reason"] = payload["change_reason"]
         metadata = self.build_business_metadata(
@@ -545,6 +547,13 @@ class KnowledgeService:
             updated_at=datetime.utcnow(),
         )
         self.session.add(draft)
+        self.session.flush()
+        old_metadata = dict(item.metadata_json or {})
+        old_metadata["embedding_stale"] = True
+        old_metadata["stale_reason"] = "new_version_created"
+        old_metadata["replacement_item_id"] = str(draft.id)
+        item.metadata_json = old_metadata
+        item.updated_at = datetime.utcnow()
         self.session.flush()
         return draft
 
