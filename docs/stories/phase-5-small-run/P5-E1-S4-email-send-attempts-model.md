@@ -1,8 +1,8 @@
 # Story P5-E1-S4：新增邮件发送尝试模型
 
-状态：未开始  
-Sprint：Sprint 1  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 1
+优先级：P0
 Epic：P5-E1（数据底座）
 
 ## 用户故事
@@ -228,3 +228,25 @@ indexes= ['email_send_attempts_pkey', 'ix_email_send_attempts_error_code', 'ix_e
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `EmailSendAttempt`、`20260605_0032_create_email_send_attempts.py` migration、phase5 migration contract 和 `tests/test_phase5_email_send_attempt_model.py` 已存在，并已由历史提交 `04361e79 feat: add email send attempt model` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_send_attempt_model.py tests/test_phase5_email_reply_draft_model.py tests/test_phase5_migration_contracts.py -q
+```
+
+复核结果：
+
+```text
+9 passed in 1.46s
+```
+
+两轮复核结论：
+
+- 第一轮：`email_send_attempts` 已覆盖 provider、from/to、subject/body 快照、status、attempt_count、provider_message_id、error_message、bounce_reason、sent_at，并可关联 `email_reply_drafts` 和 `outreach_records`；未发现需要新增实现的缺口。
+- 第二轮：本 Story 仅提供发送尝试审计数据底座，不新增真实发送、自动发送、退信回调或 Agent 直写业务表能力；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
