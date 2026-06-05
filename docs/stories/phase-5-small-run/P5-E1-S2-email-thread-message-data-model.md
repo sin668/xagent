@@ -1,8 +1,8 @@
 # Story P5-E1-S2：新增待回复邮件线程与消息模型
 
-状态：未开始  
-Sprint：Sprint 1  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 1
+优先级：P0
 Epic：P5-E1（数据底座）
 
 ## 用户故事
@@ -207,3 +207,25 @@ cd apps/api
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `EmailThread`、`EmailMessage`、`20260605_0030_create_email_threads_messages.py` migration、phase5 migration contract 和 `tests/test_phase5_email_thread_message_model.py` 已存在，并已由历史提交 `41608970 feat: add email thread message models` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_thread_message_model.py tests/test_phase5_migration_contracts.py -q
+```
+
+复核结果：
+
+```text
+6 passed in 1.51s
+```
+
+两轮复核结论：
+
+- 第一轮：`email_threads`、`email_messages`、inbound/outbound、线程状态、消息状态、`source_type`、`external_message_id` 和无客户 `customer_id nullable` 策略均已覆盖本 Story 验收标准；未发现需要新增实现的缺口。
+- 第二轮：本 Story 只提供邮件待回复数据底座，未引入自动发送、邮箱同步执行器或 Agent 写业务 core 表；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
