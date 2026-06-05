@@ -33,7 +33,7 @@ class SourceDiscoveryDefaultPromptSeed:
 
     @classmethod
     def seed(cls, session: Session, *, provider: str, model: str) -> LLMPromptTemplate:
-        existing = cls._find_existing_default(session)
+        existing = cls._find_existing_default(session, provider=provider, model=model)
         payload = cls.build_payload(provider=provider, model=model)
 
         if existing is not None:
@@ -45,6 +45,8 @@ class SourceDiscoveryDefaultPromptSeed:
         existing_templates = [
             {
                 "task_type": item.task_type,
+                "provider": item.provider,
+                "model": item.model,
                 "status": item.status,
                 "is_default": item.is_default,
             }
@@ -53,6 +55,8 @@ class SourceDiscoveryDefaultPromptSeed:
         LLMPromptTemplateService.validate_default_template_uniqueness(
             existing_templates=existing_templates,
             task_type=payload["task_type"],
+            provider=payload["provider"],
+            model=payload["model"],
             status=payload["status"],
             is_default=payload["is_default"],
         )
@@ -61,10 +65,12 @@ class SourceDiscoveryDefaultPromptSeed:
         return template
 
     @classmethod
-    def _find_existing_default(cls, session: Session) -> LLMPromptTemplate | None:
+    def _find_existing_default(cls, session: Session, *, provider: str, model: str) -> LLMPromptTemplate | None:
         return session.scalar(
             select(LLMPromptTemplate).where(
                 LLMPromptTemplate.task_type == LLMPromptTaskType.SOURCE_DISCOVERY,
+                LLMPromptTemplate.provider == provider,
+                LLMPromptTemplate.model == model,
                 LLMPromptTemplate.status == LLMPromptTemplateStatus.ACTIVE,
                 LLMPromptTemplate.is_default.is_(True),
             )

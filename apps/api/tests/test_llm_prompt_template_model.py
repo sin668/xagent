@@ -73,10 +73,12 @@ def test_prompt_template_status_and_task_type_enums_are_available() -> None:
     assert LLMPromptTaskType.LEAD_GRADING == "LEAD_GRADING"
 
 
-def test_only_one_active_default_template_is_allowed_per_task_type() -> None:
+def test_only_one_active_default_template_is_allowed_per_task_provider_model() -> None:
     existing_templates = [
         {
             "task_type": LLMPromptTaskType.SOURCE_DISCOVERY,
+            "provider": "deepseek",
+            "model": "deepseek-chat",
             "status": LLMPromptTemplateStatus.ACTIVE,
             "is_default": True,
         }
@@ -86,19 +88,23 @@ def test_only_one_active_default_template_is_allowed_per_task_type() -> None:
         LLMPromptTemplateService.validate_default_template_uniqueness(
             existing_templates=existing_templates,
             task_type=LLMPromptTaskType.SOURCE_DISCOVERY,
+            provider="deepseek",
+            model="deepseek-chat",
             status=LLMPromptTemplateStatus.ACTIVE,
             is_default=True,
         )
     except ValueError as exc:
-        assert "同一 task_type 只能有一个 active 默认模板" in str(exc)
+        assert "同一 task_type/provider/model 只能有一个 active 默认模板" in str(exc)
     else:
         raise AssertionError("Duplicate active default prompt template should be rejected")
 
 
-def test_paused_or_non_default_template_does_not_conflict_with_active_default() -> None:
+def test_same_task_type_default_template_allows_different_provider_or_model() -> None:
     existing_templates = [
         {
             "task_type": LLMPromptTaskType.SOURCE_DISCOVERY,
+            "provider": "deepseek",
+            "model": "deepseek-chat",
             "status": LLMPromptTemplateStatus.ACTIVE,
             "is_default": True,
         }
@@ -107,12 +113,37 @@ def test_paused_or_non_default_template_does_not_conflict_with_active_default() 
     LLMPromptTemplateService.validate_default_template_uniqueness(
         existing_templates=existing_templates,
         task_type=LLMPromptTaskType.SOURCE_DISCOVERY,
+        provider="openai",
+        model="gpt-5",
+        status=LLMPromptTemplateStatus.ACTIVE,
+        is_default=True,
+    )
+
+
+def test_paused_or_non_default_template_does_not_conflict_with_active_default() -> None:
+    existing_templates = [
+        {
+            "task_type": LLMPromptTaskType.SOURCE_DISCOVERY,
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "status": LLMPromptTemplateStatus.ACTIVE,
+            "is_default": True,
+        }
+    ]
+
+    LLMPromptTemplateService.validate_default_template_uniqueness(
+        existing_templates=existing_templates,
+        task_type=LLMPromptTaskType.SOURCE_DISCOVERY,
+        provider="deepseek",
+        model="deepseek-chat",
         status=LLMPromptTemplateStatus.PAUSED,
         is_default=True,
     )
     LLMPromptTemplateService.validate_default_template_uniqueness(
         existing_templates=existing_templates,
         task_type=LLMPromptTaskType.SOURCE_DISCOVERY,
+        provider="deepseek",
+        model="deepseek-chat",
         status=LLMPromptTemplateStatus.ACTIVE,
         is_default=False,
     )

@@ -19,9 +19,10 @@ def test_phase5_migration_contract_manifest_covers_expected_revisions() -> None:
         "20260605_0031",
         "20260605_0032",
         "20260605_0033",
+        "20260605_0034",
     ]
     assert "downgrade" in PHASE5_ROLLBACK_STRATEGY.lower()
-    assert "20260605_0033" in PHASE5_ROLLBACK_STRATEGY
+    assert "20260605_0034" in PHASE5_ROLLBACK_STRATEGY
     assert "20260605_0028" in PHASE5_ROLLBACK_STRATEGY
 
 
@@ -38,6 +39,11 @@ def test_phase5_migration_files_declare_downgrade_or_equivalent_rollback_strateg
 
         for table_name in contract.get("tables", {}):
             assert f'"{table_name}"' in migration
+
+        for table_name, index_names in contract.get("indexes", {}).items():
+            assert f'"{table_name}"' in migration
+            for index_name in index_names:
+                assert index_name in migration
 
         for enum_name in contract.get("enums", {}):
             assert enum_name in migration
@@ -85,5 +91,21 @@ def test_phase5_real_postgresql_database_matches_migration_contract() -> None:
                     ).scalars().all()
                     for enum_value in expected_values:
                         assert enum_value in values
+
+                for table_name, expected_indexes in contract.get("indexes", {}).items():
+                    indexes = (
+                        await conn.execute(
+                            text(
+                                """
+                                select indexname
+                                from pg_indexes
+                                where schemaname = 'public' and tablename = :table_name
+                                """
+                            ),
+                            {"table_name": table_name},
+                        )
+                    ).scalars().all()
+                    for index_name in expected_indexes:
+                        assert index_name in indexes
 
     asyncio.run(inspect_contracts())

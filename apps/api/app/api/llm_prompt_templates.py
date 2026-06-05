@@ -11,7 +11,10 @@ from app.schemas.llm_prompt_template import (
     LLMPromptTemplateDraftDetailResponse,
     LLMPromptTemplateDraftUpdate,
     LLMPromptTemplateListResponse,
+    LLMPromptTemplatePublishRequest,
+    LLMPromptTemplateRollbackRequest,
     LLMPromptTemplateResponse,
+    LLMPromptTemplateSetDefaultRequest,
     LLMPromptTemplateValidationPreviewRequest,
     LLMPromptTemplateValidationPreviewResponse,
 )
@@ -139,6 +142,82 @@ async def validate_llm_prompt_template_draft(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         sync_session.commit()
         return LLMPromptTemplateValidationPreviewResponse(**result)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/drafts/{template_id:uuid}/publish", response_model=LLMPromptTemplateDraftDetailResponse)
+async def publish_llm_prompt_template_draft(
+    template_id: UUID,
+    request: LLMPromptTemplatePublishRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> LLMPromptTemplateDraftDetailResponse:
+    def run(sync_session):
+        service = LLMPromptTemplateService(sync_session)
+        try:
+            template = service.publish_draft(
+                template_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                change_summary=request.change_summary,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=409 if "draft" in str(exc) or "校验" in str(exc) else 403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_draft_detail(template)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/{template_id:uuid}/set-default", response_model=LLMPromptTemplateDraftDetailResponse)
+async def set_default_llm_prompt_template(
+    template_id: UUID,
+    request: LLMPromptTemplateSetDefaultRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> LLMPromptTemplateDraftDetailResponse:
+    def run(sync_session):
+        service = LLMPromptTemplateService(sync_session)
+        try:
+            template = service.set_default(
+                template_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                change_summary=request.change_summary,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=409 if "版本" in str(exc) else 403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_draft_detail(template)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/{template_id:uuid}/rollback", response_model=LLMPromptTemplateDraftDetailResponse)
+async def rollback_llm_prompt_template(
+    template_id: UUID,
+    request: LLMPromptTemplateRollbackRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> LLMPromptTemplateDraftDetailResponse:
+    def run(sync_session):
+        service = LLMPromptTemplateService(sync_session)
+        try:
+            template = service.rollback_to_template(
+                template_id,
+                rollback_to_template_id=request.rollback_to_template_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                change_summary=request.change_summary,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_draft_detail(template)
 
     return await async_session.run_sync(run)
 

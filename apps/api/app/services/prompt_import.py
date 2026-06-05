@@ -88,7 +88,7 @@ class PromptImportService:
                 reason="source_file_path + source_file_hash + version 已存在，跳过幂等写入。",
             )
 
-        active_default = self._find_active_default(parsed)
+        active_default = self._find_active_default(parsed, provider=provider, model=model)
         status = LLMPromptTemplateStatus.DRAFT
         is_default = False
         parent_template_id = None
@@ -140,10 +140,12 @@ class PromptImportService:
             .order_by(LLMPromptTemplate.created_at.desc(), LLMPromptTemplate.id.desc())
         )
 
-    def _find_active_default(self, parsed: ParsedPromptFile) -> LLMPromptTemplate | None:
+    def _find_active_default(self, parsed: ParsedPromptFile, *, provider: str, model: str) -> LLMPromptTemplate | None:
         return self.session.scalar(
             select(LLMPromptTemplate)
             .where(LLMPromptTemplate.task_type == parsed.task_type)
+            .where(LLMPromptTemplate.provider == provider)
+            .where(LLMPromptTemplate.model == model)
             .where(LLMPromptTemplate.status == LLMPromptTemplateStatus.ACTIVE)
             .where(LLMPromptTemplate.is_default.is_(True))
             .order_by(LLMPromptTemplate.created_at.desc(), LLMPromptTemplate.id.desc())

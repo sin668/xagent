@@ -109,6 +109,25 @@ class LLMPromptTemplateValidationPreviewResponse(BaseModel):
     would_publish: bool = False
 
 
+class LLMPromptTemplatePublishRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    change_summary: str | None = None
+
+
+class LLMPromptTemplateSetDefaultRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    change_summary: str | None = None
+
+
+class LLMPromptTemplateRollbackRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    rollback_to_template_id: UUID
+    change_summary: str | None = None
+
+
 class LLMPromptTemplateResponse(BaseModel):
     id: UUID
     name: str

@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime
 
 from app.models.enums import LLMPromptTaskType, LLMPromptTemplateStatus
 from app.models.llm_prompt_template import LLMPromptTemplate
@@ -117,6 +118,106 @@ class LLMPromptTemplateService:
             "would_publish": False,
         }
 
+    def publish_draft(self, template_id, *, actor: str, actor_role: str, change_summary: str | None) -> LLMPromptTemplate:
+        if self.session is None:
+            raise ValueError("发布 prompt 草稿需要传入数据库 session")
+        self.ensure_draft_editor(actor_role)
+        template = self.get_template(template_id)
+        if template is None:
+            raise ValueError("Prompt template 不存在")
+        if template.status != LLMPromptTemplateStatus.DRAFT:
+            raise PermissionError("只能发布 draft 状态的 Prompt template")
+        if template.validation_status != "validation_passed":
+            raise PermissionError("Prompt template 校验未通过，不能发布")
+
+        self._clear_default_active_for_same_scope(template)
+        template.status = LLMPromptTemplateStatus.ACTIVE
+        template.is_default = True
+        template.published_by = actor
+        template.published_at = datetime.now(UTC)
+        template.change_summary = change_summary
+        self.session.flush()
+        return template
+
+    def set_default(self, template_id, *, actor: str, actor_role: str, change_summary: str | None) -> LLMPromptTemplate:
+        if self.session is None:
+            raise ValueError("切换默认 prompt 需要传入数据库 session")
+        self.ensure_draft_editor(actor_role)
+        template = self.get_template(template_id)
+        if template is None:
+            raise ValueError("Prompt template 不存在")
+        if template.status not in {LLMPromptTemplateStatus.ACTIVE, LLMPromptTemplateStatus.PAUSED}:
+            raise PermissionError("只有 active 或 paused 版本可以切换为默认版本")
+
+        self._clear_default_active_for_same_scope(template)
+        template.status = LLMPromptTemplateStatus.ACTIVE
+        template.is_default = True
+        template.published_by = actor
+        template.published_at = datetime.now(UTC)
+        template.change_summary = change_summary
+        self.session.flush()
+        return template
+
+    def rollback_to_template(
+        self,
+        template_id,
+        *,
+        rollback_to_template_id,
+        actor: str,
+        actor_role: str,
+        change_summary: str | None,
+    ) -> LLMPromptTemplate:
+        if self.session is None:
+            raise ValueError("回滚 prompt 需要传入数据库 session")
+        self.ensure_draft_editor(actor_role)
+        current = self.get_template(template_id)
+        target = self.get_template(rollback_to_template_id)
+        if current is None or target is None:
+            raise ValueError("Prompt template 不存在")
+        if current.task_type != target.task_type or current.provider != target.provider or current.model != target.model:
+            raise PermissionError("只能回滚到相同 task_type/provider/model 的历史版本")
+
+        rollback_draft = LLMPromptTemplate(
+            name=f"{target.name}_rollback",
+            task_type=target.task_type,
+            provider=target.provider,
+            model=target.model,
+            system_prompt=target.system_prompt,
+            user_prompt_template=target.user_prompt_template,
+            output_schema_json=target.output_schema_json,
+            version=f"{target.version}-rollback",
+            status=LLMPromptTemplateStatus.DRAFT,
+            is_default=False,
+            created_by=actor,
+            source_file_path=target.source_file_path,
+            source_file_hash=target.source_file_hash,
+            migration_batch_id=target.migration_batch_id,
+            parent_template_id=target.id,
+            change_summary=change_summary,
+            rollback_from_template_id=current.id,
+            validation_status=target.validation_status,
+            validation_errors_json=target.validation_errors_json,
+        )
+        self.session.add(rollback_draft)
+        self.session.flush()
+        return rollback_draft
+
+    def _clear_default_active_for_same_scope(self, template: LLMPromptTemplate) -> None:
+        existing_defaults = self.session.scalars(
+            select(LLMPromptTemplate)
+            .where(LLMPromptTemplate.task_type == template.task_type)
+            .where(LLMPromptTemplate.provider == template.provider)
+            .where(LLMPromptTemplate.model == template.model)
+            .where(LLMPromptTemplate.status == LLMPromptTemplateStatus.ACTIVE)
+            .where(LLMPromptTemplate.is_default.is_(True))
+            .where(LLMPromptTemplate.id != template.id)
+        ).all()
+        for existing in existing_defaults:
+            existing.is_default = False
+            existing.status = LLMPromptTemplateStatus.PAUSED
+        if existing_defaults:
+            self.session.flush()
+
     @classmethod
     def ensure_draft_editor(cls, actor_role: str | None) -> None:
         role = str(actor_role or "").strip().lower()
@@ -139,6 +240,8 @@ class LLMPromptTemplateService:
         *,
         existing_templates: list[dict],
         task_type: LLMPromptTaskType,
+        provider: str | None = None,
+        model: str | None = None,
         status: LLMPromptTemplateStatus,
         is_default: bool,
     ) -> None:
@@ -148,7 +251,9 @@ class LLMPromptTemplateService:
         for template in existing_templates:
             if (
                 template.get("task_type") == task_type
+                and (provider is None or template.get("provider") == provider)
+                and (model is None or template.get("model") == model)
                 and template.get("status") == LLMPromptTemplateStatus.ACTIVE
                 and template.get("is_default") is True
             ):
-                raise ValueError("同一 task_type 只能有一个 active 默认模板")
+                raise ValueError("同一 task_type/provider/model 只能有一个 active 默认模板")

@@ -42,8 +42,8 @@ def create_active_prompt_template() -> str:
                 template = LLMPromptTemplate(
                     name="phase5_draft_api_active",
                     task_type=LLMPromptTaskType.EMAIL_REPLY_DRAFT,
-                    provider="deepseek",
-                    model="deepseek-chat",
+                    provider="phase5-draft-api",
+                    model="active-edit-guard",
                     system_prompt="active system",
                     user_prompt_template="active user",
                     output_schema_json={"type": "object"},
