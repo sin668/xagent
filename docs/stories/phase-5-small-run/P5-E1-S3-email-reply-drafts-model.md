@@ -1,8 +1,8 @@
 # Story P5-E1-S3：新增 AI 邮件回复草稿模型
 
-状态：未开始  
-Sprint：Sprint 1  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 1
+优先级：P0
 Epic：P5-E1（数据底座）
 
 ## 用户故事
@@ -229,3 +229,25 @@ foreign_keys= [('email_reply_drafts_agent_task_run_id_fkey', 'agent_task_runs'),
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `EmailReplyDraft`、`20260605_0031_create_email_reply_drafts.py` migration、phase5 migration contract 和 `tests/test_phase5_email_reply_draft_model.py` 已存在，并已由历史提交 `fa279d8f feat: add email reply draft model` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_reply_draft_model.py tests/test_phase5_email_thread_message_model.py tests/test_phase5_migration_contracts.py -q
+```
+
+复核结果：
+
+```text
+9 passed in 0.81s
+```
+
+两轮复核结论：
+
+- 第一轮：`email_reply_drafts` 已分离 AI 建议内容与最终发送内容，并覆盖 `prompt_template_id/version`、`model`、`knowledge_hits_json`、`auto_send_decision_json` 和完整审核状态枚举；未发现需要新增实现的缺口。
+- 第二轮：本 Story 仅提供草稿数据底座，不新增自动发送、邮件发送器或 Agent 直写业务表能力；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
