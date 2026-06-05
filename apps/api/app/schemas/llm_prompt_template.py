@@ -18,6 +18,16 @@ class LLMPromptTemplateCreate(BaseModel):
     status: LLMPromptTemplateStatus = LLMPromptTemplateStatus.DRAFT
     is_default: bool = False
     created_by: str | None = Field(default=None, max_length=120)
+    source_file_path: str | None = Field(default=None, max_length=500)
+    source_file_hash: str | None = Field(default=None, max_length=128)
+    migration_batch_id: str | None = Field(default=None, max_length=120)
+    parent_template_id: UUID | None = None
+    published_by: str | None = Field(default=None, max_length=120)
+    published_at: datetime | None = None
+    change_summary: str | None = None
+    rollback_from_template_id: UUID | None = None
+    validation_status: str | None = Field(default=None, max_length=40)
+    validation_errors_json: dict | None = None
 
 
 class LLMPromptTemplateUpdate(BaseModel):
@@ -30,6 +40,16 @@ class LLMPromptTemplateUpdate(BaseModel):
     version: str | None = Field(default=None, min_length=1, max_length=40)
     status: LLMPromptTemplateStatus | None = None
     is_default: bool | None = None
+    source_file_path: str | None = Field(default=None, max_length=500)
+    source_file_hash: str | None = Field(default=None, max_length=128)
+    migration_batch_id: str | None = Field(default=None, max_length=120)
+    parent_template_id: UUID | None = None
+    published_by: str | None = Field(default=None, max_length=120)
+    published_at: datetime | None = None
+    change_summary: str | None = None
+    rollback_from_template_id: UUID | None = None
+    validation_status: str | None = Field(default=None, max_length=40)
+    validation_errors_json: dict | None = None
 
 
 class LLMPromptTemplateResponse(BaseModel):
@@ -45,6 +65,16 @@ class LLMPromptTemplateResponse(BaseModel):
     status: LLMPromptTemplateStatus
     is_default: bool
     created_by: str | None
+    source_file_path: str | None
+    source_file_hash: str | None
+    migration_batch_id: str | None
+    parent_template_id: UUID | None
+    published_by: str | None
+    published_at: datetime | None
+    change_summary: str | None
+    rollback_from_template_id: UUID | None
+    validation_status: str | None
+    validation_errors_json: dict | None
     created_at: datetime
     updated_at: datetime
 
