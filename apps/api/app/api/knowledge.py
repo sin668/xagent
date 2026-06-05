@@ -23,6 +23,8 @@ from app.schemas.knowledge import (
     KnowledgeRetrievalFilterResponse,
     KnowledgeRetrievalFilterResultResponse,
     KnowledgeQualitySummaryResponse,
+    KnowledgeRagRetrievalTestRequest,
+    KnowledgeRagRetrievalTestResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
     KnowledgeSearchResultResponse,
@@ -525,6 +527,46 @@ async def retrieval_filter_knowledge(
         return KnowledgeRetrievalFilterResponse(
             items=[serialize_retrieval_filter_result(result) for result in results],
             total=len(results),
+            rejection_reason=rejection_reason,
+        )
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/rag-test", response_model=KnowledgeRagRetrievalTestResponse)
+async def test_rag_retrieval(
+    request: KnowledgeRagRetrievalTestRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeRagRetrievalTestResponse:
+    def run(sync_session):
+        service = KnowledgeSearchService(sync_session)
+        content_types = request.content_types or ([request.content_type] if request.content_type else [])
+        filter_conditions = service.retrieval_filter_conditions(
+            language=request.language,
+            channel=request.channel,
+            content_types=content_types,
+            business_scene=request.business_scene,
+            auto_send_candidate=request.auto_send_context,
+            market=request.market,
+            tone=request.tone,
+        )
+        results, rejection_reason = service.retrieve_for_email_reply(
+            query=request.query,
+            language=request.language,
+            channel=request.channel,
+            content_types=content_types,
+            business_scene=request.business_scene,
+            auto_send_candidate=request.auto_send_context,
+            market=request.market,
+            tone=request.tone,
+            limit=request.limit,
+        )
+        return KnowledgeRagRetrievalTestResponse(
+            dry_run=True,
+            triggered_send=False,
+            items=[serialize_retrieval_filter_result(result) for result in results],
+            total=len(results),
+            filter_conditions=filter_conditions,
             rejection_reason=rejection_reason,
         )
 

@@ -214,6 +214,31 @@ class KnowledgeRetrievalFilterResponse(BaseModel):
     rejection_reason: str | None = None
 
 
+class KnowledgeRagRetrievalTestRequest(BaseModel):
+    query: str | None = None
+    language: str = Field(min_length=1, max_length=20)
+    channel: str | None = None
+    content_type: str | None = Field(
+        default=None,
+        pattern="^(qa_entry|email_reply_template|compliance_phrase|vehicle_product_note|process_sop)$",
+    )
+    content_types: list[str] | None = None
+    business_scene: str | None = None
+    auto_send_context: bool = False
+    market: str | None = None
+    tone: str | None = None
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+class KnowledgeRagRetrievalTestResponse(BaseModel):
+    dry_run: bool
+    triggered_send: bool
+    items: list[KnowledgeRetrievalFilterResultResponse]
+    total: int
+    filter_conditions: dict
+    rejection_reason: str | None = None
+
+
 class KnowledgeUsageRecordCreate(BaseModel):
     email_reply_draft_id: UUID | None = None
     retrieval_query: str | None = None
