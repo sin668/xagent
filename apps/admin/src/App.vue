@@ -12,6 +12,7 @@
         <a href="#phase2">第二阶段</a>
         <a href="#phase3">第三阶段</a>
         <a href="#prompt-governance">Prompt 治理</a>
+        <a href="#knowledge-governance">知识库</a>
         <a href="#llm-governance">LLM 治理</a>
       </nav>
     </aside>
@@ -517,6 +518,111 @@
         </section>
       </section>
 
+      <section id="knowledge-governance" class="admin-card knowledge-governance-card">
+        <div class="card-head">
+          <div>
+            <h3>Q&A 与邮件回复知识库</h3>
+            <span>Q&A、邮件模板、合规话术、车型说明和流程 SOP 统一进入 PostgreSQL + pgvector 治理</span>
+          </div>
+          <span :class="['tag', knowledgeGovernance.summary.embeddingStatusClass]">
+            embedding ready {{ knowledgeGovernance.summary.embeddingReadyRateText }}
+          </span>
+        </div>
+
+        <p v-if="knowledgeGovernanceError" class="guardrail">{{ knowledgeGovernanceError }}</p>
+
+        <div class="knowledge-tabs">
+          <span v-for="tab in knowledgeGovernance.tabs" :key="tab.label" class="knowledge-tab">{{ tab.label }}</span>
+        </div>
+
+        <div class="knowledge-summary">
+          <article>
+            <strong>{{ knowledgeGovernance.summary.publishedItemCount }}</strong>
+            <span>published items</span>
+          </article>
+          <article>
+            <strong>{{ knowledgeGovernance.summary.embeddingReadyCount }}</strong>
+            <span>embedding ready</span>
+          </article>
+          <article>
+            <strong>{{ knowledgeGovernance.summary.autoReplyAllowedCount }}</strong>
+            <span>auto reply allowed</span>
+          </article>
+          <article>
+            <strong>{{ knowledgeGovernance.summary.reviewDraftCount }}</strong>
+            <span>待审核草稿</span>
+          </article>
+        </div>
+
+        <div class="knowledge-governance-grid">
+          <section>
+            <div class="card-head compact-head">
+              <h4>知识条目</h4>
+              <span>草稿 -> 审核 -> 发布 -> embedding -> active_for_retrieval</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>标题</th>
+                  <th>类型</th>
+                  <th>语言</th>
+                  <th>场景</th>
+                  <th>工作流</th>
+                  <th>向量</th>
+                  <th>自动回复</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in knowledgeGovernance.items" :key="item.id">
+                  <td>{{ item.title }}</td>
+                  <td>{{ item.contentTypeLabel }}</td>
+                  <td>{{ item.language }}</td>
+                  <td>{{ item.businessScene }}</td>
+                  <td><span :class="['tag', item.statusClass]">{{ item.workflowLabel }}</span></td>
+                  <td><span :class="['tag', item.embeddingStatusClass]">{{ item.embeddingStatusLabel }}</span></td>
+                  <td>{{ item.autoReplyLabel }}</td>
+                </tr>
+                <tr v-if="knowledgeGovernance.items.length === 0">
+                  <td colspan="7">暂无真实知识库数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <div class="card-head compact-head">
+              <h4>治理操作入口</h4>
+              <span>{{ knowledgeGovernance.canPublish ? '知识管理员受控操作' : '权限不足已禁用' }}</span>
+            </div>
+            <div class="knowledge-action-list">
+              <article v-for="entry in knowledgeGovernance.actionEntrypoints" :key="entry.label">
+                <strong>{{ entry.label }}</strong>
+                <span :class="['tag', entry.enabled ? 'blue' : 'amber']">{{ entry.enabled ? '可操作' : '禁用' }}</span>
+              </article>
+            </div>
+            <p class="guardrail">{{ knowledgeGovernance.permissionNotice }}</p>
+          </section>
+        </div>
+
+        <div class="knowledge-lower-grid">
+          <section class="schema-preview">
+            <div class="card-head compact-head">
+              <h4>召回测试面板</h4>
+              <span>dry run，不触发邮件发送</span>
+            </div>
+            <pre>{{ knowledgeRagTestText }}</pre>
+          </section>
+
+          <section class="schema-preview">
+            <div class="card-head compact-head">
+              <h4>Embedding 失败与重试</h4>
+              <span>{{ knowledgeGovernance.summary.failedEmbeddingCount }} failed / {{ knowledgeGovernance.summary.totalRetryCount }} retries</span>
+            </div>
+            <pre>{{ knowledgeEmbeddingFailuresText }}</pre>
+          </section>
+        </div>
+      </section>
+
       <section id="llm-governance" class="admin-card llm-card">
         <div class="card-head">
           <div>
@@ -626,6 +732,7 @@ import { channelRiskConfigSeed } from './data/channelRiskConfigSeed.js';
 import { syncAiAuditSeed } from './data/syncAiAuditSeed.js';
 import { buildAdminOverviewView } from './services/adminOverview.js';
 import { buildChannelRiskConfigView } from './services/channelRiskConfig.js';
+import { buildKnowledgeGovernanceView, fetchKnowledgeGovernance } from './services/knowledgeGovernance.js';
 import { buildLlmGovernanceView, buildPromptGovernanceView, fetchLlmGovernance, fetchPromptGovernance } from './services/llmGovernance.js';
 import { buildPhase2DashboardView, fetchPhase2Dashboard } from './services/phase2Dashboard.js';
 import { buildPhase3DashboardView, fetchPhase3Dashboard } from './services/phase3Dashboard.js';
@@ -646,6 +753,9 @@ const llmError = ref('');
 const promptGovernancePayload = ref(null);
 const promptGovernanceLoading = ref(true);
 const promptGovernanceError = ref('');
+const knowledgeGovernancePayload = ref(null);
+const knowledgeGovernanceLoading = ref(true);
+const knowledgeGovernanceError = ref('');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
 const adminActorRole = import.meta.env.VITE_ADMIN_ACTOR_ROLE || 'operator';
 
@@ -660,6 +770,22 @@ const promptValidationErrorsText = computed(() => {
   const failed = promptGovernance.value.templates.filter((template) => template.validationErrorsText);
   if (failed.length === 0) return '暂无 schema 校验失败。';
   return failed.map((template) => `${template.name}: ${template.validationErrorsText}`).join('\n');
+});
+const knowledgeGovernance = computed(() => buildKnowledgeGovernanceView({
+  items: knowledgeGovernancePayload.value?.items || {},
+  embeddingMetrics: knowledgeGovernancePayload.value?.embeddingMetrics || {},
+  actorRole: knowledgeGovernancePayload.value?.actorRole || adminActorRole,
+}));
+const knowledgeRagTestText = computed(() => JSON.stringify({
+  query: knowledgeGovernance.value.ragTestPanel.defaultQuery,
+  filters: knowledgeGovernance.value.ragTestPanel.defaultFilters,
+  result_policy: 'dry_run_only_triggered_send_false',
+}, null, 2));
+const knowledgeEmbeddingFailuresText = computed(() => {
+  if (knowledgeGovernance.value.embeddingFailures.length === 0) return '暂无 embedding 失败案例。';
+  return knowledgeGovernance.value.embeddingFailures
+    .map((item) => `${item.knowledgeTitle} / ${item.embeddingModel} / retry=${item.retryCount} / ${item.errorMessage}`)
+    .join('\n');
 });
 const phase2PauseThresholds = computed(() => Object.values(phase2.value.pauseThresholds));
 const phase2StatusText = computed(() => {
@@ -695,10 +821,11 @@ const llmStatusClass = computed(() => {
 });
 
 onMounted(async () => {
-  const [phase2Result, phase3Result, promptGovernanceResult, llmGovernanceResult] = await Promise.allSettled([
+  const [phase2Result, phase3Result, promptGovernanceResult, knowledgeGovernanceResult, llmGovernanceResult] = await Promise.allSettled([
     fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
     fetchPhase3Dashboard({ baseUrl: apiBaseUrl }),
     fetchPromptGovernance({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
+    fetchKnowledgeGovernance({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchLlmGovernance({ baseUrl: apiBaseUrl }),
   ]);
 
@@ -720,6 +847,12 @@ onMounted(async () => {
     promptGovernanceError.value = `无法加载 Prompt 入库治理真实 API：${promptGovernanceResult.reason.message}`;
   }
 
+  if (knowledgeGovernanceResult.status === 'fulfilled') {
+    knowledgeGovernancePayload.value = knowledgeGovernanceResult.value;
+  } else {
+    knowledgeGovernanceError.value = `无法加载知识库治理真实 API：${knowledgeGovernanceResult.reason.message}`;
+  }
+
   if (llmGovernanceResult.status === 'fulfilled') {
     llmGovernancePayload.value = llmGovernanceResult.value;
   } else {
@@ -729,6 +862,7 @@ onMounted(async () => {
   phase2Loading.value = false;
   phase3Loading.value = false;
   promptGovernanceLoading.value = false;
+  knowledgeGovernanceLoading.value = false;
   llmLoading.value = false;
 });
 </script>
