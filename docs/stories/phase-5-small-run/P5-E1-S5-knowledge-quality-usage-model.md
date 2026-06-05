@@ -1,8 +1,8 @@
 # Story P5-E1-S5：新增知识质量指标与使用记录模型
 
-状态：未开始  
-Sprint：Sprint 1  
-优先级：P1  
+状态：已完成
+Sprint：Sprint 1
+优先级：P1
 Epic：P5-E1（数据底座）
 
 ## 用户故事
@@ -233,3 +233,29 @@ knowledge_quality_metrics_indexes= ['ix_knowledge_quality_metrics_knowledge_item
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `KnowledgeUsageRecord`、`KnowledgeQualityMetric`、`20260605_0033_create_knowledge_usage_quality.py` migration、phase5 migration contract 和 `tests/test_phase5_knowledge_usage_quality_model.py` 已存在，并已由历史提交 `3bf42711 feat: add knowledge usage quality models` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_knowledge_usage_quality_model.py tests/test_phase5_knowledge_quality_usage_api.py tests/test_phase5_migration_contracts.py tests/test_knowledge_schema.py tests/test_knowledge_search_api.py tests/test_rag_in_llm_prompts.py -q
+```
+
+复核结果：
+
+```text
+24 passed, 13 warnings in 7.29s
+```
+
+警告说明：
+
+- 13 个 warning 均为既有 `datetime.utcnow()` deprecation warning，分布在 `apps/api/app/services/knowledge.py`、SQLAlchemy 默认时间回调和 `apps/api/app/services/llm_lead_grading.py`；不影响本 Story 的知识使用/质量模型验收，本 Story 不扩范围修复。
+
+两轮复核结论：
+
+- 第一轮：知识使用记录已覆盖知识条目、版本、相似度、过滤条件、采纳/编辑/退信/客户回复/建议下线等结果，质量指标已支持按知识条目聚合召回次数、采纳率、编辑幅度、退信率、客户回复率和建议下线；未发现需要新增实现的缺口。
+- 第二轮：本 Story 未修改 pgvector embedding 字段和现有检索逻辑，未新增自动发送或 Agent 直写业务表能力；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
