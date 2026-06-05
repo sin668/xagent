@@ -1,8 +1,8 @@
 # Story P5-E2-S1：Prompt 文件解析与 hash 计算服务
 
-状态：未开始  
-Sprint：Sprint 2  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 2
+优先级：P0
 Epic：P5-E2（Prompt 入库治理）
 
 ## 用户故事
@@ -193,3 +193,29 @@ prompts/lead-grading.md LEAD_GRADING f5dd07fcae122e3d1f037b3c5ef7c21a86e8eef7baf
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `PromptFileParserService` 和 `tests/test_phase5_prompt_file_parser.py` 已存在，并已由历史提交 `c4300814 feat: add prompt file parser service` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_file_parser.py tests/test_phase5_prompt_template_governance.py tests/test_llm_prompt_template_model.py tests/test_llm_prompt_templates.py tests/test_llm_prompt_templates_api.py -q
+```
+
+复核结果：
+
+```text
+23 passed, 1 warning in 4.85s
+```
+
+警告说明：
+
+- warning 为既有知识库双路由兼容造成的 FastAPI duplicate operation ID warning，位于 `apps/api/app/api/knowledge.py`，不影响 Prompt 文件解析服务验收，本 Story 不扩范围修复。
+
+两轮复核结论：
+
+- 第一轮：parser 可扫描全部 `prompts/*.md`，可推断任务类型、提取 System/User 分段、计算稳定 SHA-256 hash；未内嵌可解析 JSON schema 时按规则标记 `validation_failed`，未发现需要新增实现的缺口。
+- 第二轮：本 Story 只读取本地 Prompt 文件并产出解析结果，不写业务表、不调用 LLM、不执行自动触达或自动发送；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
