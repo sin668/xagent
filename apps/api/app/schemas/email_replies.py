@@ -53,3 +53,20 @@ class EmailReplyActionRequest(BaseModel):
     actor: str = Field(min_length=1)
     review_note: str | None = None
     manual_confirmed: bool = True
+
+
+class EmailSendPreviewResponse(BaseModel):
+    reply_id: str
+    decision: str = Field(pattern="^(auto_send_allowed|manual_review|blocked)$")
+    allow_auto_send: bool = False
+    send_triggered: bool = False
+    from_email: str
+    to_emails: list[str] = Field(default_factory=list)
+    cc_emails: list[str] = Field(default_factory=list)
+    subject: str
+    body_text: str
+    knowledge_hit_count: int = 0
+    reasons: list[str] = Field(default_factory=list)
+    hard_blocks: list[str] = Field(default_factory=list)
+    manual_review_required: bool = True
+    manual_review_reason: str | None = None
