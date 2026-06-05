@@ -15,6 +15,7 @@ from app.api.customer_vehicle_intents import router as customer_vehicle_intents_
 from app.api.dashboard import router as dashboard_router
 from app.api.failed_cases import router as failed_cases_router
 from app.api.inventory import router as inventory_router
+from app.api.internal_email_reply import router as internal_email_reply_router
 from app.api.knowledge import router as knowledge_router
 from app.api.lead_enrichment import field_candidate_router as lead_enrichment_field_candidate_router
 from app.api.lead_enrichment import router as lead_enrichment_router
@@ -71,6 +72,7 @@ app.include_router(customer_vehicle_intents_router)
 app.include_router(dashboard_router)
 app.include_router(failed_cases_router)
 app.include_router(inventory_router)
+app.include_router(internal_email_reply_router)
 app.include_router(knowledge_router)
 app.include_router(lead_enrichment_field_candidate_router)
 app.include_router(lead_enrichment_router)
