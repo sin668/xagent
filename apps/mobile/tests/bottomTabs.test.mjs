@@ -13,10 +13,10 @@ test('bottom tabs expose top-level mobile destinations with active state', () =>
       'leads:/pages/leads/index:true',
       'customers:/pages/customers/index:false',
       'sources:/pages/sources/index:false',
-      'ai:/pages/outreach/index:false',
       'insights:/pages/inventory/index:false',
     ],
   );
+  assert.equal(tabs.some((tab) => tab.key === 'ai'), false);
 });
 
 test('bottom tabs support customers workbench as a top-level active destination', () => {

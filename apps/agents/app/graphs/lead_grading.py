@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.lead_extraction import LeadExtractionCandidate
 from app.schemas.lead_grading import LeadGradingAgentOutput, LeadGradingSuggestion
+from app.services.agent_logging import run_logged_node
 
 
 LEAD_GRADING_NODE_SEQUENCE = (
@@ -44,6 +45,8 @@ class LeadGradingGraphResult:
 
 
 class LeadGradingGraphRunner:
+    agent_type = "lead_grading"
+
     def __init__(self, *, boundary: ApiContractBoundary | None = None) -> None:
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
@@ -52,7 +55,15 @@ class LeadGradingGraphRunner:
     def _build_graph(self):
         graph = StateGraph(LeadGradingGraphState)
         for node_name in LEAD_GRADING_NODE_SEQUENCE:
-            graph.add_node(node_name, getattr(self, node_name))
+            graph.add_node(
+                node_name,
+                lambda state, node_name=node_name: run_logged_node(
+                    agent_type=self.agent_type,
+                    node_name=node_name,
+                    func=getattr(self, node_name),
+                    state=state,
+                ),
+            )
         graph.set_entry_point(LEAD_GRADING_NODE_SEQUENCE[0])
         for index, node_name in enumerate(LEAD_GRADING_NODE_SEQUENCE):
             next_index = index + 1

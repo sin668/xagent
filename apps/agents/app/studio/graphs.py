@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+from app.graphs.deep_enrichment import DeepEnrichmentGraphRunner
+from app.graphs.lead_cleanup import LeadCleanupGraphRunner
+from app.graphs.lead_extraction_grading import LeadExtractionGradingStudioGraphBuilder
+from app.graphs.source_discovery import SourceDiscoveryGraphRunner
+
+
+deep_enrichment_graph = DeepEnrichmentGraphRunner().compiled_graph
+lead_cleanup_graph = LeadCleanupGraphRunner().compiled_graph
+source_discovery_graph = SourceDiscoveryGraphRunner().compiled_graph
+lead_extraction_grading_graph = LeadExtractionGradingStudioGraphBuilder().compiled_graph

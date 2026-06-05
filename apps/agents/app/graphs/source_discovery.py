@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.source_discovery import SourceCandidateOutput, SourceDiscoveryAgentOutput
+from app.services.agent_logging import run_logged_node
 
 
 SOURCE_DISCOVERY_NODE_SEQUENCE = (
@@ -57,6 +58,8 @@ class EmptySourceSearchTool:
 
 
 class SourceDiscoveryGraphRunner:
+    agent_type = "source_discovery"
+
     def __init__(self, *, search_tool=None, boundary: ApiContractBoundary | None = None) -> None:
         self.search_tool = search_tool or EmptySourceSearchTool()
         self.boundary = boundary or ApiContractBoundary()
@@ -66,7 +69,15 @@ class SourceDiscoveryGraphRunner:
     def _build_graph(self):
         graph = StateGraph(SourceDiscoveryGraphState)
         for node_name in SOURCE_DISCOVERY_NODE_SEQUENCE:
-            graph.add_node(node_name, getattr(self, node_name))
+            graph.add_node(
+                node_name,
+                lambda state, node_name=node_name: run_logged_node(
+                    agent_type=self.agent_type,
+                    node_name=node_name,
+                    func=getattr(self, node_name),
+                    state=state,
+                ),
+            )
         graph.set_entry_point(SOURCE_DISCOVERY_NODE_SEQUENCE[0])
         for index, node_name in enumerate(SOURCE_DISCOVERY_NODE_SEQUENCE):
             next_index = index + 1

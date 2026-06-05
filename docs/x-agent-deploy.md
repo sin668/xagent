@@ -738,6 +738,7 @@ AGENTS_TIMEOUT_SECONDS=120
 
 ```bash
 AGENTS_API_KEY=change_me_for_local_only
+AGENTS_DATABASE_URL=sqlite:///./agents.db
 ```
 
 本地启动示例：
@@ -750,6 +751,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```bash
 cd apps/agents
 AGENTS_API_KEY=change_me_for_local_only \
+AGENTS_DATABASE_URL=sqlite:///./agents.db \
 uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
 ```
 
@@ -764,6 +766,31 @@ OpenAPI 文档：
 ```text
 http://127.0.0.1:8010/docs
 ```
+
+LangGraph Studio 可视化：
+
+```bash
+cd apps/agents
+python -m pip install -e ".[studio]"
+AGENTS_API_KEY=change_me_for_local_only \
+AGENTS_DATABASE_URL=sqlite:///./agents.db \
+langgraph dev
+```
+
+`apps/agents/langgraph.json` 会暴露以下图给 LangGraph Studio：
+
+| Graph | 说明 |
+|---|---|
+| `deep_enrichment` | Deep Enrichment 字段候选生成图 |
+| `lead_cleanup` | Lead Cleanup 清洗建议生成图 |
+| `source_discovery` | Source Discovery shadow 来源发现图 |
+| `lead_extraction_grading` | Lead Extraction/Grading 抽取、分级和组合校验可视化图 |
+
+运行日志：
+
+- `app.agent_run` logger 会打印 `agent_run_start`、`agent_run_succeeded`、`agent_run_failed`。
+- 每个 LangGraph 节点会打印 `agent_node_start`、`agent_node_finish`、`agent_node_failed`。
+- 日志包含 `agent_type`、`request_id`、`agent_mode`、`agent_service_run_id`、节点名、状态和错误类型，便于联调和 Studio 观察。
 
 鉴权策略：
 

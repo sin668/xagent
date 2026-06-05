@@ -1,0 +1,10 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "deep_enrichment": "app.studio.graphs:deep_enrichment_graph",
+    "lead_cleanup": "app.studio.graphs:lead_cleanup_graph",
+    "source_discovery": "app.studio.graphs:source_discovery_graph",
+    "lead_extraction_grading": "app.studio.graphs:lead_extraction_grading_graph"
+  },
+  "env": ".env"
+}

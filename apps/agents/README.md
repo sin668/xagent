@@ -72,6 +72,34 @@ OpenAPI 文档：
 http://127.0.0.1:8010/docs
 ```
 
+### LangGraph Studio 可视化
+
+`apps/agents` 提供 `langgraph.json`，用于在 LangGraph Studio 中查看第四阶段 Agent 图：
+
+- `deep_enrichment`
+- `lead_cleanup`
+- `source_discovery`
+- `lead_extraction_grading`
+
+本地启动：
+
+```bash
+cd apps/agents
+python -m pip install -e ".[studio]"
+langgraph dev
+```
+
+Studio 会读取 `langgraph.json` 中的 `app.studio.graphs:*` 导出。`lead_extraction_grading` 使用 Studio 专用组合视图展示抽取、分级和组合校验三个阶段；实际 HTTP API 仍使用 `LeadExtractionGradingGraphRunner` 运行。
+
+### 运行日志
+
+Agent API 和 LangGraph 节点运行会通过 `app.agent_run` logger 打印结构化文本日志，覆盖：
+
+- `agent_run_start`：Agent run 创建并进入 running。
+- `agent_node_start` / `agent_node_finish`：每个 LangGraph 节点进入和完成。
+- `agent_node_failed`：节点异常。
+- `agent_run_succeeded` / `agent_run_failed`：Agent run 最终结果。
+
 ### 内部 API Key
 
 - 受保护的 Agent Run API 使用 Header：`X-Agents-Api-Key: <AGENTS_API_KEY>`。
