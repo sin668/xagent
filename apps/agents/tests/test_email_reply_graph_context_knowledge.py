@@ -68,7 +68,7 @@ def test_email_reply_graph_loads_context_and_retrieves_knowledge_through_api_cli
         )
     )
 
-    assert result.executed_nodes == ["load_context", "retrieve_knowledge"]
+    assert result.executed_nodes == ["load_context", "retrieve_knowledge", "draft_reply", "schema_validation"]
     assert api_client.context_calls[0].schema_version == "email-reply-v1"
     assert api_client.knowledge_calls == [
         {
@@ -87,7 +87,12 @@ def test_email_reply_graph_loads_context_and_retrieves_knowledge_through_api_cli
     assert result.output.knowledge_hits[0].title == "FAQ"
     assert result.output.manual_review_required is True
     assert result.output.audit["writes_core_tables"] is False
-    assert result.output.audit["executed_nodes"] == ["load_context", "retrieve_knowledge"]
+    assert result.output.audit["executed_nodes"] == [
+        "load_context",
+        "retrieve_knowledge",
+        "draft_reply",
+        "schema_validation",
+    ]
 
 
 def test_email_reply_graph_fails_when_internal_api_auth_fails_and_records_reason() -> None:
