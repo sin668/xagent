@@ -178,6 +178,15 @@ class KnowledgeService:
         self,
         *,
         production_rag_only: bool = False,
+        status: str | KnowledgeItemStatus | None = None,
+        review_status: str | KnowledgeReviewStatus | None = None,
+        language: str | None = None,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_allowed: bool | None = None,
+        market: str | None = None,
+        tone: str | None = None,
         limit: int = 100,
     ) -> list[KnowledgeItem]:
         statement = select(KnowledgeItem).order_by(KnowledgeItem.created_at.desc()).limit(limit)
@@ -186,7 +195,39 @@ class KnowledgeService:
             statement = statement.where(KnowledgeItem.status == filters["status"])
             statement = statement.where(KnowledgeItem.review_status == filters["review_status"])
             statement = statement.where(KnowledgeItem.status.not_in(filters["exclude_statuses"]))
-        return list(self.session.scalars(statement).all())
+        if status is not None:
+            statement = statement.where(KnowledgeItem.status == KnowledgeItemStatus(status))
+        if review_status is not None:
+            statement = statement.where(KnowledgeItem.review_status == KnowledgeReviewStatus(review_status))
+        if language is not None:
+            statement = statement.where(KnowledgeItem.language == language)
+        items = list(self.session.scalars(statement).all())
+        return [
+            item
+            for item in items
+            if self.item_matches_business_filters(
+                item,
+                content_type=content_type,
+                business_scene=business_scene,
+                risk_level=risk_level,
+                auto_reply_allowed=auto_reply_allowed,
+                market=market,
+                tone=tone,
+            )
+        ]
+
+    def get_item(self, item_id: UUID) -> KnowledgeItem | None:
+        return self.session.get(KnowledgeItem, item_id)
+
+    def update_item(self, item_id: UUID, *, payload: dict) -> KnowledgeItem:
+        item = self.get_item(item_id)
+        if item is None:
+            raise ValueError("knowledge item 不存在。")
+        if item.status == KnowledgeItemStatus.ACTIVE and item.review_status == KnowledgeReviewStatus.APPROVED:
+            return self._create_draft_version_from_published(item, payload=payload)
+        self._apply_item_payload(item, payload=payload)
+        self.session.flush()
+        return item
 
     def create_embedding(
         self,
@@ -212,6 +253,91 @@ class KnowledgeService:
         self.session.add(record)
         self.session.flush()
         return record
+
+    @classmethod
+    def item_matches_business_filters(
+        cls,
+        item: KnowledgeItem,
+        *,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_allowed: bool | None = None,
+        market: str | None = None,
+        tone: str | None = None,
+    ) -> bool:
+        metadata = item.metadata_json or {}
+        expected = {
+            "content_type": content_type,
+            "business_scene": business_scene,
+            "risk_level": risk_level,
+            "auto_reply_allowed": auto_reply_allowed,
+            "market": market,
+            "tone": tone,
+        }
+        return all(value is None or metadata.get(field_name) == value for field_name, value in expected.items())
+
+    def _apply_item_payload(self, item: KnowledgeItem, *, payload: dict) -> None:
+        metadata = self.build_business_metadata(
+            metadata_json=payload.get("metadata_json", item.metadata_json),
+            content_type=payload.get("content_type"),
+            business_scene=payload.get("business_scene"),
+            risk_level=payload.get("risk_level"),
+            auto_reply_allowed=payload.get("auto_reply_allowed"),
+            market=payload.get("market"),
+            tone=payload.get("tone"),
+        )
+        for field_name in (
+            "title",
+            "body",
+            "language",
+            "country",
+            "applicable_channels",
+            "source_ref",
+            "version",
+        ):
+            if field_name in payload and payload[field_name] is not None:
+                setattr(item, field_name, payload[field_name])
+        if "status" in payload and payload["status"] is not None:
+            item.status = KnowledgeItemStatus(payload["status"])
+        if "review_status" in payload and payload["review_status"] is not None:
+            item.review_status = KnowledgeReviewStatus(payload["review_status"])
+        item.metadata_json = metadata
+        item.updated_at = datetime.utcnow()
+
+    def _create_draft_version_from_published(self, item: KnowledgeItem, *, payload: dict) -> KnowledgeItem:
+        metadata = dict(item.metadata_json or {})
+        metadata.update(payload.get("metadata_json") or {})
+        metadata["parent_item_id"] = str(item.id)
+        if payload.get("change_reason") is not None:
+            metadata["change_reason"] = payload["change_reason"]
+        metadata = self.build_business_metadata(
+            metadata_json=metadata,
+            content_type=payload.get("content_type"),
+            business_scene=payload.get("business_scene"),
+            risk_level=payload.get("risk_level"),
+            auto_reply_allowed=payload.get("auto_reply_allowed"),
+            market=payload.get("market"),
+            tone=payload.get("tone"),
+        )
+        draft = KnowledgeItem(
+            collection_id=item.collection_id,
+            title=payload.get("title") or item.title,
+            body=payload.get("body") or item.body,
+            language=payload.get("language") or item.language,
+            country=payload.get("country") if payload.get("country") is not None else item.country,
+            applicable_channels=payload.get("applicable_channels") or item.applicable_channels,
+            status=KnowledgeItemStatus.DRAFT,
+            review_status=KnowledgeReviewStatus.PENDING,
+            source_ref=payload.get("source_ref") if payload.get("source_ref") is not None else item.source_ref,
+            version=payload.get("version") or f"{item.version}-draft",
+            metadata_json=metadata,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        self.session.add(draft)
+        self.session.flush()
+        return draft
 
     @classmethod
     def build_business_metadata(

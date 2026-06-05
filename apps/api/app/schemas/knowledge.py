@@ -51,6 +51,29 @@ class KnowledgeItemCreate(BaseModel):
     tone: str | None = None
 
 
+class KnowledgeItemUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    body: str | None = Field(default=None, min_length=1)
+    language: str | None = None
+    country: str | None = None
+    applicable_channels: list | None = None
+    status: str | None = Field(default=None, pattern="^(draft|active|deprecated|disabled)$")
+    review_status: str | None = Field(default=None, pattern="^(pending|approved|rejected)$")
+    source_ref: str | None = None
+    version: str | None = None
+    metadata_json: dict | None = None
+    content_type: str | None = Field(
+        default=None,
+        pattern="^(qa_entry|email_reply_template|compliance_phrase|vehicle_product_note|process_sop)$",
+    )
+    business_scene: str | None = None
+    risk_level: str | None = None
+    auto_reply_allowed: bool | None = None
+    market: str | None = None
+    tone: str | None = None
+    change_reason: str | None = None
+
+
 class KnowledgeItemResponse(BaseModel):
     id: UUID
     collection_id: UUID

@@ -15,6 +15,7 @@ from app.schemas.knowledge import (
     KnowledgeItemCreate,
     KnowledgeItemListResponse,
     KnowledgeItemResponse,
+    KnowledgeItemUpdate,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
     KnowledgeSearchResultResponse,
@@ -133,6 +134,18 @@ async def create_item(
 @router.get("/items", response_model=KnowledgeItemListResponse)
 async def list_items(
     production_rag_only: bool = False,
+    status: str | None = Query(default=None, pattern="^(draft|active|deprecated|disabled)$"),
+    review_status: str | None = Query(default=None, pattern="^(pending|approved|rejected)$"),
+    language: str | None = Query(default=None),
+    content_type: str | None = Query(
+        default=None,
+        pattern="^(qa_entry|email_reply_template|compliance_phrase|vehicle_product_note|process_sop)$",
+    ),
+    business_scene: str | None = Query(default=None),
+    risk_level: str | None = Query(default=None),
+    auto_reply_allowed: bool | None = Query(default=None),
+    market: str | None = Query(default=None),
+    tone: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     async_session: AsyncSession = Depends(get_async_session),
 ) -> KnowledgeItemListResponse:
@@ -142,10 +155,51 @@ async def list_items(
                 serialize_item(item)
                 for item in KnowledgeService(sync_session).list_items(
                     production_rag_only=production_rag_only,
+                    status=status,
+                    review_status=review_status,
+                    language=language,
+                    content_type=content_type,
+                    business_scene=business_scene,
+                    risk_level=risk_level,
+                    auto_reply_allowed=auto_reply_allowed,
+                    market=market,
+                    tone=tone,
                     limit=limit,
                 )
             ]
         )
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/items/{item_id:uuid}", response_model=KnowledgeItemResponse)
+async def get_item(
+    item_id: UUID,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        item = KnowledgeService(sync_session).get_item(item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="knowledge item 不存在。")
+        return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.patch("/items/{item_id:uuid}", response_model=KnowledgeItemResponse)
+async def update_item(
+    item_id: UUID,
+    request: KnowledgeItemUpdate,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            item = service.update_item(item_id, payload=request.model_dump(exclude_unset=True))
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_item(item)
 
     return await async_session.run_sync(run)
 
