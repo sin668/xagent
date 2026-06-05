@@ -174,6 +174,16 @@ class EmailMessageSourceType(StrEnum):
     MAILBOX_SYNC = "mailbox_sync"
 
 
+class EmailReplyDraftStatus(StrEnum):
+    DRAFTED = "drafted"
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    SENT = "sent"
+    REJECTED = "rejected"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+
+
 class AITaskType(StrEnum):
     LEAD_EXTRACTION = "lead_extraction"
     LEAD_GRADING = "lead_grading"

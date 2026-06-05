@@ -37,3 +37,4 @@ class EmailThread(Base):
 
     customer = relationship("Customer", back_populates="email_threads")
     messages = relationship("EmailMessage", back_populates="thread", cascade="all, delete-orphan")
+    reply_drafts = relationship("EmailReplyDraft", back_populates="thread", cascade="all, delete-orphan")

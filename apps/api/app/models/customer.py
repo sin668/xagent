@@ -64,3 +64,4 @@ class Customer(Base):
     followups = relationship("CustomerFollowup", back_populates="customer", cascade="all, delete-orphan")
     email_threads = relationship("EmailThread", back_populates="customer")
     email_messages = relationship("EmailMessage", back_populates="customer")
+    email_reply_drafts = relationship("EmailReplyDraft", back_populates="customer")

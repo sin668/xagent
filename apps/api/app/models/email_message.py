@@ -55,3 +55,4 @@ class EmailMessage(Base):
 
     thread = relationship("EmailThread", back_populates="messages")
     customer = relationship("Customer", back_populates="email_messages")
+    reply_drafts = relationship("EmailReplyDraft", back_populates="message", cascade="all, delete-orphan")
