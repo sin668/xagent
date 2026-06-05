@@ -12,6 +12,7 @@ from app.schemas.knowledge import (
     KnowledgeCollectionResponse,
     KnowledgeEmbeddingCreate,
     KnowledgeEmbeddingResponse,
+    KnowledgeEmbeddingMetricsResponse,
     KnowledgeItemCreate,
     KnowledgeItemListResponse,
     KnowledgeItemResponse,
@@ -37,6 +38,7 @@ from app.services.agent_thread_runner import AgentThreadRunner
 from app.services.embedding_provider import create_embedding_provider
 from app.services.knowledge import KnowledgeService
 from app.services.knowledge_embedding_worker import KnowledgeEmbeddingWorker
+from app.services.knowledge_embedding_metrics import KnowledgeEmbeddingMetricsService
 from app.services.knowledge_import import KnowledgeImportService
 from app.services.knowledge_search import KnowledgeSearchService
 
@@ -98,6 +100,8 @@ def serialize_embedding(record) -> KnowledgeEmbeddingResponse:
         embedding_dimensions=record.embedding_dimensions,
         embedding_status=record.embedding_status.value,
         error_message=record.error_message,
+        last_error_message=record.last_error_message,
+        retry_count=record.retry_count,
         created_at=record.created_at.isoformat(),
     )
 
@@ -459,6 +463,16 @@ async def retry_embedding(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         sync_session.commit()
         return serialize_embedding(record)
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/embeddings/metrics", response_model=KnowledgeEmbeddingMetricsResponse)
+async def get_embedding_metrics(
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeEmbeddingMetricsResponse:
+    def run(sync_session):
+        return KnowledgeEmbeddingMetricsResponse(**KnowledgeEmbeddingMetricsService(sync_session).metrics())
 
     return await async_session.run_sync(run)
 

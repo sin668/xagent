@@ -78,6 +78,7 @@ class KnowledgeService:
             "embedding_dimensions": embedding_dimensions,
             "embedding_status": embedding_status,
             "error_message": error_message,
+            "last_error_message": error_message,
         }
 
     def create_collection(
@@ -448,6 +449,7 @@ class KnowledgeService:
         record.embedding = None
         record.embedding_status = KnowledgeEmbeddingStatus.FAILED
         record.error_message = error_message
+        record.last_error_message = error_message
         self.session.flush()
         return record
 
@@ -459,7 +461,9 @@ class KnowledgeService:
             raise PermissionError("只有 failed 状态的 embedding 任务可以重试。")
         record.embedding_status = KnowledgeEmbeddingStatus.PENDING
         record.embedding = None
+        record.last_error_message = record.last_error_message or record.error_message
         record.error_message = None
+        record.retry_count = (record.retry_count or 0) + 1
         self.session.flush()
         return record
 

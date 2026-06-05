@@ -1,6 +1,6 @@
 PHASE5_ROLLBACK_STRATEGY = (
     "第五阶段数据底座 migration 使用 Alembic downgrade 顺序回滚："
-    "20260605_0034 -> 20260605_0033 -> 20260605_0032 -> 20260605_0031 -> 20260605_0030 -> 20260605_0029 -> 20260605_0028。"
+    "20260605_0035 -> 20260605_0034 -> 20260605_0033 -> 20260605_0032 -> 20260605_0031 -> 20260605_0030 -> 20260605_0029 -> 20260605_0028。"
     "回滚前必须确认新增表中没有需要保留的业务数据，或先完成数据备份和迁移归档。"
 )
 
@@ -200,6 +200,22 @@ PHASE5_MIGRATION_CONTRACTS = [
         "indexes": {
             "llm_prompt_templates": [
                 "uq_llm_prompt_templates_active_default_scope",
+            ]
+        },
+    },
+    {
+        "revision": "20260605_0035",
+        "down_revision": "20260605_0034",
+        "filename": "20260605_0035_add_knowledge_embedding_retry_metrics.py",
+        "tables": {
+            "knowledge_embeddings": [
+                "last_error_message",
+                "retry_count",
+            ]
+        },
+        "indexes": {
+            "knowledge_embeddings": [
+                "ix_knowledge_embeddings_retry_count",
             ]
         },
     },

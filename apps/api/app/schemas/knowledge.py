@@ -139,7 +139,35 @@ class KnowledgeEmbeddingResponse(BaseModel):
     embedding_dimensions: int
     embedding_status: str
     error_message: str | None
+    last_error_message: str | None = None
+    retry_count: int = 0
     created_at: str
+
+
+class KnowledgeEmbeddingFailureReasonGroupResponse(BaseModel):
+    reason: str
+    count: int
+
+
+class KnowledgeEmbeddingFailedCaseResponse(BaseModel):
+    embedding_id: UUID
+    knowledge_title: str
+    embedding_model: str
+    error_message: str
+    retry_count: int
+
+
+class KnowledgeEmbeddingMetricsResponse(BaseModel):
+    published_knowledge_count: int
+    embedding_task_count: int
+    ready_count: int
+    pending_count: int
+    failed_count: int
+    ready_rate: float
+    total_retry_count: int
+    go_no_go_ready: bool
+    failure_reason_groups: list[KnowledgeEmbeddingFailureReasonGroupResponse]
+    failed_cases: list[KnowledgeEmbeddingFailedCaseResponse]
 
 
 class PhaseOneKnowledgeImportRequest(BaseModel):

@@ -20,9 +20,10 @@ def test_phase5_migration_contract_manifest_covers_expected_revisions() -> None:
         "20260605_0032",
         "20260605_0033",
         "20260605_0034",
+        "20260605_0035",
     ]
     assert "downgrade" in PHASE5_ROLLBACK_STRATEGY.lower()
-    assert "20260605_0034" in PHASE5_ROLLBACK_STRATEGY
+    assert "20260605_0035" in PHASE5_ROLLBACK_STRATEGY
     assert "20260605_0028" in PHASE5_ROLLBACK_STRATEGY
 
 
