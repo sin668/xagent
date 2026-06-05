@@ -26,8 +26,13 @@ Runtime stack target:
 - `AGENTS_BASE_URL`：默认值为 `http://localhost:8010`。
 - `AGENTS_API_KEY`：`apps/api` 调用 `apps/agents` 时使用的内部 API Key。
 - `AGENTS_TIMEOUT_SECONDS`：调用 `apps/agents` 的 HTTP 超时时间，默认值为 `120`。
+- `EXTERNAL_AGENT_SCHEDULER_ENABLED`：默认 `false`，控制 `apps/api` 是否定时通过 HTTP 触发 `apps/agents`。
+- `EXTERNAL_AGENT_SOURCE_DISCOVERY_ENABLED`：默认 `false`，控制外部 Source Discovery shadow job。
+- `EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_ENABLED`：默认 `false`，控制外部 Lead Extraction/Grading shadow job。
 
 当 `AGENTS_API_KEY` 为空时，`Settings.http_agent_runtime_enabled == False`，HTTP Agent runtime 会被显式禁用。
 `apps/api` 只能通过 HTTP 配置调用 `apps/agents`，不得把 `apps/agents` 作为本地包导入。
+
+旧 `AGENT_SOURCE_DISCOVERY_*`、`AGENT_LEAD_EXTRACTION_*`、`AGENT_RETRY_WORKER_*` 仅控制 `apps/api` 内原有本地 LLM Agent scheduler；它们不会启动 `apps/agents`。
 
 Local dependency installation is intentionally not vendored in this repository.

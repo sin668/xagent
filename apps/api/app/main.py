@@ -36,6 +36,10 @@ from app.api.staging_leads import router as staging_leads_router
 from app.api.sync import router as sync_router
 from app.services.agent_scheduler_bootstrap import shutdown_agent_scheduler, start_agent_scheduler
 from app.services.agent_thread_runner import AgentThreadRunner
+from app.services.external_agent_scheduler_bootstrap import (
+    shutdown_external_agent_scheduler,
+    start_external_agent_scheduler,
+)
 from app.settings import settings
 
 
@@ -45,11 +49,14 @@ logger = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     agent_scheduler = start_agent_scheduler()
+    external_agent_scheduler = start_external_agent_scheduler()
     app.state.agent_scheduler = agent_scheduler
+    app.state.external_agent_scheduler = external_agent_scheduler
     try:
         yield
     finally:
         AgentThreadRunner.shutdown(wait=True)
+        shutdown_external_agent_scheduler(external_agent_scheduler)
         shutdown_agent_scheduler(agent_scheduler)
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Callable
 from typing import TypeVar
 
@@ -8,6 +9,28 @@ from typing import TypeVar
 logger = logging.getLogger("app.agent_run")
 
 StateT = TypeVar("StateT")
+
+
+def configure_agent_logging() -> None:
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+        logger.addHandler(handler)
+    logger.propagate = True
+
+
+configure_agent_logging()
+
+
+def log_agent_service_start(*, service_name: str, service_version: str) -> None:
+    logger.info("agent_service_start service=%s version=%s", service_name, service_version)
+
+
+def log_agent_auto_start_disabled() -> None:
+    logger.info(
+        "agent_auto_start_disabled reason=apps_agents_is_http_runtime_only source_discovery_and_lead_extraction_require_explicit_api_call"
+    )
 
 
 def log_agent_run_start(

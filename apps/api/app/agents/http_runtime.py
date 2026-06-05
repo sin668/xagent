@@ -302,4 +302,6 @@ class HttpAgentRuntime:
             detail = response_json.get("detail")
             if isinstance(detail, str) and detail:
                 return detail
+            if isinstance(detail, list) and detail:
+                return f"apps/agents request failed with HTTP {response.status_code}: {detail}"
         return f"apps/agents request failed with HTTP {response.status_code}."

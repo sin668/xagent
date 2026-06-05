@@ -76,3 +76,15 @@ def test_agent_run_logs_start_nodes_and_result(client: TestClient, caplog: pytes
     assert any("agent_node_finish agent_type=deep_enrichment node=recommend_action" in message for message in messages)
     assert any("agent_run_succeeded agent_type=deep_enrichment" in message for message in messages)
     assert any("status=succeeded" in message for message in messages)
+
+
+def test_service_startup_logs_runtime_mode(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.INFO, logger="app.agent_run"):
+        with TestClient(app) as client:
+            response = client.get("/health")
+
+    assert response.status_code == 200
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("agent_service_start service=vehicle-leads-agents version=0.1.0" in message for message in messages)
+    assert any("agent_auto_start_disabled" in message for message in messages)
+    assert any("source_discovery_and_lead_extraction_require_explicit_api_call" in message for message in messages)
