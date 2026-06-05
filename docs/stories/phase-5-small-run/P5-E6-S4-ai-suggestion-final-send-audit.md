@@ -1,6 +1,6 @@
 # Story P5-E6-S4：AI 建议与最终发送分离审计
 
-状态：未开始  
+状态：已完成
 Sprint：Sprint 6  
 优先级：P0  
 Epic：P5-E6（自动回复规则与审计）
@@ -69,3 +69,60 @@ Epic：P5-E6（自动回复规则与审计）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 执行记录
+
+### TDD 红灯
+
+- 新增测试文件：`apps/api/tests/test_phase5_email_reply_audit_service.py`。
+- 红灯命令：
+  - `cd apps/api && /opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_reply_audit_service.py -q`
+- 红灯结果：
+  - 失败原因符合预期：`ModuleNotFoundError: No module named 'app.services.email_reply_audit'`，说明邮件回复审计服务尚未实现。
+
+### TDD 绿灯
+
+- 新增服务文件：`apps/api/app/services/email_reply_audit.py`。
+- 实现内容：
+  - `EmailReplyAuditService.apply_human_edit(...)` 保存人工最终主题/正文、编辑人、编辑时间和编辑差异，不覆盖 AI 建议字段。
+  - `EmailReplyAuditService.calculate_edit_metrics(...)` 统计主题/正文是否变化、长度差异和正文相似度。
+  - `EmailReplyAuditService.build_send_trace(...)` 构建发送追踪，包含 prompt、model、knowledge hits、AI 建议、最终正文、操作人和发送尝试快照。
+- 绿灯命令：
+  - `cd apps/api && /opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_reply_audit_service.py -q`
+- 绿灯结果：
+  - `3 passed in 0.31s`
+
+### 验证记录
+
+- 回归验证命令：
+  - `cd apps/api && /opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_email_reply_audit_service.py tests/test_phase5_email_reply_draft_model.py tests/test_phase5_email_send_attempt_model.py tests/test_phase5_email_reply_hard_block_service.py tests/test_phase5_auto_send_eligibility_service.py -q`
+- 回归验证结果：
+  - `17 passed in 0.44s`
+- 格式验证命令：
+  - `git diff --check`
+- 格式验证结果：
+  - 通过，无尾随空格或 patch 格式问题。
+
+## 两轮独立多维度评审
+
+### 第一轮评审：审计边界与业务完整性
+
+- 结论：
+  - 通过。AI 建议主题/正文和人工最终主题/正文分开保存，人工编辑不会覆盖 AI 原始建议。
+- 发现项：
+  - 审计摘要包含编辑人、编辑时间、编辑差异指标和 `ai_content_preserved`。
+  - 发送追踪包含 prompt version、model、knowledge hits、AI 建议、最终正文、操作人和发送尝试快照。
+  - 服务只构建审计与更新草稿字段，不发送邮件、不新增发送 API。
+- 修正结果：
+  - 未发现需要修正的实质阻塞问题。
+
+### 第二轮评审：工程契约与后续复用
+
+- 结论：
+  - 通过。审计服务为纯服务层模块，可被邮件审核 API、发送前检查 API、人工确认发送 API 和 EMAIL_REPLY Agent 回写流程复用。
+- 发现项：
+  - `calculate_edit_metrics(...)` 对空值做归一化，避免最终正文为空时统计异常。
+  - `build_send_trace(...)` 对 `EmailSendAttemptStatus` 做枚举值序列化，适合写入 JSON 审计字段。
+  - 新增服务复用 `email_reply_drafts` 与 `email_send_attempts` 已有字段，不需要新增 migration。
+- 修正结果：
+  - 未发现新增实质阻塞问题。
