@@ -190,7 +190,8 @@ export async function fetchEmailQualityDashboard({
     throw new Error('fetcher is required to load email quality dashboard');
   }
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-  const [promptResponse, embeddingResponse, aiAuditResponse, draftsResponse, riskEventsResponse] = await Promise.all([
+  const [qualityFoundationResponse, promptResponse, embeddingResponse, aiAuditResponse, draftsResponse, riskEventsResponse] = await Promise.all([
+    fetcher(`${normalizedBaseUrl}/dashboard/phase5-quality-foundation`),
     fetcher(`${normalizedBaseUrl}/llm-prompt-templates`),
     fetcher(`${normalizedBaseUrl}/knowledge/embeddings/metrics`),
     fetcher(`${normalizedBaseUrl}/sync/audit-dashboard`),
@@ -198,6 +199,7 @@ export async function fetchEmailQualityDashboard({
     fetcher(`${normalizedBaseUrl}/dashboard/risk-events`),
   ]);
   return {
+    qualityFoundation: await parseJsonResponse(qualityFoundationResponse, 'Failed to load phase5 quality foundation metrics'),
     promptTemplates: await parseJsonResponse(promptResponse, 'Failed to load prompt templates'),
     embeddingMetrics: await parseJsonResponse(embeddingResponse, 'Failed to load embedding metrics'),
     aiAudit: await parseJsonResponse(aiAuditResponse, 'Failed to load AI audit metrics'),

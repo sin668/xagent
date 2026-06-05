@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from pathlib import Path
 
 from sqlalchemy import false, select
 from sqlalchemy.orm import Session, selectinload
@@ -12,7 +13,11 @@ from app.models import (
     ComplianceReview,
     Customer,
     EmailSendAttempt,
+    KnowledgeCollection,
+    KnowledgeEmbedding,
+    KnowledgeItem,
     LeadSource,
+    LLMPromptTemplate,
     OutreachRecord,
     RiskEvent,
     RoiCostEntry,
@@ -26,12 +31,17 @@ from app.models.enums import (
     CustomerGrade,
     CustomerStatus,
     EmailSendAttemptStatus,
+    KnowledgeEmbeddingStatus,
+    KnowledgeItemStatus,
+    KnowledgeReviewStatus,
+    LLMPromptTemplateStatus,
     OutreachStatus,
     RiskEventSeverity,
     RiskEventStatus,
     SourcePlatform,
     StagingReviewStatus,
 )
+from app.services.prompt_file_parser import PromptFileParserService
 
 
 DISPLAY_NAMES = {
@@ -176,6 +186,94 @@ class DashboardService:
     def __init__(self, session: Session) -> None:
         self.session = session
 
+    def phase5_quality_foundation_metrics(
+        self,
+        *,
+        repo_root: Path,
+        knowledge_collection_prefix: str | None = None,
+    ) -> dict[str, object]:
+        prompt_files = PromptFileParserService.scan_prompt_directory(repo_root / "prompts", repo_root=repo_root)
+        expected_prompt_paths = [item.source_file_path for item in prompt_files]
+        templates = list(
+            self.session.scalars(
+                select(LLMPromptTemplate).where(LLMPromptTemplate.source_file_path.in_(expected_prompt_paths))
+            ).all()
+        ) if expected_prompt_paths else []
+        covered_paths = {
+            template.source_file_path
+            for template in templates
+            if template.source_file_path
+            and template.source_file_hash
+            and template.status == LLMPromptTemplateStatus.ACTIVE
+            and template.is_default
+        }
+        prompt_coverage_rate = len(covered_paths) / len(expected_prompt_paths) if expected_prompt_paths else 0.0
+
+        knowledge_statement = (
+            select(KnowledgeItem)
+            .options(selectinload(KnowledgeItem.embeddings), selectinload(KnowledgeItem.collection))
+            .where(KnowledgeItem.status == KnowledgeItemStatus.ACTIVE)
+            .where(KnowledgeItem.review_status == KnowledgeReviewStatus.APPROVED)
+        )
+        if knowledge_collection_prefix:
+            knowledge_statement = knowledge_statement.join(KnowledgeCollection).where(
+                KnowledgeCollection.name.like(f"{knowledge_collection_prefix}%")
+            )
+        published_items = list(self.session.scalars(knowledge_statement).all())
+        embeddings: list[KnowledgeEmbedding] = [embedding for item in published_items for embedding in item.embeddings]
+        ready_count = sum(1 for embedding in embeddings if embedding.embedding_status == KnowledgeEmbeddingStatus.READY)
+        pending_count = sum(1 for embedding in embeddings if embedding.embedding_status == KnowledgeEmbeddingStatus.PENDING)
+        failed_count = sum(1 for embedding in embeddings if embedding.embedding_status == KnowledgeEmbeddingStatus.FAILED)
+        published_count = len(published_items)
+        embedding_ready_rate = ready_count / published_count if published_count else 0.0
+        prompt_ready = prompt_coverage_rate >= 1.0
+        embedding_ready = embedding_ready_rate >= 0.95
+        reasons: list[str] = []
+        if not prompt_ready:
+            reasons.append("Prompt 入库覆盖率未达到 100%")
+        if not embedding_ready:
+            reasons.append("embedding ready 率低于 95%")
+
+        return {
+            "prompt_metrics": {
+                "expected_prompt_file_count": len(expected_prompt_paths),
+                "covered_prompt_file_count": len(covered_paths),
+                "prompt_coverage_rate": prompt_coverage_rate,
+                "expected_prompt_files": expected_prompt_paths,
+                "covered_prompt_files": sorted(covered_paths),
+                "missing_prompt_files": [path for path in expected_prompt_paths if path not in covered_paths],
+                "active_default_template_count": len(
+                    [
+                        template
+                        for template in templates
+                        if template.status == LLMPromptTemplateStatus.ACTIVE and template.is_default
+                    ]
+                ),
+            },
+            "knowledge_metrics": {
+                "published_knowledge_count": published_count,
+                "active_for_retrieval_count": sum(
+                    1
+                    for item in published_items
+                    if (item.metadata_json or {}).get("workflow_state") in {None, "active_for_retrieval"}
+                ),
+                "auto_reply_allowed_count": sum(
+                    1 for item in published_items if bool((item.metadata_json or {}).get("auto_reply_allowed"))
+                ),
+                "content_type_counts": self._knowledge_content_type_counts(published_items),
+            },
+            "embedding_metrics": {
+                "embedding_task_count": len(embeddings),
+                "ready_count": ready_count,
+                "pending_count": pending_count,
+                "failed_count": failed_count,
+                "ready_rate": embedding_ready_rate,
+                "total_retry_count": sum(int(embedding.retry_count or 0) for embedding in embeddings),
+            },
+            "go_no_go_ready": prompt_ready and embedding_ready,
+            "go_no_go_reasons": reasons,
+        }
+
     def email_delivery_quality_metrics(self) -> dict[str, int | float]:
         attempts = list(self.session.scalars(select(EmailSendAttempt)).all())
         total = len(attempts)
@@ -192,6 +290,14 @@ class DashboardService:
             "failure_rate": round(failed_count / total, 4) if total else 0.0,
             "bounce_rate": round(bounced_count / total, 4) if total else 0.0,
         }
+
+    @staticmethod
+    def _knowledge_content_type_counts(items: list[KnowledgeItem]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in items:
+            content_type = str((item.metadata_json or {}).get("content_type") or "unknown")
+            counts[content_type] = counts.get(content_type, 0) + 1
+        return counts
 
     @staticmethod
     def _empty_funnel_bucket(date_label: str | None = None, channel_name: str | None = None, risk_level: str | None = None) -> dict:

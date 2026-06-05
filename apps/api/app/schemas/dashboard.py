@@ -323,3 +323,37 @@ class EmailDeliveryQualityResponse(BaseModel):
     bounced_count: int
     failure_rate: float
     bounce_rate: float
+
+
+class Phase5PromptMetrics(BaseModel):
+    expected_prompt_file_count: int
+    covered_prompt_file_count: int
+    prompt_coverage_rate: float
+    expected_prompt_files: list[str]
+    covered_prompt_files: list[str]
+    missing_prompt_files: list[str]
+    active_default_template_count: int
+
+
+class Phase5KnowledgeMetrics(BaseModel):
+    published_knowledge_count: int
+    active_for_retrieval_count: int
+    auto_reply_allowed_count: int
+    content_type_counts: dict[str, int]
+
+
+class Phase5EmbeddingMetrics(BaseModel):
+    embedding_task_count: int
+    ready_count: int
+    pending_count: int
+    failed_count: int
+    ready_rate: float
+    total_retry_count: int
+
+
+class Phase5QualityFoundationResponse(BaseModel):
+    prompt_metrics: Phase5PromptMetrics
+    knowledge_metrics: Phase5KnowledgeMetrics
+    embedding_metrics: Phase5EmbeddingMetrics
+    go_no_go_ready: bool
+    go_no_go_reasons: list[str]

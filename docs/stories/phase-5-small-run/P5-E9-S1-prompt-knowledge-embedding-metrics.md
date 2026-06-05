@@ -1,6 +1,6 @@
 # Story P5-E9-S1：Prompt、知识与 embedding 指标服务
 
-状态：未开始  
+状态：已完成
 Sprint：Sprint 9  
 优先级：P1  
 Epic：P5-E9（质量指标与端到端验收）
@@ -69,3 +69,124 @@ Epic：P5-E9（质量指标与端到端验收）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 本次执行记录（2026-06-06）
+
+### TDD 红灯
+
+先新增 `apps/api/tests/test_phase5_prompt_knowledge_embedding_metrics_api.py`，覆盖统一质量基础指标 API：
+
+- 从 `prompts/*.md` 解析 expected Prompt 文件清单。
+- 基于 `llm_prompt_templates.source_file_path/source_file_hash/status/is_default` 统计 Prompt 入库覆盖率。
+- 基于已发布知识统计 `published_knowledge_count`、`active_for_retrieval_count` 和 `auto_reply_allowed_count`。
+- 基于已发布知识关联的 `knowledge_embeddings` 统计 ready、pending、failed、ready rate 和 retry。
+
+同时更新 `apps/admin/tests/emailQualityDashboard.test.mjs`，要求 admin 邮件质量页请求 `/dashboard/phase5-quality-foundation` 并保留统一指标 payload。
+
+红灯命令与结果：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_knowledge_embedding_metrics_api.py -q
+```
+
+- 结果：`1 failed`
+- 失败原因：`/dashboard/phase5-quality-foundation` 返回 404，确认统一指标 API 尚未实现。
+
+```bash
+export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH
+npm --prefix apps/admin test -- tests/emailQualityDashboard.test.mjs
+```
+
+- 结果：`1 failed`
+- 失败原因：admin 邮件质量页尚未请求 `/dashboard/phase5-quality-foundation`。
+
+### 最小实现
+
+本次新增和更新：
+
+- 在 `apps/api/app/services/dashboard.py` 新增 `phase5_quality_foundation_metrics()`，聚合 Prompt、知识和 embedding 基础质量指标。
+- 在 `apps/api/app/schemas/dashboard.py` 新增 `Phase5QualityFoundationResponse` 及 Prompt、知识、embedding 子指标 schema。
+- 在 `apps/api/app/api/dashboard.py` 新增 `GET /dashboard/phase5-quality-foundation`，支持 `knowledge_collection_prefix` 用于测试和排查时限定知识集合。
+- 在 `apps/admin/src/services/emailQualityDashboard.js` 中接入 `/dashboard/phase5-quality-foundation`，让 `admin-email-quality` 页面能消费统一基础指标。
+
+### 绿灯与回归验证
+
+定向绿灯命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_knowledge_embedding_metrics_api.py -q
+```
+
+结果：
+
+- `1 passed, 11 warnings`
+
+后端相关回归命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest \
+  tests/test_phase5_prompt_knowledge_embedding_metrics_api.py \
+  tests/test_phase5_prompt_file_parser.py \
+  tests/test_phase5_prompt_import_service.py \
+  tests/test_phase5_embedding_metrics_failed_cases.py \
+  tests/test_phase5_embedding_async_worker.py \
+  tests/test_phase5_knowledge_review_publish_archive_api.py \
+  tests/test_phase5_knowledge_quality_usage_api.py \
+  tests/test_phase5_email_failure_bounce_api.py -q
+```
+
+结果：
+
+- `19 passed, 103 warnings`
+- warnings 为既有 `datetime.utcnow()` deprecation，不影响本 Story 验收。
+
+后台质量页验证命令：
+
+```bash
+export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH
+npm --prefix apps/admin test -- tests/emailQualityDashboard.test.mjs
+npm --prefix apps/admin run check:syntax
+```
+
+结果：
+
+- admin 测试：`43 passed`
+- admin 语法检查：通过
+
+### 第一轮独立多维度评审
+
+结论：通过。
+
+发现项：
+
+- TDD 顺序有效：先确认后端统一指标接口 404、前端未请求统一指标接口，再实现最小 API 与前端接入。
+- Prompt 覆盖率来自真实 `prompts/*.md` 扫描和真实 `llm_prompt_templates` 表，不依赖 seed 静态数据。
+- 知识发布与 embedding ready 率来自真实 `knowledge_items` 与 `knowledge_embeddings` 表，测试仅通过 marker 限定清理范围，未破坏真实业务数据。
+- admin 邮件质量页已请求统一基础指标 API，同时保留既有 Prompt、embedding、审计、草稿和风险事件 API。
+
+修正结果：
+
+- 发现后端 ready rate 因四舍五入导致 `1/3` 精度不符合测试，已改为返回原始比例。
+
+### 第二轮独立多维度评审
+
+结论：通过。
+
+发现项：
+
+- 本 Story 只补齐 P5-E9-S1 的 Prompt、知识与 embedding 基础质量指标，没有进入 P5-E9-S2 的采纳率、编辑幅度、退信率完整口径。
+- 实现继续遵守 `apps/api` 业务数据权威，`apps/admin` 只读取真实 API，不直接访问业务表。
+- 新增 `knowledge_collection_prefix` 仅用于测试和排查过滤，不影响默认全局统计。
+- 未发现绕过 DNC/D/E、硬拦截、自动发送准入或 AI 建议/最终发送分离审计的风险。
+
+修正结果：
+
+- 未发现新增实质阻塞问题，当前 Story 可标记为已完成。
+
+### 残留风险
+
+- P5-E9-S1 只提供质量基础指标；AI 回复生成成功率、人工采纳率、编辑幅度、自动发送成功率、退信率和客户回复率仍由 P5-E9-S2 补齐。
+- `admin-email-quality` 当前仍同时请求统一基础指标和既有分散指标；后续 P5-E9-S2/P5-E9-S3 可进一步统一 Go/No-Go 聚合口径。

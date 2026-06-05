@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from datetime import date
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.schemas.dashboard import (
     ChannelLeadDashboardResponse,
     ChannelQualityDashboardResponse,
     EmailDeliveryQualityResponse,
+    Phase5QualityFoundationResponse,
     PhaseOneFunnelDashboardResponse,
     RiskEventDashboardResponse,
 )
@@ -18,6 +20,7 @@ from app.schemas.dashboard import RoiCostCreateRequest, RoiCostResponse, RoiMetr
 from app.services.dashboard import DashboardService
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 async def get_async_session() -> AsyncIterator[AsyncSession]:
@@ -56,6 +59,23 @@ async def get_email_delivery_quality(
     def run(sync_session):
         service = DashboardService(sync_session)
         return EmailDeliveryQualityResponse(**service.email_delivery_quality_metrics())
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/phase5-quality-foundation", response_model=Phase5QualityFoundationResponse)
+async def get_phase5_quality_foundation(
+    knowledge_collection_prefix: str | None = Query(default=None),
+    async_session: AsyncSession = Depends(get_async_session),
+) -> Phase5QualityFoundationResponse:
+    def run(sync_session):
+        service = DashboardService(sync_session)
+        return Phase5QualityFoundationResponse(
+            **service.phase5_quality_foundation_metrics(
+                repo_root=REPO_ROOT,
+                knowledge_collection_prefix=knowledge_collection_prefix,
+            )
+        )
 
     return await async_session.run_sync(run)
 

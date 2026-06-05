@@ -150,6 +150,18 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
     baseUrl: 'https://api.example.test/',
     fetcher: async (url) => {
       requestedUrls.push(url);
+      if (url.endsWith('/dashboard/phase5-quality-foundation')) {
+        return {
+          ok: true,
+          json: async () => ({
+            prompt_metrics: { prompt_coverage_rate: 1, covered_prompt_file_count: 2 },
+            knowledge_metrics: { published_knowledge_count: 3 },
+            embedding_metrics: embeddingMetricsPayload,
+            go_no_go_ready: true,
+            go_no_go_reasons: [],
+          }),
+        };
+      }
       if (url.endsWith('/llm-prompt-templates')) return { ok: true, json: async () => promptTemplatesPayload };
       if (url.endsWith('/knowledge/embeddings/metrics')) return { ok: true, json: async () => embeddingMetricsPayload };
       if (url.endsWith('/sync/audit-dashboard')) return { ok: true, json: async () => aiAuditPayload };
@@ -160,12 +172,14 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
   });
 
   assert.deepEqual(requestedUrls, [
+    'https://api.example.test/dashboard/phase5-quality-foundation',
     'https://api.example.test/llm-prompt-templates',
     'https://api.example.test/knowledge/embeddings/metrics',
     'https://api.example.test/sync/audit-dashboard',
     'https://api.example.test/email-reply/drafts?limit=500',
     'https://api.example.test/dashboard/risk-events',
   ]);
+  assert.equal(payload.qualityFoundation.prompt_metrics.prompt_coverage_rate, 1);
   assert.equal(payload.embeddingMetrics.ready_rate, 0.96);
   assert.equal(payload.riskEvents.items.length, 1);
 });
