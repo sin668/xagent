@@ -313,3 +313,13 @@ class AdminOverviewResponse(BaseModel):
     team_queues: AdminOverviewTeamQueues
     risk_events: list[AdminOverviewRiskEvent]
     blocked_tasks: list[AdminOverviewRiskEvent]
+
+
+class EmailDeliveryQualityResponse(BaseModel):
+    total_send_attempts: int
+    sent_count: int
+    failed_count: int
+    retry_pending_count: int
+    bounced_count: int
+    failure_rate: float
+    bounce_rate: float

@@ -11,6 +11,7 @@ from app.models import (
     ChannelRiskRule,
     ComplianceReview,
     Customer,
+    EmailSendAttempt,
     LeadSource,
     OutreachRecord,
     RiskEvent,
@@ -24,6 +25,7 @@ from app.models.enums import (
     ContactMethodType,
     CustomerGrade,
     CustomerStatus,
+    EmailSendAttemptStatus,
     OutreachStatus,
     RiskEventSeverity,
     RiskEventStatus,
@@ -173,6 +175,23 @@ def source_platform_filter_value(channel: str | None) -> SourcePlatform | None:
 class DashboardService:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def email_delivery_quality_metrics(self) -> dict[str, int | float]:
+        attempts = list(self.session.scalars(select(EmailSendAttempt)).all())
+        total = len(attempts)
+        sent_count = sum(1 for attempt in attempts if attempt.status == EmailSendAttemptStatus.SENT)
+        failed_count = sum(1 for attempt in attempts if attempt.status == EmailSendAttemptStatus.FAILED)
+        retry_pending_count = sum(1 for attempt in attempts if attempt.status == EmailSendAttemptStatus.RETRY_PENDING)
+        bounced_count = sum(1 for attempt in attempts if attempt.status == EmailSendAttemptStatus.BOUNCED)
+        return {
+            "total_send_attempts": total,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "retry_pending_count": retry_pending_count,
+            "bounced_count": bounced_count,
+            "failure_rate": round(failed_count / total, 4) if total else 0.0,
+            "bounce_rate": round(bounced_count / total, 4) if total else 0.0,
+        }
 
     @staticmethod
     def _empty_funnel_bucket(date_label: str | None = None, channel_name: str | None = None, risk_level: str | None = None) -> dict:

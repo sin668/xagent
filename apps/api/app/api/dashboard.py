@@ -9,6 +9,7 @@ from app.schemas.dashboard import (
     AdminOverviewResponse,
     ChannelLeadDashboardResponse,
     ChannelQualityDashboardResponse,
+    EmailDeliveryQualityResponse,
     PhaseOneFunnelDashboardResponse,
     RiskEventDashboardResponse,
 )
@@ -44,6 +45,17 @@ async def get_admin_overview(
     def run(sync_session):
         service = DashboardService(sync_session)
         return AdminOverviewResponse(**service.admin_overview())
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/email-delivery-quality", response_model=EmailDeliveryQualityResponse)
+async def get_email_delivery_quality(
+    async_session: AsyncSession = Depends(get_async_session),
+) -> EmailDeliveryQualityResponse:
+    def run(sync_session):
+        service = DashboardService(sync_session)
+        return EmailDeliveryQualityResponse(**service.email_delivery_quality_metrics())
 
     return await async_session.run_sync(run)
 
