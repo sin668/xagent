@@ -14,6 +14,7 @@ from app.schemas.lead_extraction import (
     LeadExtractionCandidate,
     LeadExtractionFieldName,
 )
+from app.services.agent_logging import run_logged_node
 
 
 LEAD_EXTRACTION_NODE_SEQUENCE = (
@@ -60,6 +61,8 @@ class LeadExtractionGraphResult:
 
 
 class LeadExtractionGraphRunner:
+    agent_type = "lead_extraction"
+
     def __init__(self, *, boundary: ApiContractBoundary | None = None) -> None:
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
@@ -68,7 +71,15 @@ class LeadExtractionGraphRunner:
     def _build_graph(self):
         graph = StateGraph(LeadExtractionGraphState)
         for node_name in LEAD_EXTRACTION_NODE_SEQUENCE:
-            graph.add_node(node_name, getattr(self, node_name))
+            graph.add_node(
+                node_name,
+                lambda state, node_name=node_name: run_logged_node(
+                    agent_type=self.agent_type,
+                    node_name=node_name,
+                    func=getattr(self, node_name),
+                    state=state,
+                ),
+            )
         graph.set_entry_point(LEAD_EXTRACTION_NODE_SEQUENCE[0])
         for index, node_name in enumerate(LEAD_EXTRACTION_NODE_SEQUENCE):
             next_index = index + 1

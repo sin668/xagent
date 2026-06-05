@@ -12,6 +12,7 @@ from app.graphs.lead_extraction_grading import LeadExtractionGradingGraphRunner,
 from app.graphs.source_discovery import SourceDiscoveryGraphRunner, SourceDiscoveryGraphState
 from app.schemas.agent_run import AgentRunAudit, AgentRunError, AgentRunRequest, AgentRunResponse
 from app.security import require_internal_api_key
+from app.services.agent_logging import log_agent_run_failed, log_agent_run_start, log_agent_run_succeeded
 from app.services.agent_service_runs import AgentRunNotFound, AgentServiceRunService
 
 
@@ -37,6 +38,13 @@ def run_deep_enrichment(
         max_retries=request.options.max_retries,
     )
     service.mark_running(run.id)
+    log_agent_run_start(
+        agent_type="deep_enrichment",
+        request_id=str(request.request_id),
+        agent_mode=request.agent_mode,
+        trigger_source=request.trigger_source,
+        agent_service_run_id=str(run.id),
+    )
 
     try:
         graph_result = DeepEnrichmentGraphRunner().run(
@@ -51,6 +59,14 @@ def run_deep_enrichment(
     except Exception as exc:
         error_type = _classify_deep_enrichment_error(exc)
         failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
+        log_agent_run_failed(
+            agent_type="deep_enrichment",
+            request_id=str(request.request_id),
+            agent_mode=failed.agent_mode,
+            agent_service_run_id=str(failed.id),
+            error_type=error_type,
+            error_message=str(exc),
+        )
         return AgentRunResponse(
             agent_service_run_id=failed.id,
             request_id=failed.request_id,
@@ -73,6 +89,13 @@ def run_deep_enrichment(
     session.add(succeeded)
     session.commit()
     session.refresh(succeeded)
+    log_agent_run_succeeded(
+        agent_type="deep_enrichment",
+        request_id=str(succeeded.request_id),
+        agent_mode=succeeded.agent_mode,
+        agent_service_run_id=str(succeeded.id),
+        executed_node_count=len(graph_result.executed_nodes),
+    )
 
     return AgentRunResponse(
         agent_service_run_id=succeeded.id,
@@ -102,6 +125,13 @@ def run_lead_cleanup(
         max_retries=request.options.max_retries,
     )
     service.mark_running(run.id)
+    log_agent_run_start(
+        agent_type="lead_cleanup",
+        request_id=str(request.request_id),
+        agent_mode=request.agent_mode,
+        trigger_source=request.trigger_source,
+        agent_service_run_id=str(run.id),
+    )
 
     try:
         graph_result = LeadCleanupGraphRunner().run(
@@ -114,6 +144,14 @@ def run_lead_cleanup(
     except Exception as exc:
         error_type = _classify_lead_cleanup_error(exc)
         failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
+        log_agent_run_failed(
+            agent_type="lead_cleanup",
+            request_id=str(request.request_id),
+            agent_mode=failed.agent_mode,
+            agent_service_run_id=str(failed.id),
+            error_type=error_type,
+            error_message=str(exc),
+        )
         return _failed_response(
             failed,
             agent_type="lead_cleanup",
@@ -132,6 +170,13 @@ def run_lead_cleanup(
     session.add(succeeded)
     session.commit()
     session.refresh(succeeded)
+    log_agent_run_succeeded(
+        agent_type="lead_cleanup",
+        request_id=str(succeeded.request_id),
+        agent_mode=succeeded.agent_mode,
+        agent_service_run_id=str(succeeded.id),
+        executed_node_count=len(graph_result.executed_nodes),
+    )
 
     return AgentRunResponse(
         agent_service_run_id=succeeded.id,
@@ -161,6 +206,13 @@ def run_source_discovery(
         max_retries=request.options.max_retries,
     )
     service.mark_running(run.id)
+    log_agent_run_start(
+        agent_type="source_discovery",
+        request_id=str(request.request_id),
+        agent_mode=request.agent_mode,
+        trigger_source=request.trigger_source,
+        agent_service_run_id=str(run.id),
+    )
 
     try:
         graph_result = SourceDiscoveryGraphRunner().run(
@@ -177,6 +229,14 @@ def run_source_discovery(
     except Exception as exc:
         error_type = _classify_source_discovery_error(exc)
         failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
+        log_agent_run_failed(
+            agent_type="source_discovery",
+            request_id=str(request.request_id),
+            agent_mode=failed.agent_mode,
+            agent_service_run_id=str(failed.id),
+            error_type=error_type,
+            error_message=str(exc),
+        )
         return _failed_response(
             failed,
             agent_type="source_discovery",
@@ -196,6 +256,13 @@ def run_source_discovery(
     session.add(succeeded)
     session.commit()
     session.refresh(succeeded)
+    log_agent_run_succeeded(
+        agent_type="source_discovery",
+        request_id=str(succeeded.request_id),
+        agent_mode=succeeded.agent_mode,
+        agent_service_run_id=str(succeeded.id),
+        executed_node_count=len(graph_result.executed_nodes),
+    )
 
     return AgentRunResponse(
         agent_service_run_id=succeeded.id,
@@ -225,6 +292,13 @@ def run_lead_extraction_grading(
         max_retries=request.options.max_retries,
     )
     service.mark_running(run.id)
+    log_agent_run_start(
+        agent_type="lead_extraction_grading",
+        request_id=str(request.request_id),
+        agent_mode=request.agent_mode,
+        trigger_source=request.trigger_source,
+        agent_service_run_id=str(run.id),
+    )
 
     try:
         graph_result = LeadExtractionGradingGraphRunner().run(
@@ -243,6 +317,14 @@ def run_lead_extraction_grading(
     except Exception as exc:
         error_type = _classify_lead_extraction_grading_error(exc)
         failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
+        log_agent_run_failed(
+            agent_type="lead_extraction_grading",
+            request_id=str(request.request_id),
+            agent_mode=failed.agent_mode,
+            agent_service_run_id=str(failed.id),
+            error_type=error_type,
+            error_message=str(exc),
+        )
         return _failed_response(
             failed,
             agent_type="lead_extraction_grading",
@@ -261,6 +343,13 @@ def run_lead_extraction_grading(
     session.add(succeeded)
     session.commit()
     session.refresh(succeeded)
+    log_agent_run_succeeded(
+        agent_type="lead_extraction_grading",
+        request_id=str(succeeded.request_id),
+        agent_mode=succeeded.agent_mode,
+        agent_service_run_id=str(succeeded.id),
+        executed_node_count=len(graph_result.executed_nodes),
+    )
 
     return AgentRunResponse(
         agent_service_run_id=succeeded.id,

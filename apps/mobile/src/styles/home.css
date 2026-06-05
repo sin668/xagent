@@ -5,8 +5,8 @@
   min-height: 100vh;
   margin: 0 auto;
   overflow-x: hidden;
-  background: #eef3f8;
-  color: #132033;
+  background: var(--xagent-paper, #eef3f8);
+  color: var(--xagent-ink, #132033);
 }
 
 .status-bar {
@@ -80,9 +80,9 @@
   position: relative;
   min-height: 190px;
   overflow: hidden;
-  border-radius: 26px;
+  border-radius: 28px;
   background: #172033;
-  box-shadow: 0 22px 40px rgba(13, 27, 48, 0.22);
+  box-shadow: var(--xagent-shadow-hero, 0 22px 40px rgba(13, 27, 48, 0.22));
 }
 
 .hero-image {
@@ -147,8 +147,8 @@
   padding: 14px 10px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.07);
+  background: var(--xagent-surface, #ffffff);
+  box-shadow: var(--xagent-shadow-sm, 0 12px 26px rgba(15, 23, 42, 0.07));
 }
 
 .metric-value {
@@ -204,8 +204,8 @@
 .entry-card {
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+  background: var(--xagent-surface, #ffffff);
+  box-shadow: var(--xagent-shadow-sm, 0 12px 26px rgba(15, 23, 42, 0.06));
 }
 
 .task-card {
@@ -355,7 +355,7 @@
   grid-template-columns: repeat(5, 1fr);
   padding: 8px 8px calc(22px + var(--safe-bottom, 0px));
   border-top: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(251, 253, 255, 0.94);
   backdrop-filter: blur(20px);
   z-index: 20;
 }

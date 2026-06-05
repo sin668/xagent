@@ -47,6 +47,8 @@ build/
 *.sqlite
 *.sqlite3
 *.db
+.langgraph_api/
+apps/**/.langgraph_api/
 
 # Node / frontend
 node_modules

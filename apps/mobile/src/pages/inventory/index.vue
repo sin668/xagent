@@ -89,7 +89,7 @@ import '../../styles/inventory.css';
 
 const heroImage = 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=80';
 const now = '2026-05-28T00:00:00Z';
-const bottomTabs = buildBottomTabs('insights');
+const bottomTabs = buildBottomTabs('customers');
 const inventoryItems = ref([]);
 const inventoryCards = computed(() => inventoryItems.value.map((item) => buildInventoryCardView(item, { now })));
 const priorityItems = computed(() => filterPriorityInventory(inventoryItems.value, { now }));

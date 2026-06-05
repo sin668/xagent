@@ -2,11 +2,11 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.db.types import JsonType
 from app.models.enums import (
     CustomerGrade,
     CustomerType,
@@ -30,7 +30,7 @@ class StagingLead(Base):
         default=CustomerType.UNKNOWN,
         index=True,
     )
-    contacts_json: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    contacts_json: Mapped[list] = mapped_column(JsonType, nullable=False, default=list)
     activity_level: Mapped[str | None] = mapped_column(String(80), nullable=True)
     scale_signal: Mapped[str | None] = mapped_column(Text, nullable=True)
     import_used_car_relevance: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -41,7 +41,7 @@ class StagingLead(Base):
         index=True,
     )
     recommended_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    missing_fields: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    missing_fields: Mapped[list] = mapped_column(JsonType, nullable=False, default=list)
     review_status: Mapped[StagingReviewStatus] = mapped_column(
         Enum(StagingReviewStatus, values_callable=enum_values),
         nullable=False,

@@ -1,0 +1,240 @@
+.email-replies-page,
+.email-reply-detail-page {
+  position: relative;
+  width: 100%;
+  max-width: var(--phone-width, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow-x: hidden;
+  background: var(--xagent-paper, #eef3f8);
+  color: var(--xagent-ink, #132033);
+}
+
+.email-replies-content,
+.email-reply-detail-content {
+  overflow-x: hidden;
+  padding: 0 16px calc(96px + var(--safe-bottom, 0px));
+}
+
+.email-reply-detail-content {
+  padding-bottom: calc(132px + var(--safe-bottom, 0px));
+}
+
+.email-decision-band,
+.email-card,
+.email-panel,
+.reply-editor {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: var(--xagent-surface, #fbfdff);
+  box-shadow: var(--xagent-shadow-sm, 0 12px 26px rgba(15, 23, 42, 0.06));
+}
+
+.email-decision-band {
+  padding: 15px;
+  margin-top: 12px;
+}
+
+.email-decision-band-blocked {
+  border-color: rgba(185, 28, 28, 0.2);
+  background: #fff1f2;
+}
+
+.email-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.email-card,
+.email-panel,
+.reply-editor {
+  padding: 15px;
+}
+
+.email-card-top,
+.email-knowledge-hit,
+.email-rule-grid {
+  display: flex;
+  gap: 12px;
+}
+
+.email-card-top {
+  justify-content: space-between;
+}
+
+.email-card-main {
+  min-width: 0;
+}
+
+.email-subject {
+  overflow: hidden;
+  color: var(--xagent-ink, #132033);
+  font-size: 15px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-meta,
+.email-preview,
+.email-rule-note {
+  color: var(--xagent-muted, #64748b);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.email-meta {
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-preview {
+  margin-top: 11px;
+  padding: 11px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.email-knowledge-hit {
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 11px;
+  border-radius: 15px;
+  background: #f8fafc;
+}
+
+.email-knowledge-icon {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 17px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.email-row-title {
+  display: block;
+  color: var(--xagent-ink, #132033);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.email-row-note {
+  display: block;
+  margin-top: 3px;
+  color: var(--xagent-muted, #64748b);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.email-empty,
+.email-alert {
+  padding: 32px 18px;
+  border-radius: 18px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.email-empty {
+  border: 1px dashed rgba(100, 116, 139, 0.35);
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--xagent-muted, #64748b);
+}
+
+.email-alert {
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.email-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.email-rule {
+  min-height: 88px;
+  padding: 12px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.email-rule-icon {
+  display: block;
+  color: #b91c1c;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.email-rule-title {
+  display: block;
+  margin-top: 7px;
+  color: var(--xagent-ink, #132033);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.reply-subject {
+  display: block;
+  color: var(--xagent-ink, #132033);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.reply-body {
+  display: block;
+  margin-top: 12px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.65;
+  font-weight: 750;
+}
+
+.email-action-bar {
+  position: fixed;
+  right: auto;
+  bottom: 0;
+  left: 50%;
+  width: min(100vw, var(--phone-width, 430px));
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 10px;
+  padding: 10px 16px calc(20px + var(--safe-bottom, 0px));
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(251, 253, 255, 0.94);
+  transform: translateX(-50%);
+  backdrop-filter: blur(20px);
+  z-index: 30;
+}
+
+.email-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.email-button-secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.email-button-primary {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.email-button-disabled {
+  background: #cbd5e1;
+  color: #64748b;
+}

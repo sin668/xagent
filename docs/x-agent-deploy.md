@@ -734,11 +734,50 @@ AGENTS_API_KEY=change_me_for_local_only
 AGENTS_TIMEOUT_SECONDS=120
 ```
 
+`apps/api` 原有本地 LLM Agent scheduler 配置保持独立，仅控制 `apps/api` 内历史任务，不会启动 `apps/agents`：
+
+```bash
+AGENT_SCHEDULER_ENABLED=false
+AGENT_SCHEDULER_LOCK_TTL_SECONDS=300
+AGENT_SOURCE_DISCOVERY_ENABLED=false
+AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS=900
+AGENT_LEAD_EXTRACTION_ENABLED=false
+AGENT_LEAD_EXTRACTION_INTERVAL_SECONDS=300
+AGENT_RETRY_WORKER_ENABLED=false
+AGENT_RETRY_WORKER_INTERVAL_SECONDS=900
+```
+
+如需由 `apps/api` 定时触发 `apps/agents` 中的 LangGraph Agent，使用独立的外部 Agent scheduler 配置。它通过 HTTP 调用 `/agent-runs/source-discovery` 和 `/agent-runs/lead-extraction-grading`，不 import `apps/agents` 本地包：
+
+```bash
+EXTERNAL_AGENT_SCHEDULER_ENABLED=true
+EXTERNAL_AGENT_SCHEDULER_LOCK_TTL_SECONDS=300
+EXTERNAL_AGENT_SOURCE_DISCOVERY_ENABLED=true
+EXTERNAL_AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS=900
+EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_ENABLED=true
+EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_INTERVAL_SECONDS=300
+```
+
+边界说明：
+
+- `EXTERNAL_AGENT_*` 与 `AGENT_*` 是两套配置；旧 `AGENT_*` 关闭时，仍可通过 `EXTERNAL_AGENT_*` 启动 `apps/agents` HTTP Agent。
+- 第四阶段 Source Discovery 与 Lead Extraction/Grading 仍以 `agent_mode=shadow` 运行；`apps/agents` 不直接写 `apps/api` core 业务表。
+- `apps/api` 的 external scheduler 收到 `apps/agents` 成功响应后，会由 API 侧 result consumer 消费 shadow output：Source Discovery 写入 `lead_source_candidates`，Lead Extraction/Grading 写入 `candidate_urls` 与 `staging_leads`，并补写 `agent_task_runs` 审计记录。
+- 只有 `status=succeeded`、`audit.writes_core_tables=false` 且 agent 类型匹配的响应会被消费入库；失败响应或越界响应不会写业务表。
+- Source Discovery 小范围定时输入会携带固定公开 seed URL，避免当前无真实搜索工具接入时 shadow 运行产出 0 个来源候选。
+- 启用 `EXTERNAL_AGENT_SCHEDULER_ENABLED=true` 前，必须保证 `apps/agents` 已启动，且两侧 `AGENTS_API_KEY` 一致。
+- 启用 `EXTERNAL_AGENT_SCHEDULER_ENABLED=true` 时，`apps/api` 仍需要配置 `REDIS_URL`，用于跨进程定时任务锁。
+
 `apps/agents` 环境变量：
 
 ```bash
 AGENTS_API_KEY=change_me_for_local_only
+AGENTS_DATABASE_URL=sqlite:///./agents.db
 ```
+
+`apps/agents` 的 Alembic 版本记录使用独立表 `agents_alembic_version`。如果 `AGENTS_DATABASE_URL` 与 `apps/api` 指向同一个 PostgreSQL 数据库，也不会读取 `apps/api.alembic_version` 中的业务库 revision。
+
+`apps/agents` 的 API handler 和 SQLAlchemy Session 是同步运行方式。如果 `AGENTS_DATABASE_URL` 配置为 `postgresql+asyncpg://`，服务会在内部转换为 `postgresql+psycopg://`；部署环境需安装 `psycopg[binary]` 依赖。
 
 本地启动示例：
 
@@ -750,6 +789,14 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```bash
 cd apps/agents
 AGENTS_API_KEY=change_me_for_local_only \
+AGENTS_DATABASE_URL=sqlite:///./agents.db \
+alembic upgrade head
+```
+
+```bash
+cd apps/agents
+AGENTS_API_KEY=change_me_for_local_only \
+AGENTS_DATABASE_URL=sqlite:///./agents.db \
 uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
 ```
 
@@ -763,6 +810,53 @@ OpenAPI 文档：
 
 ```text
 http://127.0.0.1:8010/docs
+```
+
+LangGraph Studio 可视化：
+
+```bash
+cd apps/agents
+python -m pip install -e ".[studio]"
+AGENTS_API_KEY=change_me_for_local_only \
+AGENTS_DATABASE_URL=sqlite:///./agents.db \
+langgraph dev
+```
+
+`apps/agents/langgraph.json` 会暴露以下图给 LangGraph Studio：
+
+| Graph | 说明 |
+|---|---|
+| `deep_enrichment` | Deep Enrichment 字段候选生成图 |
+| `lead_cleanup` | Lead Cleanup 清洗建议生成图 |
+| `source_discovery` | Source Discovery shadow 来源发现图 |
+| `lead_extraction_grading` | Lead Extraction/Grading 抽取、分级和组合校验可视化图 |
+
+运行日志：
+
+- `app.agent_run` logger 会在服务启动时打印 `agent_service_start`。
+- `app.agent_run` logger 会在启动时打印 `agent_auto_start_disabled`，说明 `apps/agents` 只作为 HTTP runtime，不会自动启动来源发现或线索抽取。
+- `app.agent_run` logger 会打印 `agent_run_start`、`agent_run_succeeded`、`agent_run_failed`。
+- 每个 LangGraph 节点会打印 `agent_node_start`、`agent_node_finish`、`agent_node_failed`。
+- 日志包含 `agent_type`、`request_id`、`agent_mode`、`agent_service_run_id`、节点名、状态和错误类型，便于联调和 Studio 观察。
+- Source Discovery、Lead Extraction/Grading、Deep Enrichment 和 Lead Cleanup 必须由 `apps/api` 或本地调试请求显式调用对应 `/agent-runs/*` HTTP API 后才会运行；当前 `apps/agents` 不包含自动 scheduler。
+
+本地触发 Source Discovery shadow 示例：
+
+```bash
+curl -X POST http://127.0.0.1:8010/agent-runs/source-discovery \
+  -H "Content-Type: application/json" \
+  -H "X-Agents-Api-Key: change_me_for_local_only" \
+  -d '{
+    "request_id": "11111111-1111-1111-1111-111111111111",
+    "trigger_source": "shadow_run",
+    "agent_mode": "shadow",
+    "input": {
+      "market": "Russia",
+      "channel_strategy": {"keywords": ["used cars"], "target_segments": ["local_dealer"]},
+      "seed_urls": ["https://dealer.example.ru"]
+    },
+    "options": {"max_retries": 2, "timeout_seconds": 120, "shadow_mode": true}
+  }'
 ```
 
 鉴权策略：
@@ -1103,9 +1197,10 @@ order by recommended_grade, queue_status;
 暂停动作：
 
 1. 设置 `AGENT_SCHEDULER_ENABLED=false` 并重启 API。
-2. 暂停相关渠道计划。
-3. 保留并归档 `agent_task_runs`、`lead_source_candidates`、`staging_leads`、`ai_audit_logs`。
-4. 合规负责人完成复盘后，再以人工小样本恢复。
+2. 设置 `EXTERNAL_AGENT_SCHEDULER_ENABLED=false` 并重启 API，停止由 `apps/api` 定时触发 `apps/agents`。
+3. 暂停相关渠道计划。
+4. 保留并归档 `agent_task_runs`、`lead_source_candidates`、`staging_leads`、`ai_audit_logs`。
+5. 合规负责人完成复盘后，再以人工小样本恢复。
 
 ---
 

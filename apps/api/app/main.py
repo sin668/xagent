@@ -13,6 +13,7 @@ from app.api.customers import router as customers_router
 from app.api.customer_followups import router as customer_followups_router
 from app.api.customer_vehicle_intents import router as customer_vehicle_intents_router
 from app.api.dashboard import router as dashboard_router
+from app.api.email_replies import router as email_replies_router
 from app.api.failed_cases import router as failed_cases_router
 from app.api.inventory import router as inventory_router
 from app.api.internal_email_reply import router as internal_email_reply_router
@@ -37,6 +38,10 @@ from app.api.staging_leads import router as staging_leads_router
 from app.api.sync import router as sync_router
 from app.services.agent_scheduler_bootstrap import shutdown_agent_scheduler, start_agent_scheduler
 from app.services.agent_thread_runner import AgentThreadRunner
+from app.services.external_agent_scheduler_bootstrap import (
+    shutdown_external_agent_scheduler,
+    start_external_agent_scheduler,
+)
 from app.settings import settings
 
 
@@ -46,11 +51,14 @@ logger = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     agent_scheduler = start_agent_scheduler()
+    external_agent_scheduler = start_external_agent_scheduler()
     app.state.agent_scheduler = agent_scheduler
+    app.state.external_agent_scheduler = external_agent_scheduler
     try:
         yield
     finally:
         AgentThreadRunner.shutdown(wait=True)
+        shutdown_external_agent_scheduler(external_agent_scheduler)
         shutdown_agent_scheduler(agent_scheduler)
 
 
@@ -70,6 +78,7 @@ app.include_router(customers_router)
 app.include_router(customer_followups_router)
 app.include_router(customer_vehicle_intents_router)
 app.include_router(dashboard_router)
+app.include_router(email_replies_router)
 app.include_router(failed_cases_router)
 app.include_router(inventory_router)
 app.include_router(internal_email_reply_router)

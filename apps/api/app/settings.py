@@ -87,6 +87,50 @@ class Settings(BaseSettings):
         ge=1,
         validation_alias=AliasChoices("VEHICLE_LEADS_AGENTS_TIMEOUT_SECONDS", "AGENTS_TIMEOUT_SECONDS"),
     )
+    external_agent_scheduler_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_SCHEDULER_ENABLED",
+            "EXTERNAL_AGENT_SCHEDULER_ENABLED",
+        ),
+    )
+    external_agent_scheduler_lock_ttl_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_SCHEDULER_LOCK_TTL_SECONDS",
+            "EXTERNAL_AGENT_SCHEDULER_LOCK_TTL_SECONDS",
+        ),
+    )
+    external_agent_source_discovery_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_SOURCE_DISCOVERY_ENABLED",
+            "EXTERNAL_AGENT_SOURCE_DISCOVERY_ENABLED",
+        ),
+    )
+    external_agent_source_discovery_interval_seconds: int = Field(
+        default=900,
+        ge=1,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS",
+            "EXTERNAL_AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS",
+        ),
+    )
+    external_agent_lead_extraction_grading_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_ENABLED",
+            "EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_ENABLED",
+        ),
+    )
+    external_agent_lead_extraction_grading_interval_seconds: int = Field(
+        default=300,
+        ge=1,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_INTERVAL_SECONDS",
+            "EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_INTERVAL_SECONDS",
+        ),
+    )
     agent_deep_enrichment_http_active_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices(

@@ -57,6 +57,13 @@ AGENTS_TIMEOUT_SECONDS=120
 cd apps/agents
 AGENTS_API_KEY=change_me_for_local_only \
 AGENTS_DATABASE_URL=sqlite:///./agents.db \
+alembic upgrade head
+```
+
+```bash
+cd apps/agents
+AGENTS_API_KEY=change_me_for_local_only \
+AGENTS_DATABASE_URL=sqlite:///./agents.db \
 uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
 ```
 
@@ -72,6 +79,57 @@ OpenAPI 文档：
 http://127.0.0.1:8010/docs
 ```
 
+### LangGraph Studio 可视化
+
+`apps/agents` 提供 `langgraph.json`，用于在 LangGraph Studio 中查看第四阶段 Agent 图：
+
+- `deep_enrichment`
+- `lead_cleanup`
+- `source_discovery`
+- `lead_extraction_grading`
+
+本地启动：
+
+```bash
+cd apps/agents
+python -m pip install -e ".[studio]"
+langgraph dev
+```
+
+Studio 会读取 `langgraph.json` 中的 `app.studio.graphs:*` 导出。`lead_extraction_grading` 使用 Studio 专用组合视图展示抽取、分级和组合校验三个阶段；实际 HTTP API 仍使用 `LeadExtractionGradingGraphRunner` 运行。
+
+### 运行日志
+
+Agent API 和 LangGraph 节点运行会通过 `app.agent_run` logger 打印结构化文本日志，覆盖：
+
+- `agent_service_start`：服务启动。
+- `agent_auto_start_disabled`：提示 `apps/agents` 只作为 HTTP runtime，不会自动启动来源发现或线索抽取。
+- `agent_run_start`：Agent run 创建并进入 running。
+- `agent_node_start` / `agent_node_finish`：每个 LangGraph 节点进入和完成。
+- `agent_node_failed`：节点异常。
+- `agent_run_succeeded` / `agent_run_failed`：Agent run 最终结果。
+
+`apps/agents` 不包含自动 scheduler。Source Discovery、Lead Extraction/Grading、Deep Enrichment 和 Lead Cleanup 都必须由 `apps/api` 或本地调试请求显式调用对应 HTTP API 后才会运行。
+
+本地触发 Source Discovery shadow 示例：
+
+```bash
+curl -X POST http://127.0.0.1:8010/agent-runs/source-discovery \
+  -H "Content-Type: application/json" \
+  -H "X-Agents-Api-Key: change_me_for_local_only" \
+  -d '{
+    "request_id": "11111111-1111-1111-1111-111111111111",
+    "trigger_source": "shadow_run",
+    "agent_mode": "shadow",
+    "input": {
+      "market": "Russia",
+      "channel_strategy": {"keywords": ["used cars"], "target_segments": ["local_dealer"]},
+      "seed_urls": ["https://dealer.example.ru"]
+    },
+    "options": {"max_retries": 2, "timeout_seconds": 120, "shadow_mode": true}
+  }'
+```
+
 ### 内部 API Key
 
 - 受保护的 Agent Run API 使用 Header：`X-Agents-Api-Key: <AGENTS_API_KEY>`。
@@ -83,7 +141,10 @@ http://127.0.0.1:8010/docs
 
 - `apps/agents` 使用 `AGENTS_DATABASE_URL` 连接自己的 Agent 运行状态库。
 - 未配置 `AGENTS_DATABASE_URL` 时，会回退读取 `DATABASE_URL`。
+- 如果配置为 `postgresql+asyncpg://`，`apps/agents` 会在内部转换为同步运行所需的 `postgresql+psycopg://`。
 - 本地小范围运行默认值为 `sqlite:///./agents.db`。
+- 启动 `apps/agents` 前需要在 `apps/agents` 目录执行 `alembic upgrade head`，创建 `agent_service_runs`。
+- Alembic 版本记录使用独立表 `agents_alembic_version`，避免和 `apps/api` 的 `alembic_version` 冲突。
 - `apps/agents` 只写 `agent_service_runs` 等自身运行状态表，不直接写 `customers`、`contact_methods`、`staging_leads` 等业务 core 表。
 
 ## 运行边界

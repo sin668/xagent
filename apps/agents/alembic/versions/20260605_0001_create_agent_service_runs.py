@@ -7,7 +7,6 @@ Create Date: 2026-06-05
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision = "20260605_0001"
 down_revision = None
@@ -18,16 +17,16 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "agent_service_runs",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("request_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), nullable=False),
+        sa.Column("request_id", sa.Uuid(as_uuid=True), nullable=False),
         sa.Column("agent_type", sa.String(length=80), nullable=False),
         sa.Column("agent_mode", sa.String(length=40), nullable=False),
         sa.Column("status", sa.String(length=40), nullable=False),
         sa.Column("trigger_source", sa.String(length=80), nullable=False),
-        sa.Column("input_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("output_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("output_summary_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("audit_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("input_json", sa.JSON(), nullable=False),
+        sa.Column("output_json", sa.JSON(), nullable=True),
+        sa.Column("output_summary_json", sa.JSON(), nullable=True),
+        sa.Column("audit_json", sa.JSON(), nullable=False),
         sa.Column("retry_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("max_retries", sa.Integer(), nullable=False, server_default="2"),
         sa.Column("next_retry_at", sa.DateTime(timezone=True), nullable=True),

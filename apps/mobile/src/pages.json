@@ -55,6 +55,18 @@
       }
     },
     {
+      "path": "pages/email-replies/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/email-replies/detail",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/agent-run/index",
       "style": {
         "navigationStyle": "custom"

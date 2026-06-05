@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.lead_cleanup import CleanupAgentOutput, CleanupSuggestionOutput
+from app.services.agent_logging import run_logged_node
 from app.tools.duplicate_detector import DuplicateDetector
 
 
@@ -42,6 +43,8 @@ class LeadCleanupGraphResult:
 
 
 class LeadCleanupGraphRunner:
+    agent_type = "lead_cleanup"
+
     def __init__(
         self,
         *,
@@ -56,7 +59,15 @@ class LeadCleanupGraphRunner:
     def _build_graph(self):
         graph = StateGraph(LeadCleanupGraphState)
         for node_name in LEAD_CLEANUP_NODE_SEQUENCE:
-            graph.add_node(node_name, getattr(self, node_name))
+            graph.add_node(
+                node_name,
+                lambda state, node_name=node_name: run_logged_node(
+                    agent_type=self.agent_type,
+                    node_name=node_name,
+                    func=getattr(self, node_name),
+                    state=state,
+                ),
+            )
         graph.set_entry_point(LEAD_CLEANUP_NODE_SEQUENCE[0])
         for index, node_name in enumerate(LEAD_CLEANUP_NODE_SEQUENCE):
             next_index = index + 1
