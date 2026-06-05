@@ -53,6 +53,8 @@ class EmailReplyActionRequest(BaseModel):
     actor: str = Field(min_length=1)
     review_note: str | None = None
     manual_confirmed: bool = True
+    final_subject: str | None = None
+    final_body: str | None = None
 
 
 class EmailSendPreviewResponse(BaseModel):
