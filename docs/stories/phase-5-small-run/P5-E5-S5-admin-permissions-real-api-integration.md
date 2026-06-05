@@ -1,8 +1,8 @@
 # Story P5-E5-S5：后台权限与真实 API 联调
 
-状态：未开始  
-Sprint：Sprint 5  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 5
+优先级：P0
 Epic：P5-E5（apps/admin 后台管理页面）
 
 ## 用户故事
@@ -69,3 +69,46 @@ Epic：P5-E5（apps/admin 后台管理页面）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## TDD 执行记录
+
+### 红灯
+
+- 新增测试：`apps/admin/tests/adminRealApiIntegration.test.mjs`。
+- 红灯命令：`node --test apps/admin/tests/adminRealApiIntegration.test.mjs`。
+- 红灯结果：测试首次运行失败，原因是 `apps/admin/src/services/adminRealApiIntegration.js` 模块不存在，证明测试覆盖的是本 Story 新增的后台真实 API 联调能力。
+
+### 绿灯
+
+- 新增 `apps/admin/src/services/adminRealApiIntegration.js`，统一输出 Prompt、知识库、邮件审核三条真实 API 联调记录。
+- 新增 401、403、422、500 错误态中文文案，用于后台 UI 明确提示鉴权、权限、参数校验和后端服务异常。
+- 更新 `apps/admin/src/App.vue`，新增「第五阶段真实 API 联调」区块，显示三条真实 API 联调记录、HTTP 状态、真实记录数、权限提示和错误态。
+- 更新 `apps/admin/src/styles/admin.css`，补齐联调记录卡片样式。
+- 更新 `apps/admin/package.json`，将 `adminRealApiIntegration.js` 纳入语法检查。
+
+## 验收记录
+
+- `node --test apps/admin/tests/adminRealApiIntegration.test.mjs`：3 项测试通过。
+- `npm --prefix apps/admin test`：43 项测试通过。
+- `npm --prefix apps/admin run check:syntax`：通过。
+- `npm --prefix apps/admin run build`：通过。
+
+## 真实 API 联调记录
+
+- Prompt 治理：`GET /llm-prompt-templates`，用于校验后台 Prompt 入库治理不依赖 seed 静态数据。
+- 知识库治理：`GET /knowledge/items?limit=100`，用于校验 Q&A、邮件模板、合规话术、车型说明和流程 SOP 进入真实知识库 API。
+- 邮件审核台：`GET /email-reply/drafts?limit=100`，用于校验邮件自动回复审核台读取真实邮件回复草稿 API。
+
+## 两轮独立多维度评审
+
+### 第一轮评审
+
+- 结论：本 Story 已覆盖真实 API、权限提示和错误态 UI，且只改动第五阶段后台联调相关文件，没有进入下一个 Story。
+- 发现项：新增测试位于 `apps/admin/tests`，该目录被 `.gitignore` 忽略，普通 `git status` 不会显示新测试文件。
+- 修正结果：提交前需要使用 `git add -f apps/admin/tests/adminRealApiIntegration.test.mjs` 强制加入测试，避免实现提交但红绿测试缺失。
+
+### 第二轮评审
+
+- 结论：三条联调记录均通过真实 API 契约生成，页面明确声明 `seedFallbackAllowed=false`，未把 seed 静态数据作为第五阶段后台页面验收依据。
+- 发现项：错误态不能只显示英文 `Failed to load ...`，否则运营无法区分鉴权失败、权限不足、参数校验失败和后端服务异常。
+- 修正结果：新增统一 `buildAdminApiErrorState`，对 401/403/422/500 分别给出中文 UI 文案；第二轮复核未发现新的实质阻塞问题。

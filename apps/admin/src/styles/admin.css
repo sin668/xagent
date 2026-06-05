@@ -258,6 +258,7 @@ body {
 .knowledge-governance-card,
 .email-reply-card,
 .email-quality-card,
+.phase5-integration-card,
 .llm-card {
   margin-top: 18px;
 }
@@ -845,6 +846,38 @@ body {
   display: block;
   margin-bottom: 8px;
   font-size: 14px;
+}
+
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.integration-grid article {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.integration-grid strong {
+  font-size: 18px;
+}
+
+.integration-grid span {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.integration-grid em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
 }
 
 .fallback-list {

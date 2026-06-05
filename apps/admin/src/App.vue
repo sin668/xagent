@@ -15,6 +15,7 @@
         <a href="#knowledge-governance">知识库</a>
         <a href="#email-reply-review">邮件审核</a>
         <a href="#email-quality">质量指标</a>
+        <a href="#phase5-integration">真实 API 联调</a>
         <a href="#llm-governance">LLM 治理</a>
       </nav>
     </aside>
@@ -429,6 +430,33 @@
         </div>
 
         <p class="guardrail">第三阶段只展示指标和风控状态；AI 不得自动晋级客户、自动归并客户、自动恢复 Invalid，客户触达必须人工确认。</p>
+      </section>
+
+      <section id="phase5-integration" class="admin-card phase5-integration-card">
+        <div class="card-head">
+          <div>
+            <h3>第五阶段真实 API 联调</h3>
+            <span>Prompt、知识库和邮件审核三条后台链路必须接真实 API，不允许以 seed 静态数据作为验收依据</span>
+          </div>
+          <span :class="['tag', phase5Integration.statusClass]">{{ phase5Integration.statusLabel }}</span>
+        </div>
+
+        <div class="integration-grid">
+          <article v-for="record in phase5Integration.integrationRecords" :key="record.key">
+            <div>
+              <strong>{{ record.name }}</strong>
+              <span>{{ record.url }}</span>
+            </div>
+            <span :class="['tag', record.statusClass]">{{ record.statusLabel }}</span>
+            <em>{{ record.itemCount }} 条真实记录 / HTTP {{ record.status }}</em>
+          </article>
+        </div>
+
+        <p v-if="phase5IntegrationError" class="guardrail">{{ phase5IntegrationError }}</p>
+        <p v-if="phase5Integration.firstError" class="guardrail">
+          {{ phase5Integration.firstError.title }}：{{ phase5Integration.firstError.message }}
+        </p>
+        <p class="guardrail">{{ phase5Integration.permission.notice }}</p>
       </section>
 
       <section id="prompt-governance" class="admin-card prompt-governance-card">
@@ -931,6 +959,7 @@ import { computed, onMounted, ref } from 'vue';
 import { adminOverviewSeed } from './data/adminOverviewSeed.js';
 import { channelRiskConfigSeed } from './data/channelRiskConfigSeed.js';
 import { syncAiAuditSeed } from './data/syncAiAuditSeed.js';
+import { buildPhase5AdminIntegrationView, fetchPhase5AdminIntegration } from './services/adminRealApiIntegration.js';
 import { buildAdminOverviewView } from './services/adminOverview.js';
 import { buildChannelRiskConfigView } from './services/channelRiskConfig.js';
 import { buildEmailQualityDashboardView, fetchEmailQualityDashboard } from './services/emailQualityDashboard.js';
@@ -965,6 +994,9 @@ const emailReplyReviewError = ref('');
 const emailQualityPayload = ref(null);
 const emailQualityLoading = ref(true);
 const emailQualityError = ref('');
+const phase5IntegrationPayload = ref(null);
+const phase5IntegrationLoading = ref(true);
+const phase5IntegrationError = ref('');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
 const adminActorRole = import.meta.env.VITE_ADMIN_ACTOR_ROLE || 'operator';
 
@@ -1015,6 +1047,11 @@ const emailQualityReasonsText = computed(() => {
   const reasons = emailQualityDashboard.value.goNoGo.reasons;
   return reasons.length > 0 ? reasons.join(' / ') : '暂无暂停或重跑原因';
 });
+const phase5Integration = computed(() => buildPhase5AdminIntegrationView({
+  ...(phase5IntegrationPayload.value || {}),
+  actorRole: phase5IntegrationPayload.value?.actorRole || adminActorRole,
+  seedFallbackAllowed: false,
+}));
 const phase2PauseThresholds = computed(() => Object.values(phase2.value.pauseThresholds));
 const phase2StatusText = computed(() => {
   if (phase2Loading.value) return '加载中';
@@ -1056,6 +1093,7 @@ onMounted(async () => {
     knowledgeGovernanceResult,
     emailReplyReviewResult,
     emailQualityResult,
+    phase5IntegrationResult,
     llmGovernanceResult,
   ] = await Promise.allSettled([
     fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
@@ -1064,6 +1102,7 @@ onMounted(async () => {
     fetchKnowledgeGovernance({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchEmailReplyReview({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchEmailQualityDashboard({ baseUrl: apiBaseUrl }),
+    fetchPhase5AdminIntegration({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchLlmGovernance({ baseUrl: apiBaseUrl }),
   ]);
 
@@ -1103,6 +1142,12 @@ onMounted(async () => {
     emailQualityError.value = `无法加载第五阶段质量指标真实 API：${emailQualityResult.reason.message}`;
   }
 
+  if (phase5IntegrationResult.status === 'fulfilled') {
+    phase5IntegrationPayload.value = phase5IntegrationResult.value;
+  } else {
+    phase5IntegrationError.value = `无法加载第五阶段真实 API 联调记录：${phase5IntegrationResult.reason.message}`;
+  }
+
   if (llmGovernanceResult.status === 'fulfilled') {
     llmGovernancePayload.value = llmGovernanceResult.value;
   } else {
@@ -1115,6 +1160,7 @@ onMounted(async () => {
   knowledgeGovernanceLoading.value = false;
   emailReplyReviewLoading.value = false;
   emailQualityLoading.value = false;
+  phase5IntegrationLoading.value = false;
   llmLoading.value = false;
 });
 </script>
