@@ -1,8 +1,8 @@
 # Story P5-E2-S3：Prompt 草稿创建与编辑 API
 
-状态：未开始  
-Sprint：Sprint 2  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 2
+优先级：P0
 Epic：P5-E2（Prompt 入库治理）
 
 ## 用户故事
@@ -199,3 +199,29 @@ leftover_phase5_draft_api_rows=0
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 Prompt 草稿创建、详情和编辑 API 已存在，并已由历史提交 `76dd65f3 feat: add prompt draft edit api` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_draft_edit_api.py tests/test_llm_prompt_templates_api.py tests/test_llm_prompt_template_model.py tests/test_phase5_prompt_import_service.py tests/test_phase5_prompt_file_parser.py tests/test_phase5_prompt_template_governance.py -q
+```
+
+复核结果：
+
+```text
+27 passed, 1 warning in 8.60s
+```
+
+警告说明：
+
+- warning 为既有知识库双路由兼容造成的 FastAPI duplicate operation ID warning，位于 `apps/api/app/api/knowledge.py`，不影响 Prompt 草稿 API 验收，本 Story 不扩范围修复。
+
+两轮复核结论：
+
+- 第一轮：后台可创建 Prompt 草稿、编辑草稿和查看草稿详情；只能编辑 `draft`，编辑 `active` 返回 409；响应包含版本、来源 hash、校验状态和审计摘要；权限边界区分 `admin` / `tech_admin`。
+- 第二轮：本 Story 只操作 `llm_prompt_templates` 草稿，不发布、不切默认、不调用 LLM、不执行自动触达或自动发送；架构边界保持 `apps/api` 业务数据权威，未发现新的实质阻塞问题。
