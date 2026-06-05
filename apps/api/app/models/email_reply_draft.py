@@ -74,3 +74,4 @@ class EmailReplyDraft(Base):
     prompt_template = relationship("LLMPromptTemplate")
     sent_record = relationship("OutreachRecord")
     send_attempts = relationship("EmailSendAttempt", back_populates="reply_draft")
+    knowledge_usage_records = relationship("KnowledgeUsageRecord", back_populates="email_reply_draft")

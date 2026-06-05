@@ -251,6 +251,16 @@ class KnowledgeEmbeddingStatus(StrEnum):
     FAILED = "failed"
 
 
+class KnowledgeUsageOutcome(StrEnum):
+    RETRIEVED = "retrieved"
+    ADOPTED = "adopted"
+    EDITED = "edited"
+    REJECTED = "rejected"
+    CUSTOMER_REPLIED = "customer_replied"
+    BOUNCED = "bounced"
+    SUGGEST_DEPRECATE = "suggest_deprecate"
+
+
 class LLMPromptTaskType(StrEnum):
     SOURCE_DISCOVERY = "SOURCE_DISCOVERY"
     LEAD_EXTRACTION = "LEAD_EXTRACTION"

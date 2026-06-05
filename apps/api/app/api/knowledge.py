@@ -143,6 +143,7 @@ async def list_items(
     return await async_session.run_sync(run)
 
 
+@router.post("/items/{item_id}/embedding", response_model=KnowledgeEmbeddingResponse)
 @router.post("/items/{item_id:uuid}/embedding", response_model=KnowledgeEmbeddingResponse)
 async def create_embedding(
     item_id: UUID,

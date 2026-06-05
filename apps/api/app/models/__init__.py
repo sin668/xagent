@@ -41,6 +41,7 @@ from app.models.enums import (
     KnowledgeEmbeddingStatus,
     KnowledgeItemStatus,
     KnowledgeReviewStatus,
+    KnowledgeUsageOutcome,
     LeadCleanupRunStatus,
     LeadCleanupSuggestionReviewStatus,
     LeadCleanupSuggestionType,
@@ -64,7 +65,7 @@ from app.models.enums import (
 )
 from app.models.failed_case import FailedCase
 from app.models.inventory_item import InventoryItem
-from app.models.knowledge import KnowledgeCollection, KnowledgeEmbedding, KnowledgeItem
+from app.models.knowledge import KnowledgeCollection, KnowledgeEmbedding, KnowledgeItem, KnowledgeQualityMetric, KnowledgeUsageRecord
 from app.models.lead_cleanup_run import LeadCleanupRun
 from app.models.lead_cleanup_suggestion import LeadCleanupSuggestion
 from app.models.lead_enrichment_field_candidate import LeadEnrichmentFieldCandidate
@@ -129,7 +130,10 @@ __all__ = [
     "KnowledgeEmbeddingStatus",
     "KnowledgeItem",
     "KnowledgeItemStatus",
+    "KnowledgeQualityMetric",
     "KnowledgeReviewStatus",
+    "KnowledgeUsageOutcome",
+    "KnowledgeUsageRecord",
     "LeadCleanupRun",
     "LeadCleanupRunStatus",
     "LeadCleanupSuggestion",
