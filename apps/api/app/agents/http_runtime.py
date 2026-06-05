@@ -115,6 +115,40 @@ class HttpAgentRuntime:
             options={"timeout_seconds": self.settings.agents_timeout_seconds},
         )
 
+    def run_email_reply_response(
+        self,
+        *,
+        request_id: Any,
+        agent_task_run_id: Any,
+        thread_id: Any,
+        message_id: Any,
+        customer_id: Any | None = None,
+        draft_id: Any | None = None,
+        context: dict[str, Any] | None = None,
+        prompt: dict[str, Any] | None = None,
+        options: dict[str, Any] | None = None,
+        agent_mode: str = "active",
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        input_payload = {
+            "thread_id": str(thread_id),
+            "message_id": str(message_id),
+            "customer_id": str(customer_id) if customer_id is not None else None,
+            "draft_id": str(draft_id) if draft_id is not None else None,
+            "context": context or {},
+            "prompt": prompt or {},
+            "options": options or {},
+        }
+        return self._run_agent_sync(
+            "email-reply",
+            request_id=str(request_id),
+            agent_task_run_id=str(agent_task_run_id),
+            trigger_source="phase5_email_reply_runtime",
+            agent_mode=agent_mode,
+            input_payload=input_payload,
+            options={"timeout_seconds": self.settings.agents_timeout_seconds, "dry_run": dry_run},
+        )
+
     async def run_agent(
         self,
         agent_endpoint: str,

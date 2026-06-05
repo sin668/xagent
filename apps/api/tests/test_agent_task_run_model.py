@@ -50,6 +50,7 @@ def test_agent_task_type_and_status_enums_are_available() -> None:
     assert AgentTaskType.LEAD_EXTRACTION == "LEAD_EXTRACTION"
     assert AgentTaskType.LEAD_GRADING == "LEAD_GRADING"
     assert AgentTaskType.RETRY_WORKER == "RETRY_WORKER"
+    assert AgentTaskType.EMAIL_REPLY == "EMAIL_REPLY"
 
     assert AgentTaskRunStatus.PENDING == "pending"
     assert AgentTaskRunStatus.RUNNING == "running"

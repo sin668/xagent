@@ -1,6 +1,6 @@
 # Story P5-E7-S6：apps/api EmailReplyAgent client 集成
 
-状态：未开始  
+状态：已完成
 Sprint：Sprint 7  
 优先级：P0  
 Epic：P5-E7（EMAIL_REPLY Agent）
@@ -69,3 +69,112 @@ Epic：P5-E7（EMAIL_REPLY Agent）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 执行记录
+
+执行日期：2026-06-05
+
+### TDD 红灯
+
+新增测试：
+
+- `apps/api/tests/agents/test_http_agent_runtime.py::test_http_agent_runtime_posts_email_reply_response_contract`
+- `apps/api/tests/test_phase5_email_reply_agent_client.py`
+
+红灯命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/agents/test_http_agent_runtime.py::test_http_agent_runtime_posts_email_reply_response_contract tests/test_phase5_email_reply_agent_client.py -q
+```
+
+红灯结果：
+
+- 失败符合预期：`ModuleNotFoundError: No module named 'app.services.email_reply_agent'`。
+- 证明当前 `apps/api` 缺少 EMAIL_REPLY Agent client 服务和对应任务摘要保存能力。
+
+### 最小实现
+
+实现内容：
+
+- 在 `apps/api/app/agents/http_runtime.py` 新增同步兼容方法 `run_email_reply_response(...)`，通过 `POST /agent-runs/email-reply` 调用 `apps/agents`。
+- 在 `apps/api/app/services/email_reply_agent.py` 新增 `EmailReplyAgentService` 和 `select_email_reply_runtime`。
+- 新增 `AgentTaskType.EMAIL_REPLY`。
+- 新增 migration `20260605_0036_add_email_reply_agent_task_type.py`，扩展 PostgreSQL enum `agenttasktype`。
+- 在 `apps/api/app/settings.py` 和 `apps/api/.env.example` 增加 `AGENT_EMAIL_REPLY_HTTP_ACTIVE_ENABLED` 开关。
+- 成功时保存 `external_agent_run_id`、外部状态、Agent 类型、模式、审计摘要、知识命中数、自动发送判断和人工复核判断。
+- 失败时写入降级错误摘要，保持 `writes_core_tables=false`，并把草稿置为 `failed + manual_review_required=true`，不影响其他 API。
+- 支持传入数据库 Session 时 `add/flush` `AgentTaskRun` 和 `EmailReplyDraft`，用于后续真实 PostgreSQL 路由集成。
+
+### 绿灯与回归验证
+
+命令一：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/agents/test_http_agent_runtime.py::test_http_agent_runtime_posts_email_reply_response_contract tests/test_phase5_email_reply_agent_client.py tests/test_agent_task_run_model.py tests/test_settings.py -q
+```
+
+结果：`12 passed in 0.53s`。
+
+命令二：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/agents/test_http_agent_runtime.py tests/test_phase5_email_reply_agent_client.py tests/test_agent_task_run_model.py tests/test_phase5_email_reply_draft_model.py tests/test_phase5_email_reply_customer_policy_integration.py tests/test_phase5_email_reply_hard_block_service.py -q
+```
+
+结果：`28 passed in 0.42s`。
+
+命令三：
+
+```bash
+cd apps/agents
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_email_reply_agent_run_api.py tests/test_email_reply_auto_send_route.py tests/test_email_reply_draft_schema_validation.py tests/test_email_reply_graph_context_knowledge.py tests/test_email_reply_schema.py -q
+```
+
+结果：`18 passed in 1.25s`。
+
+命令四：
+
+```bash
+git diff --check
+```
+
+结果：通过，无格式错误。
+
+## 两轮独立多维度评审
+
+### 第一轮评审：需求覆盖、API/Agent 边界、任务摘要保存
+
+结论：通过。
+
+发现项：
+
+- 已覆盖 `AGENTS_BASE_URL`、API Key、超时和 EMAIL_REPLY HTTP 开关配置。
+- 已通过 `HttpAgentRuntime.run_email_reply_response` 调用 `apps/agents` 的 `/agent-runs/email-reply`，并保留统一 envelope 校验。
+- 已新增 `EmailReplyAgentService` 保存兼容任务摘要，包括 `external_agent_run_id`、外部状态、Agent 类型、模式、错误、审计摘要和输出摘要。
+- 已保持 `apps/api` 业务权威，`apps/agents` 只返回结构化结果，不直接写 core 表。
+
+修正结果：
+
+- 第一轮中发现 runtime 方法最初是 async，不适合同步 service 直接调用；已修正为同步兼容方法，和现有 deep-enrichment / lead-cleanup runtime 模式一致。
+
+### 第二轮评审：降级错误、可观测性、后续 P5-E8 衔接
+
+结论：通过。
+
+发现项：
+
+- Agent 不可用时不会向调用方抛出异常，而是写入 failed 任务摘要、错误类型 `external_agent_unavailable` 和 `writes_core_tables=false`。
+- Agent 输出 schema 不正确时写入 `schema_validation_error`，并保留外部 run id，方便排查。
+- `EmailReplyDraft` 已保存 AI 建议、知识命中、自动发送判断、人工复核原因、模型和 Prompt 版本，为 P5-E8 邮件发送前检查与人工确认发送衔接。
+- `.env.example` 已暴露 EMAIL_REPLY HTTP 开关，默认关闭，符合小范围运行和人工受控原则。
+
+修正结果：
+
+- 第二轮中发现失败路径摘要缺少 `writes_core_tables=false`；已补齐并通过回归测试验证。
+
+残留风险：
+
+- 本 Story 只完成 `apps/api` 到 `apps/agents` EMAIL_REPLY client 与任务摘要保存；正式触发路由、发送前检查和真实邮件发送属于 P5-E8，不在本 Story 范围内。

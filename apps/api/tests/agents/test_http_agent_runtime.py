@@ -217,3 +217,77 @@ async def test_http_agent_runtime_rejects_invalid_response_envelope() -> None:
 
     assert exc_info.value.status_code == 200
     assert "phase4.agent.run.v1" in str(exc_info.value)
+
+
+def test_http_agent_runtime_posts_email_reply_response_contract() -> None:
+    captured_request: dict[str, object] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured_request["method"] = request.method
+        captured_request["url"] = str(request.url)
+        captured_request["api_key"] = request.headers.get("X-Agents-Api-Key")
+        captured_request["payload"] = httpx.Response(200, request=request, content=request.content).json()
+        return httpx.Response(
+            200,
+            json={
+                "schema_version": "phase4.agent.run.v1",
+                "agent_service_run_id": "44444444-4444-4444-4444-444444444444",
+                "request_id": "11111111-1111-1111-1111-111111111111",
+                "status": "succeeded",
+                "agent_type": "email_reply",
+                "agent_mode": "active",
+                "output": {
+                    "schema_version": "email-reply-v1",
+                    "suggested_subject": "Vehicle procurement follow-up",
+                    "suggested_body": "Hello, thanks for your message.",
+                    "knowledge_hits": [],
+                    "auto_send_allowed": False,
+                    "manual_review_required": True,
+                    "manual_review_reason": "需要人工确认。",
+                    "audit": {"model": "deepseek-chat"},
+                },
+                "audit": {"writes_core_tables": False, "executed_nodes": ["load_context", "draft_reply"]},
+                "error": None,
+            },
+        )
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        runtime = HttpAgentRuntime(settings=build_settings(), http_client=http_client)
+        response = runtime.run_email_reply_response(
+            request_id="11111111-1111-1111-1111-111111111111",
+            agent_task_run_id="22222222-2222-2222-2222-222222222222",
+            thread_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            message_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            customer_id="cccccccc-cccc-cccc-cccc-cccccccccccc",
+            draft_id="dddddddd-dddd-dddd-dddd-dddddddddddd",
+            context={"customer": {"name": "OOO Test"}},
+            prompt={"task_type": "EMAIL_REPLY_DRAFT", "version": "v1"},
+            options={"tone": "concise"},
+            agent_mode="active",
+            dry_run=True,
+        )
+    finally:
+        __import__("asyncio").run(http_client.aclose())
+
+    assert captured_request["method"] == "POST"
+    assert captured_request["url"] == "http://agents.local:8010/agent-runs/email-reply"
+    assert captured_request["api_key"] == "agents-test-key"
+    assert captured_request["payload"] == {
+        "request_id": "11111111-1111-1111-1111-111111111111",
+        "agent_task_run_id": "22222222-2222-2222-2222-222222222222",
+        "trigger_source": "phase5_email_reply_runtime",
+        "agent_mode": "active",
+        "input": {
+            "thread_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "message_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "customer_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "draft_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "context": {"customer": {"name": "OOO Test"}},
+            "prompt": {"task_type": "EMAIL_REPLY_DRAFT", "version": "v1"},
+            "options": {"tone": "concise"},
+        },
+        "options": {"timeout_seconds": 15, "dry_run": True},
+    }
+    assert response["agent_service_run_id"] == "44444444-4444-4444-4444-444444444444"
+    assert response["output"]["schema_version"] == "email-reply-v1"

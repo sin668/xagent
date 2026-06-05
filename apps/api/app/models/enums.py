@@ -283,6 +283,7 @@ class AgentTaskType(StrEnum):
     LEAD_EXTRACTION = "LEAD_EXTRACTION"
     LEAD_GRADING = "LEAD_GRADING"
     RETRY_WORKER = "RETRY_WORKER"
+    EMAIL_REPLY = "EMAIL_REPLY"
 
 
 class AgentTaskRunStatus(StrEnum):

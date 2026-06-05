@@ -145,6 +145,13 @@ class Settings(BaseSettings):
             "AGENT_LEAD_CLEANUP_HTTP_ACTIVE_ENABLED",
         ),
     )
+    agent_email_reply_http_active_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_AGENT_EMAIL_REPLY_HTTP_ACTIVE_ENABLED",
+            "AGENT_EMAIL_REPLY_HTTP_ACTIVE_ENABLED",
+        ),
+    )
     lead_enrichment_daily_quota_per_lead: int = Field(
         default=2,
         validation_alias=AliasChoices(
