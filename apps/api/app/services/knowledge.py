@@ -11,6 +11,22 @@ from app.models.enums import KnowledgeEmbeddingStatus, KnowledgeItemStatus, Know
 
 
 class KnowledgeService:
+    SUPPORTED_CONTENT_TYPES = {
+        "qa_entry",
+        "email_reply_template",
+        "compliance_phrase",
+        "vehicle_product_note",
+        "process_sop",
+    }
+    BUSINESS_METADATA_FIELDS = {
+        "content_type",
+        "business_scene",
+        "risk_level",
+        "auto_reply_allowed",
+        "market",
+        "tone",
+    }
+
     def __init__(self, session: Session) -> None:
         self.session = session
 
@@ -121,9 +137,24 @@ class KnowledgeService:
         source_ref: str | None = None,
         version: str = "v1",
         metadata_json: dict | None = None,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_allowed: bool | None = None,
+        market: str | None = None,
+        tone: str | None = None,
     ) -> KnowledgeItem:
         if self.session.get(KnowledgeCollection, collection_id) is None:
             raise ValueError("knowledge collection 不存在。")
+        normalized_metadata = self.build_business_metadata(
+            metadata_json=metadata_json,
+            content_type=content_type,
+            business_scene=business_scene,
+            risk_level=risk_level,
+            auto_reply_allowed=auto_reply_allowed,
+            market=market,
+            tone=tone,
+        )
         item = KnowledgeItem(
             collection_id=collection_id,
             title=title,
@@ -135,7 +166,7 @@ class KnowledgeService:
             review_status=KnowledgeReviewStatus(review_status),
             source_ref=source_ref,
             version=version,
-            metadata_json=metadata_json,
+            metadata_json=normalized_metadata,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -181,3 +212,31 @@ class KnowledgeService:
         self.session.add(record)
         self.session.flush()
         return record
+
+    @classmethod
+    def build_business_metadata(
+        cls,
+        *,
+        metadata_json: dict | None = None,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_allowed: bool | None = None,
+        market: str | None = None,
+        tone: str | None = None,
+    ) -> dict | None:
+        metadata = dict(metadata_json or {})
+        field_values = {
+            "content_type": content_type,
+            "business_scene": business_scene,
+            "risk_level": risk_level,
+            "auto_reply_allowed": auto_reply_allowed,
+            "market": market,
+            "tone": tone,
+        }
+        if field_values["content_type"] is not None and field_values["content_type"] not in cls.SUPPORTED_CONTENT_TYPES:
+            raise ValueError("knowledge content_type 不在允许范围内。")
+        for field_name, value in field_values.items():
+            if value is not None:
+                metadata[field_name] = value
+        return metadata or None

@@ -40,6 +40,15 @@ class KnowledgeItemCreate(BaseModel):
     source_ref: str | None = None
     version: str = "v1"
     metadata_json: dict | None = None
+    content_type: str | None = Field(
+        default=None,
+        pattern="^(qa_entry|email_reply_template|compliance_phrase|vehicle_product_note|process_sop)$",
+    )
+    business_scene: str | None = None
+    risk_level: str | None = None
+    auto_reply_allowed: bool | None = None
+    market: str | None = None
+    tone: str | None = None
 
 
 class KnowledgeItemResponse(BaseModel):
@@ -55,6 +64,12 @@ class KnowledgeItemResponse(BaseModel):
     source_ref: str | None
     version: str
     metadata_json: dict | None
+    content_type: str | None = None
+    business_scene: str | None = None
+    risk_level: str | None = None
+    auto_reply_allowed: bool | None = None
+    market: str | None = None
+    tone: str | None = None
     rag_eligible: bool
     created_at: str
     updated_at: str
@@ -97,6 +112,15 @@ class KnowledgeSearchRequest(BaseModel):
     country: str | None = None
     language: str | None = None
     channel: str | None = None
+    content_type: str | None = Field(
+        default=None,
+        pattern="^(qa_entry|email_reply_template|compliance_phrase|vehicle_product_note|process_sop)$",
+    )
+    business_scene: str | None = None
+    risk_level: str | None = None
+    auto_reply_only: bool = False
+    market: str | None = None
+    tone: str | None = None
     query: str | None = None
     query_embedding: list[float] | None = None
     allow_keyword_fallback: bool = True

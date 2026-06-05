@@ -38,6 +38,12 @@ class KnowledgeImportResult:
 
 
 class KnowledgeImportService:
+    SOURCE_FALLBACKS = {
+        "docs/poc/channel-risk-register.md": "docs/stories/poc-mvp-run/sprint-0-poc-prep/E0-S2-create-channel-risk-register.md",
+        "docs/poc/russian-keyword-library.md": "docs/stories/poc-mvp-run/sprint-0-poc-prep/E0-S3-create-russian-keyword-library.md",
+        "docs/poc/faq-and-outreach-templates.md": "docs/stories/poc-mvp-run/sprint-0-poc-prep/E9-S3-create-faq-objection-library.md",
+        "docs/poc/ai-output-schema.md": "docs/stories/poc-mvp-run/sprint-1-poc-collection/E2-S1-ai-public-web-extraction.md",
+    }
     COLLECTION_DESCRIPTIONS = {
         "channel_sop": "渠道风险、允许动作、禁止动作和人工核查 SOP。",
         "faq": "客服和销售可审核使用的 FAQ。",
@@ -54,7 +60,13 @@ class KnowledgeImportService:
 
     @staticmethod
     def read_repo_text(repo_root: Path, relative_path: str) -> str:
-        return (repo_root / relative_path).read_text(encoding="utf-8")
+        path = repo_root / relative_path
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        fallback_path = repo_root / KnowledgeImportService.SOURCE_FALLBACKS.get(relative_path, "")
+        if fallback_path.exists():
+            return fallback_path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8")
 
     @classmethod
     def phase_one_import_specs(cls, repo_root: Path | str) -> list[KnowledgeImportSpec]:
@@ -193,4 +205,3 @@ class KnowledgeImportService:
             collection_names=collection_names,
             item_titles=imported_titles,
         )
-

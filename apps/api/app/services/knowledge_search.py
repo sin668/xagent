@@ -20,6 +20,8 @@ class KnowledgeSearchResult:
 
 
 class KnowledgeSearchService:
+    BLOCKED_RISK_LEVELS = {"blocked", "Forbidden", "High"}
+
     def __init__(self, session: Session) -> None:
         self.session = session
 
@@ -54,10 +56,22 @@ class KnowledgeSearchService:
         country: str | None = None,
         language: str | None = None,
         channel: str | None = None,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_only: bool = False,
+        market: str | None = None,
+        tone: str | None = None,
     ) -> bool:
         if not cls.item_is_production_rag_eligible(item):
             return False
         if KnowledgeItemStatus(item.status) == KnowledgeItemStatus.DEPRECATED:
+            return False
+        metadata = getattr(item, "metadata_json", None) or {}
+        item_risk_level = metadata.get("risk_level")
+        if item_risk_level in cls.BLOCKED_RISK_LEVELS:
+            return False
+        if auto_reply_only and metadata.get("auto_reply_allowed") is not True:
             return False
         if collection and getattr(getattr(item, "collection", None), "name", None) != collection:
             return False
@@ -66,6 +80,16 @@ class KnowledgeSearchService:
         if language and item.language != language:
             return False
         if channel and channel not in (item.applicable_channels or []):
+            return False
+        if content_type and metadata.get("content_type") != content_type:
+            return False
+        if business_scene and metadata.get("business_scene") != business_scene:
+            return False
+        if risk_level and item_risk_level != risk_level:
+            return False
+        if market and metadata.get("market") != market:
+            return False
+        if tone and metadata.get("tone") != tone:
             return False
         return True
 
@@ -87,6 +111,12 @@ class KnowledgeSearchService:
         country: str | None = None,
         language: str | None = None,
         channel: str | None = None,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_only: bool = False,
+        market: str | None = None,
+        tone: str | None = None,
         query: str | None = None,
         limit: int = 10,
     ) -> list[KnowledgeSearchResult]:
@@ -98,6 +128,12 @@ class KnowledgeSearchService:
                 country=country,
                 language=language,
                 channel=channel,
+                content_type=content_type,
+                business_scene=business_scene,
+                risk_level=risk_level,
+                auto_reply_only=auto_reply_only,
+                market=market,
+                tone=tone,
             ):
                 continue
             score = cls.keyword_score(item, query)
@@ -130,6 +166,12 @@ class KnowledgeSearchService:
         country: str | None = None,
         language: str | None = None,
         channel: str | None = None,
+        content_type: str | None = None,
+        business_scene: str | None = None,
+        risk_level: str | None = None,
+        auto_reply_only: bool = False,
+        market: str | None = None,
+        tone: str | None = None,
         query: str | None = None,
         query_embedding: list[float] | None = None,
         allow_keyword_fallback: bool = True,
@@ -164,8 +206,23 @@ class KnowledgeSearchService:
                 if language is not None:
                     statement = statement.where(KnowledgeItem.language == language)
                 items = list(self.session.scalars(statement).all())
-                if channel is not None:
-                    items = [item for item in items if channel in (item.applicable_channels or [])]
+                items = [
+                    item
+                    for item in items
+                    if self.item_matches_filters(
+                        item,
+                        collection=collection,
+                        country=country,
+                        language=language,
+                        channel=channel,
+                        content_type=content_type,
+                        business_scene=business_scene,
+                        risk_level=risk_level,
+                        auto_reply_only=auto_reply_only,
+                        market=market,
+                        tone=tone,
+                    )
+                ]
                 return (
                     [
                         KnowledgeSearchResult(
@@ -193,6 +250,12 @@ class KnowledgeSearchService:
                 country=country,
                 language=language,
                 channel=channel,
+                content_type=content_type,
+                business_scene=business_scene,
+                risk_level=risk_level,
+                auto_reply_only=auto_reply_only,
+                market=market,
+                tone=tone,
                 query=query,
                 limit=limit,
             ),

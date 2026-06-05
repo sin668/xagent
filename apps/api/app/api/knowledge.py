@@ -49,6 +49,7 @@ def serialize_collection(collection) -> KnowledgeCollectionResponse:
 
 
 def serialize_item(item) -> KnowledgeItemResponse:
+    metadata = item.metadata_json or {}
     return KnowledgeItemResponse(
         id=item.id,
         collection_id=item.collection_id,
@@ -62,6 +63,12 @@ def serialize_item(item) -> KnowledgeItemResponse:
         source_ref=item.source_ref,
         version=item.version,
         metadata_json=item.metadata_json,
+        content_type=metadata.get("content_type"),
+        business_scene=metadata.get("business_scene"),
+        risk_level=metadata.get("risk_level"),
+        auto_reply_allowed=metadata.get("auto_reply_allowed"),
+        market=metadata.get("market"),
+        tone=metadata.get("tone"),
         rag_eligible=KnowledgeService.is_rag_eligible(status=item.status, review_status=item.review_status),
         created_at=item.created_at.isoformat(),
         updated_at=item.updated_at.isoformat(),
