@@ -1,8 +1,8 @@
 # Story P5-E2-S2：Prompt 入库迁移脚本
 
-状态：未开始  
-Sprint：Sprint 2  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 2
+优先级：P0
 Epic：P5-E2（Prompt 入库治理）
 
 ## 用户故事
@@ -211,3 +211,32 @@ leftover_test_prompt_rows=0
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `PromptImportService`、`scripts/poc/import_prompts.py` 和 `tests/test_phase5_prompt_import_service.py` 已存在，并已由历史提交 `95efb4b7 feat: add prompt import migration script` 纳入当前分支。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_prompt_import_service.py tests/test_phase5_prompt_file_parser.py tests/test_phase5_prompt_template_governance.py tests/test_llm_prompt_template_model.py tests/test_llm_prompt_templates.py tests/test_llm_prompt_templates_api.py -q
+cd ../..
+/opt/miniconda3/envs/booking-room/bin/python scripts/poc/import_prompts.py --dry-run --batch-id phase5-story-p5-e2-s2-recheck
+```
+
+复核结果：
+
+```text
+27 passed, 1 warning in 6.09s
+脚本输出：迁移报告，scanned_count=2，planned_count=2，created_count=0，skipped_count=0
+```
+
+警告说明：
+
+- warning 为既有知识库双路由兼容造成的 FastAPI duplicate operation ID warning，位于 `apps/api/app/api/knowledge.py`，不影响 Prompt 入库脚本验收，本 Story 不扩范围修复。
+
+两轮复核结论：
+
+- 第一轮：导入服务仍满足幂等规则，同一 `source_file_path + source_file_hash + version` 不重复写入；hash 变化且已有 active default 时创建草稿，不覆盖线上版本；脚本可在 macOS 本地用 Python 执行并输出中文迁移报告。
+- 第二轮：本 Story 仅导入本地 Prompt 基线文件到 `apps/api` 权威表，不调用 LLM、不执行自动触达或自动发送、不让 `apps/agents` 直写业务表；未发现新的实质阻塞问题。
