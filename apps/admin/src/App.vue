@@ -11,6 +11,7 @@
         <a href="#sync-audit">同步</a>
         <a href="#phase2">第二阶段</a>
         <a href="#phase3">第三阶段</a>
+        <a href="#prompt-governance">Prompt 治理</a>
         <a href="#llm-governance">LLM 治理</a>
       </nav>
     </aside>
@@ -427,6 +428,95 @@
         <p class="guardrail">第三阶段只展示指标和风控状态；AI 不得自动晋级客户、自动归并客户、自动恢复 Invalid，客户触达必须人工确认。</p>
       </section>
 
+      <section id="prompt-governance" class="admin-card prompt-governance-card">
+        <div class="card-head">
+          <div>
+            <h3>Prompt 全量入库与版本治理</h3>
+            <span>文件保留为基线，运行时读取数据库 active default；草稿校验、发布和回滚全审计</span>
+          </div>
+          <span :class="['tag', promptGovernance.summary.coverageStatusClass]">覆盖率 {{ promptGovernance.summary.coverageRateText }}</span>
+        </div>
+
+        <p v-if="promptGovernanceError" class="guardrail">{{ promptGovernanceError }}</p>
+
+        <div class="prompt-summary">
+          <article>
+            <strong>{{ promptGovernance.summary.importedPromptCount }}</strong>
+            <span>已入库 Prompt</span>
+          </article>
+          <article>
+            <strong>{{ promptGovernance.summary.activeDefaultCount }}</strong>
+            <span>active default</span>
+          </article>
+          <article>
+            <strong>{{ promptGovernance.summary.draftValidationPendingCount }}</strong>
+            <span>草稿待校验</span>
+          </article>
+          <article>
+            <strong>{{ promptGovernance.summary.schemaErrorCount }}</strong>
+            <span>schema error</span>
+          </article>
+        </div>
+
+        <div class="prompt-governance-grid">
+          <section>
+            <div class="card-head compact-head">
+              <h4>Prompt 版本</h4>
+              <span>来源 hash、校验状态、默认版本</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>任务</th>
+                  <th>版本</th>
+                  <th>状态</th>
+                  <th>来源 hash</th>
+                  <th>校验</th>
+                  <th>默认</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="template in promptGovernance.templates" :key="template.id">
+                  <td>{{ template.name }}</td>
+                  <td>{{ template.taskType }}</td>
+                  <td>{{ template.version }}</td>
+                  <td><span :class="['tag', template.statusClass]">{{ template.statusLabel }}</span></td>
+                  <td>{{ template.sourceHashShort }}</td>
+                  <td>{{ template.validationStatusLabel }}</td>
+                  <td>{{ template.defaultLabel }}</td>
+                </tr>
+                <tr v-if="promptGovernance.templates.length === 0">
+                  <td colspan="7">暂无真实 Prompt 入库数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <div class="card-head compact-head">
+              <h4>草稿校验与操作入口</h4>
+              <span>{{ promptGovernance.canPublish ? '管理员受控操作' : '权限不足已禁用' }}</span>
+            </div>
+            <div class="prompt-action-list">
+              <article v-for="entry in promptGovernance.actionEntrypoints" :key="entry.label">
+                <strong>{{ entry.label }}</strong>
+                <span :class="['tag', entry.enabled ? 'blue' : 'amber']">{{ entry.enabled ? '可操作' : '禁用' }}</span>
+              </article>
+            </div>
+            <p class="guardrail">{{ promptGovernance.permissionNotice }}</p>
+          </section>
+        </div>
+
+        <section class="schema-preview">
+          <div class="card-head compact-head">
+            <h4>校验失败摘要</h4>
+            <span>用于发布前修正</span>
+          </div>
+          <pre>{{ promptValidationErrorsText }}</pre>
+        </section>
+      </section>
+
       <section id="llm-governance" class="admin-card llm-card">
         <div class="card-head">
           <div>
@@ -536,7 +626,7 @@ import { channelRiskConfigSeed } from './data/channelRiskConfigSeed.js';
 import { syncAiAuditSeed } from './data/syncAiAuditSeed.js';
 import { buildAdminOverviewView } from './services/adminOverview.js';
 import { buildChannelRiskConfigView } from './services/channelRiskConfig.js';
-import { buildLlmGovernanceView, fetchLlmGovernance } from './services/llmGovernance.js';
+import { buildLlmGovernanceView, buildPromptGovernanceView, fetchLlmGovernance, fetchPromptGovernance } from './services/llmGovernance.js';
 import { buildPhase2DashboardView, fetchPhase2Dashboard } from './services/phase2Dashboard.js';
 import { buildPhase3DashboardView, fetchPhase3Dashboard } from './services/phase3Dashboard.js';
 import { buildSyncAiAuditView } from './services/syncAiAudit.js';
@@ -553,11 +643,24 @@ const phase3Error = ref('');
 const llmGovernancePayload = ref(null);
 const llmLoading = ref(true);
 const llmError = ref('');
+const promptGovernancePayload = ref(null);
+const promptGovernanceLoading = ref(true);
+const promptGovernanceError = ref('');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+const adminActorRole = import.meta.env.VITE_ADMIN_ACTOR_ROLE || 'operator';
 
 const phase2 = computed(() => buildPhase2DashboardView(phase2Payload.value || {}));
 const phase3 = computed(() => buildPhase3DashboardView(phase3Payload.value || {}));
 const llmGovernance = computed(() => buildLlmGovernanceView(llmGovernancePayload.value || {}));
+const promptGovernance = computed(() => buildPromptGovernanceView({
+  templates: promptGovernancePayload.value?.templates || {},
+  actorRole: promptGovernancePayload.value?.actorRole || adminActorRole,
+}));
+const promptValidationErrorsText = computed(() => {
+  const failed = promptGovernance.value.templates.filter((template) => template.validationErrorsText);
+  if (failed.length === 0) return '暂无 schema 校验失败。';
+  return failed.map((template) => `${template.name}: ${template.validationErrorsText}`).join('\n');
+});
 const phase2PauseThresholds = computed(() => Object.values(phase2.value.pauseThresholds));
 const phase2StatusText = computed(() => {
   if (phase2Loading.value) return '加载中';
@@ -592,9 +695,10 @@ const llmStatusClass = computed(() => {
 });
 
 onMounted(async () => {
-  const [phase2Result, phase3Result, llmGovernanceResult] = await Promise.allSettled([
+  const [phase2Result, phase3Result, promptGovernanceResult, llmGovernanceResult] = await Promise.allSettled([
     fetchPhase2Dashboard({ baseUrl: apiBaseUrl }),
     fetchPhase3Dashboard({ baseUrl: apiBaseUrl }),
+    fetchPromptGovernance({ baseUrl: apiBaseUrl, actorRole: adminActorRole }),
     fetchLlmGovernance({ baseUrl: apiBaseUrl }),
   ]);
 
@@ -610,6 +714,12 @@ onMounted(async () => {
     phase3Error.value = `无法加载第三阶段真实 API 指标：${phase3Result.reason.message}`;
   }
 
+  if (promptGovernanceResult.status === 'fulfilled') {
+    promptGovernancePayload.value = promptGovernanceResult.value;
+  } else {
+    promptGovernanceError.value = `无法加载 Prompt 入库治理真实 API：${promptGovernanceResult.reason.message}`;
+  }
+
   if (llmGovernanceResult.status === 'fulfilled') {
     llmGovernancePayload.value = llmGovernanceResult.value;
   } else {
@@ -618,6 +728,7 @@ onMounted(async () => {
 
   phase2Loading.value = false;
   phase3Loading.value = false;
+  promptGovernanceLoading.value = false;
   llmLoading.value = false;
 });
 </script>

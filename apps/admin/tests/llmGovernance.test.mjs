@@ -3,7 +3,9 @@ import { test } from 'node:test';
 
 import {
   buildLlmGovernanceView,
+  buildPromptGovernanceView,
   buildPromptTemplateQuery,
+  fetchPromptGovernance,
   fetchLlmGovernance,
 } from '../src/services/llmGovernance.js';
 
@@ -128,5 +130,77 @@ test('fetch llm governance calls health and prompt template read-only APIs witho
   ]);
   assert.equal(result.health.api_key, undefined);
   assert.equal(result.health.provider, 'deepseek');
+  assert.equal(result.templates.total, 2);
+});
+
+test('prompt governance view exposes coverage, source hash, validation, and permission-gated actions', () => {
+  const view = buildPromptGovernanceView({
+    templates: templatesPayload,
+    actorRole: 'operator',
+    expectedTaskTypes: ['SOURCE_DISCOVERY', 'LEAD_EXTRACTION', 'LEAD_GRADING', 'EMAIL_REPLY_DRAFT'],
+  });
+
+  assert.equal(view.summary.importedPromptCount, 2);
+  assert.equal(view.summary.activeDefaultCount, 1);
+  assert.equal(view.summary.draftValidationPendingCount, 1);
+  assert.equal(view.summary.schemaErrorCount, 0);
+  assert.equal(view.summary.coverageRateText, '25%');
+  assert.equal(view.summary.coverageStatusClass, 'amber');
+  assert.equal(view.templates[0].sourceHashShort, 'Unknown');
+  assert.equal(view.templates[0].validationStatusLabel, '未校验');
+  assert.equal(view.canEditDraft, false);
+  assert.equal(view.canPublish, false);
+  assert.equal(view.canRollback, false);
+  assert.equal(view.permissionNotice, '当前角色只能查看 Prompt 入库治理，编辑、发布和回滚入口已禁用。');
+});
+
+test('prompt governance view enables publish and rollback actions for tech admin', () => {
+  const view = buildPromptGovernanceView({
+    templates: {
+      items: [
+        {
+          ...templatesPayload.items[0],
+          source_file_hash: 'abcdef1234567890',
+          validation_status: 'validation_passed',
+        },
+        {
+          ...templatesPayload.items[1],
+          source_file_hash: 'fedcba9876543210',
+          validation_status: 'validation_failed',
+          validation_errors_json: { missing_variables: ['customer_context'] },
+        },
+      ],
+    },
+    actorRole: 'tech_admin',
+    expectedTaskTypes: ['SOURCE_DISCOVERY', 'LEAD_EXTRACTION'],
+  });
+
+  assert.equal(view.canEditDraft, true);
+  assert.equal(view.canPublish, true);
+  assert.equal(view.canRollback, true);
+  assert.equal(view.summary.coverageRateText, '50%');
+  assert.equal(view.templates[0].sourceHashShort, 'abcdef12');
+  assert.equal(view.templates[0].validationStatusLabel, '通过');
+  assert.equal(view.templates[1].validationStatusLabel, '失败');
+  assert.equal(view.templates[1].validationErrorsText, 'missing_variables: customer_context');
+  assert.equal(view.actionEntrypoints.map((item) => item.label).join(','), '校验草稿,发布版本,回滚版本');
+});
+
+test('fetch prompt governance calls real prompt template API with role context', async () => {
+  const requestedUrls = [];
+  const result = await fetchPromptGovernance({
+    baseUrl: 'https://api.example.test/',
+    actorRole: 'tech_admin',
+    fetcher: async (url) => {
+      requestedUrls.push(url);
+      if (url.endsWith('/llm-prompt-templates')) {
+        return { ok: true, json: async () => templatesPayload };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+  });
+
+  assert.deepEqual(requestedUrls, ['https://api.example.test/llm-prompt-templates']);
+  assert.equal(result.actorRole, 'tech_admin');
   assert.equal(result.templates.total, 2);
 });

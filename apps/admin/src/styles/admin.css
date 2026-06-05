@@ -254,6 +254,7 @@ body {
 .sync-audit-card,
 .phase2-card,
 .phase3-card,
+.prompt-governance-card,
 .llm-card {
   margin-top: 18px;
 }
@@ -525,6 +526,56 @@ body {
   grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
   gap: 14px;
   margin-top: 16px;
+}
+
+.prompt-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.prompt-summary article {
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.prompt-summary strong {
+  display: block;
+  font-size: 24px;
+}
+
+.prompt-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.prompt-governance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.prompt-action-list {
+  display: grid;
+  gap: 10px;
+}
+
+.prompt-action-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.prompt-action-list strong {
+  font-size: 13px;
 }
 
 .fallback-list {

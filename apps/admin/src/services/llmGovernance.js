@@ -5,6 +5,14 @@ const STATUS_LABELS = {
   archived: 'archived',
 };
 
+const VALIDATION_LABELS = {
+  validation_passed: '通过',
+  validation_failed: '失败',
+  validation_pending: '待校验',
+};
+
+const PROMPT_GOVERNANCE_ROLES = new Set(['admin', 'tech_admin']);
+
 function statusClass(status) {
   if (status === 'active') return 'green';
   if (status === 'draft' || status === 'paused') return 'amber';
@@ -46,6 +54,36 @@ function normalizeTemplate(item = {}) {
     schemaText: compactJson(item.output_schema_json || item.outputSchemaJson),
     systemPromptPreview: item.system_prompt || item.systemPrompt || '',
     userPromptPreview: item.user_prompt_template || item.userPromptTemplate || '',
+  };
+}
+
+function validationStatusLabel(status) {
+  return VALIDATION_LABELS[status] || '未校验';
+}
+
+function validationErrorsText(errors) {
+  if (!errors || typeof errors !== 'object') return '';
+  return Object.entries(errors)
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
+    .join(' / ');
+}
+
+function normalizeGovernanceTemplate(item = {}) {
+  const template = normalizeTemplate(item);
+  const sourceHash = item.source_file_hash || item.sourceFileHash || '';
+  const validationStatus = item.validation_status || item.validationStatus || '';
+  const validationErrors = item.validation_errors_json || item.validationErrorsJson;
+  return {
+    ...template,
+    sourceFilePath: item.source_file_path || item.sourceFilePath || 'Unknown',
+    sourceFileHash: sourceHash || 'Unknown',
+    sourceHashShort: sourceHash ? sourceHash.slice(0, 8) : 'Unknown',
+    migrationBatchId: item.migration_batch_id || item.migrationBatchId || 'Unknown',
+    validationStatus,
+    validationStatusLabel: validationStatusLabel(validationStatus),
+    validationErrorsText: validationErrorsText(validationErrors),
+    publishedBy: item.published_by || item.publishedBy || 'Unknown',
+    publishedAt: item.published_at || item.publishedAt || '',
   };
 }
 
@@ -95,6 +133,55 @@ export function buildLlmGovernanceView({ health = {}, templates = {} } = {}) {
   };
 }
 
+export function buildPromptGovernanceView({
+  templates = {},
+  actorRole = 'operator',
+  expectedTaskTypes = [
+    'SOURCE_DISCOVERY',
+    'LEAD_EXTRACTION',
+    'LEAD_GRADING',
+    'EMAIL_REPLY_DRAFT',
+    'EMAIL_REPLY_AUTO_SEND_CHECK',
+    'EMAIL_REPLY_KNOWLEDGE_RETRIEVAL',
+    'EMAIL_REPLY_SEND',
+  ],
+} = {}) {
+  const promptTemplates = Array.isArray(templates.items)
+    ? templates.items.map(normalizeGovernanceTemplate)
+    : [];
+  const coveredTaskTypes = new Set(promptTemplates.map((template) => template.taskType));
+  const coverageRate = expectedTaskTypes.length > 0
+    ? coveredTaskTypes.size / expectedTaskTypes.length
+    : 0;
+  const draftTemplates = promptTemplates.filter((template) => template.status === 'draft');
+  const schemaErrorCount = promptTemplates.filter((template) => template.validationStatus === 'validation_failed').length;
+  const canGovern = PROMPT_GOVERNANCE_ROLES.has(String(actorRole || '').trim().toLowerCase());
+
+  return {
+    summary: {
+      importedPromptCount: promptTemplates.length,
+      activeDefaultCount: promptTemplates.filter((template) => template.status === 'active' && template.isDefault).length,
+      draftValidationPendingCount: draftTemplates.filter((template) => template.validationStatus !== 'validation_passed').length,
+      schemaErrorCount,
+      coverageRate,
+      coverageRateText: `${Math.round(coverageRate * 100)}%`,
+      coverageStatusClass: coverageRate >= 1 ? 'green' : coverageRate > 0 ? 'amber' : 'red',
+    },
+    templates: promptTemplates,
+    canEditDraft: canGovern,
+    canPublish: canGovern,
+    canRollback: canGovern,
+    actionEntrypoints: [
+      { label: '校验草稿', enabled: canGovern },
+      { label: '发布版本', enabled: canGovern },
+      { label: '回滚版本', enabled: canGovern },
+    ],
+    permissionNotice: canGovern
+      ? '当前角色可校验草稿、发布版本和创建回滚草稿，所有操作写入审计。'
+      : '当前角色只能查看 Prompt 入库治理，编辑、发布和回滚入口已禁用。',
+  };
+}
+
 export async function fetchLlmGovernance({
   baseUrl = '',
   filters,
@@ -120,5 +207,24 @@ export async function fetchLlmGovernance({
   return {
     health: await healthResponse.json(),
     templates: await templatesResponse.json(),
+  };
+}
+
+export async function fetchPromptGovernance({
+  baseUrl = '',
+  actorRole = 'operator',
+  fetcher = globalThis.fetch,
+} = {}) {
+  if (typeof fetcher !== 'function') {
+    throw new Error('fetcher is required to load prompt governance');
+  }
+  const normalizedBaseUrl = String(baseUrl || '').replace(/\/$/, '');
+  const response = await fetcher(`${normalizedBaseUrl}/llm-prompt-templates`);
+  if (!response.ok) {
+    throw new Error(`Failed to load prompt templates: ${response.status || 'unknown'}`);
+  }
+  return {
+    actorRole,
+    templates: await response.json(),
   };
 }
