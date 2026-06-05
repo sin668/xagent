@@ -437,3 +437,26 @@ class Phase5GoNoGoReportResponse(BaseModel):
     reasons: list[str]
     recommended_actions: list[str]
     data_sources: list[str]
+
+
+class Phase5E2EIntegrationStage(BaseModel):
+    key: str
+    label: str
+    status: str
+    evidence: dict[str, object]
+    findings: list[str] = Field(default_factory=list)
+
+
+class Phase5E2EIntegrationSummary(BaseModel):
+    passed_count: int
+    failed_count: int
+    total_count: int
+
+
+class Phase5E2EIntegrationReportResponse(BaseModel):
+    overall_status: str
+    seed_fallback_allowed: bool
+    time_window: Phase5GoNoGoTimeWindow
+    summary: Phase5E2EIntegrationSummary
+    stages: list[Phase5E2EIntegrationStage]
+    notes: list[str]

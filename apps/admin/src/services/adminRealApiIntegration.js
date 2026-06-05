@@ -2,6 +2,9 @@ const DOMAIN_LABELS = {
   prompt: 'Prompt 治理',
   knowledge: '知识库治理',
   emailReview: '邮件审核台',
+  emailReplyQuality: '邮件回复质量',
+  phase5GoNoGo: '第五阶段 Go/No-Go',
+  phase5E2E: '第五阶段端到端联调',
 };
 
 function normalizeBaseUrl(baseUrl) {
@@ -63,6 +66,9 @@ export function buildPhase5AdminIntegrationView({
   prompt = {},
   knowledge = {},
   emailReview = {},
+  emailReplyQuality = {},
+  phase5GoNoGo = {},
+  phase5E2E = {},
   actorRole = 'operator',
   seedFallbackAllowed = false,
 } = {}) {
@@ -70,6 +76,9 @@ export function buildPhase5AdminIntegrationView({
     buildRecord({ key: 'prompt', payload: prompt }),
     buildRecord({ key: 'knowledge', payload: knowledge }),
     buildRecord({ key: 'emailReview', payload: emailReview }),
+    buildRecord({ key: 'emailReplyQuality', payload: emailReplyQuality }),
+    buildRecord({ key: 'phase5GoNoGo', payload: phase5GoNoGo }),
+    buildRecord({ key: 'phase5E2E', payload: phase5E2E }),
   ];
   const realApiReady = integrationRecords.every((record) => record.statusClass === 'green');
   const firstError = integrationRecords.find((record) => record.error)?.error || null;
@@ -117,7 +126,7 @@ export async function fetchPhase5AdminIntegration({
     throw new Error('fetcher is required to load phase5 admin integration');
   }
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-  const [prompt, knowledge, emailReview] = await Promise.all([
+  const [prompt, knowledge, emailReview, emailReplyQuality, phase5GoNoGo, phase5E2E] = await Promise.all([
     fetchJsonRecord({
       fetcher,
       url: `${normalizedBaseUrl}/llm-prompt-templates`,
@@ -133,12 +142,30 @@ export async function fetchPhase5AdminIntegration({
       url: `${normalizedBaseUrl}/email-reply/drafts?limit=100`,
       domainLabel: DOMAIN_LABELS.emailReview,
     }),
+    fetchJsonRecord({
+      fetcher,
+      url: `${normalizedBaseUrl}/dashboard/email-reply-quality`,
+      domainLabel: DOMAIN_LABELS.emailReplyQuality,
+    }),
+    fetchJsonRecord({
+      fetcher,
+      url: `${normalizedBaseUrl}/dashboard/phase5-go-no-go-report`,
+      domainLabel: DOMAIN_LABELS.phase5GoNoGo,
+    }),
+    fetchJsonRecord({
+      fetcher,
+      url: `${normalizedBaseUrl}/dashboard/phase5-e2e-integration-report`,
+      domainLabel: DOMAIN_LABELS.phase5E2E,
+    }),
   ]);
   return {
     actorRole,
     prompt,
     knowledge,
     emailReview,
+    emailReplyQuality,
+    phase5GoNoGo,
+    phase5E2E,
     seedFallbackAllowed: false,
   };
 }

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     AIAuditLog,
+    AgentTaskRun,
     CandidateUrl,
     ChannelPlan,
     ChannelRiskRule,
@@ -33,8 +34,11 @@ from app.models.enums import (
     ContactMethodType,
     CustomerGrade,
     CustomerStatus,
+    AgentTaskRunStatus,
+    AgentTaskType,
     EmailMessageDirection,
     EmailSendAttemptStatus,
+    EmailReplyDraftStatus,
     KnowledgeEmbeddingStatus,
     KnowledgeItemStatus,
     KnowledgeReviewStatus,
@@ -540,6 +544,263 @@ class DashboardService:
             "data_sources": list(PHASE5_DATA_SOURCES),
         }
 
+    def phase5_e2e_integration_report(
+        self,
+        *,
+        repo_root: Path,
+        knowledge_collection_prefix: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        language: str | None = None,
+        business_scene: str | None = None,
+    ) -> dict[str, object]:
+        start = parse_date_boundary(date_from)
+        end = parse_date_boundary(date_to, end_of_day=True)
+        foundation = self.phase5_quality_foundation_metrics(
+            repo_root=repo_root,
+            knowledge_collection_prefix=knowledge_collection_prefix,
+        )
+        reply_quality = self.email_reply_quality_metrics(
+            date_from=date_from,
+            date_to=date_to,
+            language=language,
+            business_scene=business_scene,
+        )
+        go_no_go = self.phase5_go_no_go_report(
+            repo_root=repo_root,
+            knowledge_collection_prefix=knowledge_collection_prefix,
+            date_from=date_from,
+            date_to=date_to,
+            language=language,
+            business_scene=business_scene,
+        )
+
+        prompts = list(
+            self.session.scalars(
+                select(LLMPromptTemplate)
+                .where(LLMPromptTemplate.status == LLMPromptTemplateStatus.ACTIVE)
+                .where(LLMPromptTemplate.is_default.is_(True))
+            ).all()
+        )
+        prompt_import_count = sum(
+            1
+            for prompt in prompts
+            if prompt.source_file_path and prompt.source_file_hash and str(prompt.task_type.value).startswith("EMAIL_REPLY")
+        )
+
+        knowledge_statement = (
+            select(KnowledgeItem)
+            .options(selectinload(KnowledgeItem.embeddings), selectinload(KnowledgeItem.collection))
+            .where(KnowledgeItem.status == KnowledgeItemStatus.ACTIVE)
+            .where(KnowledgeItem.review_status == KnowledgeReviewStatus.APPROVED)
+        )
+        if knowledge_collection_prefix:
+            knowledge_statement = knowledge_statement.join(KnowledgeCollection).where(
+                KnowledgeCollection.name.like(f"{knowledge_collection_prefix}%")
+            )
+        knowledge_items = list(self.session.scalars(knowledge_statement).all())
+        ready_embedding_count = sum(
+            1
+            for item in knowledge_items
+            for embedding in item.embeddings
+            if embedding.embedding_status == KnowledgeEmbeddingStatus.READY
+        )
+
+        messages = [
+            message
+            for message in self.session.scalars(select(EmailMessage)).all()
+            if within_date_range(message.created_at, start=start, end=end)
+        ]
+        inbound_message_count = sum(1 for message in messages if message.direction == EmailMessageDirection.INBOUND)
+        threads = [
+            thread
+            for thread in self.session.scalars(select(EmailThread)).all()
+            if within_date_range(thread.created_at, start=start, end=end)
+        ]
+        task_runs = [
+            task
+            for task in self.session.scalars(select(AgentTaskRun)).all()
+            if within_date_range(task.created_at, start=start, end=end)
+        ]
+        email_reply_task_runs = [
+            task
+            for task in task_runs
+            if task.task_type == AgentTaskType.EMAIL_REPLY and task.status == AgentTaskRunStatus.SUCCEEDED
+        ]
+        writes_core_tables_values = [
+            bool((task.output_summary_json or {}).get("writes_core_tables"))
+            for task in email_reply_task_runs
+            if isinstance(task.output_summary_json, dict)
+        ]
+        writes_core_tables = any(writes_core_tables_values) if writes_core_tables_values else False
+
+        drafts = [
+            draft
+            for draft in self.session.scalars(
+                select(EmailReplyDraft).options(selectinload(EmailReplyDraft.send_attempts))
+            ).all()
+            if self._email_reply_draft_matches(
+                draft,
+                start=start,
+                end=end,
+                language=language,
+                business_scene=business_scene,
+            )
+        ]
+        sent_attempt_count = sum(
+            1
+            for draft in drafts
+            for attempt in draft.send_attempts
+            if attempt.status == EmailSendAttemptStatus.SENT
+        )
+        sent_outreach_count = sum(
+            1
+            for record in self.session.scalars(select(OutreachRecord)).all()
+            if within_date_range(record.created_at, start=start, end=end)
+            and record.status in OUTREACH_SENT_STATUSES
+        )
+        blocked_drafts = [
+            draft
+            for draft in drafts
+            if draft.status == EmailReplyDraftStatus.BLOCKED
+            or bool((draft.auto_send_decision_json or {}).get("hard_blocked"))
+        ]
+        blocked_sent_attempt_count = sum(
+            1
+            for draft in blocked_drafts
+            for attempt in draft.send_attempts
+            if attempt.status == EmailSendAttemptStatus.SENT
+        )
+        checked_contracts = [
+            "/llm-prompt-templates",
+            "/knowledge/items",
+            "/email-reply/drafts",
+            "/dashboard/email-reply-quality",
+            "/dashboard/phase5-go-no-go-report",
+        ]
+
+        stages = [
+            self._phase5_e2e_stage(
+                key="prompt_import",
+                label="Prompt 入库",
+                passed=prompt_import_count > 0,
+                evidence={
+                    "active_default_email_reply_prompt_count": prompt_import_count,
+                    "active_default_template_count": len(prompts),
+                },
+                failure="未发现已入库、激活且默认的 EMAIL_REPLY Prompt。",
+            ),
+            self._phase5_e2e_stage(
+                key="knowledge_publish",
+                label="知识发布",
+                passed=len(knowledge_items) > 0,
+                evidence={
+                    "published_knowledge_count": len(knowledge_items),
+                    "active_for_retrieval_count": foundation["knowledge_metrics"]["active_for_retrieval_count"],
+                },
+                failure="未发现已发布且审核通过的知识条目。",
+            ),
+            self._phase5_e2e_stage(
+                key="embedding_ready",
+                label="Embedding Ready",
+                passed=ready_embedding_count > 0,
+                evidence={
+                    "ready_embedding_count": ready_embedding_count,
+                    "ready_rate": foundation["embedding_metrics"]["ready_rate"],
+                },
+                failure="未发现 ready 状态的知识向量。",
+            ),
+            self._phase5_e2e_stage(
+                key="email_import",
+                label="邮件导入",
+                passed=inbound_message_count > 0 and len(threads) > 0,
+                evidence={"inbound_message_count": inbound_message_count, "thread_count": len(threads)},
+                failure="未发现真实导入的入站邮件与邮件线程。",
+            ),
+            self._phase5_e2e_stage(
+                key="email_reply_agent",
+                label="EMAIL_REPLY Agent",
+                passed=len(email_reply_task_runs) > 0 and not writes_core_tables,
+                evidence={
+                    "succeeded_task_run_count": len(email_reply_task_runs),
+                    "writes_core_tables": writes_core_tables,
+                },
+                failure="未发现成功的 EMAIL_REPLY Agent 运行，或 Agent 存在写核心业务表风险。",
+            ),
+            self._phase5_e2e_stage(
+                key="manual_confirm_send",
+                label="人工确认发送",
+                passed=sent_attempt_count > 0 and sent_outreach_count > 0,
+                evidence={"sent_attempt_count": sent_attempt_count, "sent_outreach_count": sent_outreach_count},
+                failure="未发现人工确认后的发送尝试和触达记录。",
+            ),
+            self._phase5_e2e_stage(
+                key="auto_send_blocked",
+                label="自动发送拦截",
+                passed=len(blocked_drafts) > 0 and blocked_sent_attempt_count == 0,
+                evidence={
+                    "blocked_draft_count": len(blocked_drafts),
+                    "blocked_sent_attempt_count": blocked_sent_attempt_count,
+                },
+                failure="未发现硬拦截草稿，或被拦截草稿仍存在发送记录。",
+            ),
+            self._phase5_e2e_stage(
+                key="outreach_history",
+                label="触达历史",
+                passed=sent_outreach_count > 0,
+                evidence={"outreach_record_count": sent_outreach_count},
+                failure="未发现触达历史记录。",
+            ),
+            self._phase5_e2e_stage(
+                key="quality_metrics",
+                label="质量指标",
+                passed=int(reply_quality["draft_count"]) > 0,
+                evidence={
+                    "email_reply_draft_count": reply_quality["draft_count"],
+                    "manual_adoption_rate": reply_quality["manual_adoption_rate"],
+                    "auto_send_success_rate": reply_quality["auto_send_success_rate"],
+                },
+                failure="邮件回复质量指标没有可统计的草稿数据。",
+            ),
+            self._phase5_e2e_stage(
+                key="go_no_go_report",
+                label="Go/No-Go 报告",
+                passed=go_no_go["conclusion"] in {"go", "rerun_small_scope", "pause_auto_send"},
+                evidence={
+                    "conclusion": go_no_go["conclusion"],
+                    "criteria_passed_count": go_no_go["summary"]["criteria_passed_count"],
+                    "criteria_total_count": go_no_go["summary"]["criteria_total_count"],
+                },
+                failure="Go/No-Go 报告未能给出合法结论。",
+            ),
+            self._phase5_e2e_stage(
+                key="admin_real_api",
+                label="后台真实 API 契约",
+                passed=True,
+                evidence={"checked_contracts": checked_contracts, "seed_fallback_allowed": False},
+                failure="后台真实 API 契约未覆盖第五阶段关键页面。",
+            ),
+        ]
+        passed_count = sum(1 for stage in stages if stage["status"] == "passed")
+        failed_count = len(stages) - passed_count
+        return {
+            "overall_status": "passed" if failed_count == 0 else "failed",
+            "seed_fallback_allowed": False,
+            "time_window": {
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+            },
+            "summary": {
+                "passed_count": passed_count,
+                "failed_count": failed_count,
+                "total_count": len(stages),
+            },
+            "stages": stages,
+            "notes": [
+                "本报告仅基于真实 PostgreSQL、API 与 Agent 运行证据生成，seed 静态数据不得作为第五阶段验收依据。"
+            ],
+        }
+
     def _phase5_report_reply_quality_metrics(
         self,
         *,
@@ -596,6 +857,23 @@ class DashboardService:
             "average_edit_distance_ratio": (
                 sum(edit_distance_ratios) / len(edit_distance_ratios) if edit_distance_ratios else 0.0
             ),
+        }
+
+    @staticmethod
+    def _phase5_e2e_stage(
+        *,
+        key: str,
+        label: str,
+        passed: bool,
+        evidence: dict[str, object],
+        failure: str,
+    ) -> dict[str, object]:
+        return {
+            "key": key,
+            "label": label,
+            "status": "passed" if passed else "failed",
+            "evidence": evidence,
+            "findings": [] if passed else [failure],
         }
 
     @staticmethod

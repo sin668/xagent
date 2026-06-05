@@ -12,6 +12,7 @@ from app.schemas.dashboard import (
     ChannelQualityDashboardResponse,
     EmailDeliveryQualityResponse,
     EmailReplyQualityResponse,
+    Phase5E2EIntegrationReportResponse,
     Phase5GoNoGoReportResponse,
     Phase5QualityFoundationResponse,
     PhaseOneFunnelDashboardResponse,
@@ -117,6 +118,31 @@ async def get_phase5_go_no_go_report(
         service = DashboardService(sync_session)
         return Phase5GoNoGoReportResponse(
             **service.phase5_go_no_go_report(
+                repo_root=REPO_ROOT,
+                knowledge_collection_prefix=knowledge_collection_prefix,
+                date_from=date_from,
+                date_to=date_to,
+                language=language,
+                business_scene=business_scene,
+            )
+        )
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/phase5-e2e-integration-report", response_model=Phase5E2EIntegrationReportResponse)
+async def get_phase5_e2e_integration_report(
+    knowledge_collection_prefix: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    language: str | None = Query(default=None),
+    business_scene: str | None = Query(default=None),
+    async_session: AsyncSession = Depends(get_async_session),
+) -> Phase5E2EIntegrationReportResponse:
+    def run(sync_session):
+        service = DashboardService(sync_session)
+        return Phase5E2EIntegrationReportResponse(
+            **service.phase5_e2e_integration_report(
                 repo_root=REPO_ROOT,
                 knowledge_collection_prefix=knowledge_collection_prefix,
                 date_from=date_from,
