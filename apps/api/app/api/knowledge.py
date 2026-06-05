@@ -31,7 +31,10 @@ from app.schemas.knowledge import (
     PhaseOneKnowledgeImportRequest,
     PhaseOneKnowledgeImportResponse,
 )
+from app.services.agent_thread_runner import AgentThreadRunner
+from app.services.embedding_provider import create_embedding_provider
 from app.services.knowledge import KnowledgeService
+from app.services.knowledge_embedding_worker import KnowledgeEmbeddingWorker
 from app.services.knowledge_import import KnowledgeImportService
 from app.services.knowledge_search import KnowledgeSearchService
 
@@ -292,7 +295,10 @@ async def publish_item(
     request: KnowledgeReviewActionRequest,
     async_session: AsyncSession = Depends(get_async_session),
 ) -> KnowledgeItemResponse:
+    queued_embedding_id: UUID | None = None
+
     def run(sync_session):
+        nonlocal queued_embedding_id
         service = KnowledgeService(sync_session)
         try:
             item = service.publish_item(
@@ -301,6 +307,13 @@ async def publish_item(
                 actor_role=request.actor_role,
                 review_note=request.review_note,
             )
+            provider = create_embedding_provider()
+            embedding_task = service.create_pending_embedding_task(
+                item_id=item.id,
+                embedding_model=provider.model,
+                embedding_dimensions=provider.dimensions,
+            )
+            queued_embedding_id = embedding_task.id
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
@@ -308,7 +321,15 @@ async def publish_item(
         sync_session.commit()
         return serialize_item(item)
 
-    return await async_session.run_sync(run)
+    response = await async_session.run_sync(run)
+    if queued_embedding_id is not None:
+        provider = create_embedding_provider()
+        worker = KnowledgeEmbeddingWorker(provider)
+        AgentThreadRunner.start(
+            name=f"knowledge-embedding-worker-{queued_embedding_id}",
+            target=lambda: worker.run_once(queued_embedding_id),
+        )
+    return response
 
 
 @router.post("/items/{item_id:uuid}/activate-retrieval", response_model=KnowledgeItemResponse)

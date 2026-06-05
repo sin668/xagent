@@ -408,6 +408,49 @@ class KnowledgeService:
         self.session.flush()
         return record
 
+    def create_pending_embedding_task(
+        self,
+        *,
+        item_id: UUID,
+        embedding_model: str,
+        embedding_dimensions: int = 1536,
+    ) -> KnowledgeEmbedding:
+        return self.create_embedding(
+            item_id=item_id,
+            embedding_model=embedding_model,
+            embedding=None,
+            embedding_dimensions=embedding_dimensions,
+        )
+
+    def mark_embedding_ready(
+        self,
+        embedding_id: UUID,
+        *,
+        embedding: list[float],
+        embedding_model: str,
+        embedding_dimensions: int,
+    ) -> KnowledgeEmbedding:
+        record = self.session.get(KnowledgeEmbedding, embedding_id)
+        if record is None:
+            raise ValueError("embedding 任务不存在。")
+        record.embedding = embedding
+        record.embedding_model = embedding_model
+        record.embedding_dimensions = embedding_dimensions
+        record.embedding_status = KnowledgeEmbeddingStatus.READY
+        record.error_message = None
+        self.session.flush()
+        return record
+
+    def mark_embedding_failed(self, embedding_id: UUID, *, error_message: str) -> KnowledgeEmbedding:
+        record = self.session.get(KnowledgeEmbedding, embedding_id)
+        if record is None:
+            raise ValueError("embedding 任务不存在。")
+        record.embedding = None
+        record.embedding_status = KnowledgeEmbeddingStatus.FAILED
+        record.error_message = error_message
+        self.session.flush()
+        return record
+
     def retry_embedding(self, embedding_id: UUID) -> KnowledgeEmbedding:
         record = self.session.get(KnowledgeEmbedding, embedding_id)
         if record is None:

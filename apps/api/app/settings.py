@@ -152,6 +152,22 @@ class Settings(BaseSettings):
         default="deepseek-chat",
         validation_alias=AliasChoices("VEHICLE_LEADS_LLM_GRADING_MODEL", "LLM_GRADING_MODEL"),
     )
+    llm_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_EMBEDDING_MODEL", "LLM_EMBEDDING_MODEL"),
+    )
+    llm_embedding_dimensions: int = Field(
+        default=1536,
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_EMBEDDING_DIMENSIONS", "LLM_EMBEDDING_DIMENSIONS"),
+    )
+    llm_embedding_base_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_EMBEDDING_BASE_URL", "LLM_EMBEDDING_BASE_URL"),
+    )
+    llm_embedding_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_LLM_EMBEDDING_API_KEY", "LLM_EMBEDDING_API_KEY"),
+    )
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -169,6 +185,13 @@ class Settings(BaseSettings):
     @field_validator("agents_api_key", mode="before")
     @classmethod
     def blank_agents_api_key_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("llm_embedding_api_key", mode="before")
+    @classmethod
+    def blank_embedding_api_key_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value
