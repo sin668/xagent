@@ -30,6 +30,26 @@ class LLMPromptTemplateCreate(BaseModel):
     validation_errors_json: dict | None = None
 
 
+class LLMPromptTemplateDraftCreate(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    task_type: LLMPromptTaskType
+    provider: str = Field(min_length=1, max_length=80)
+    model: str = Field(min_length=1, max_length=120)
+    system_prompt: str = Field(min_length=1)
+    user_prompt_template: str = Field(min_length=1)
+    output_schema_json: dict
+    version: str = Field(min_length=1, max_length=40)
+    source_file_path: str | None = Field(default=None, max_length=500)
+    source_file_hash: str | None = Field(default=None, max_length=128)
+    migration_batch_id: str | None = Field(default=None, max_length=120)
+    parent_template_id: UUID | None = None
+    change_summary: str | None = None
+    validation_status: str | None = Field(default=None, max_length=40)
+    validation_errors_json: dict | None = None
+
+
 class LLMPromptTemplateUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
     provider: str | None = Field(default=None, min_length=1, max_length=80)
@@ -48,6 +68,25 @@ class LLMPromptTemplateUpdate(BaseModel):
     published_at: datetime | None = None
     change_summary: str | None = None
     rollback_from_template_id: UUID | None = None
+    validation_status: str | None = Field(default=None, max_length=40)
+    validation_errors_json: dict | None = None
+
+
+class LLMPromptTemplateDraftUpdate(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    provider: str | None = Field(default=None, min_length=1, max_length=80)
+    model: str | None = Field(default=None, min_length=1, max_length=120)
+    system_prompt: str | None = Field(default=None, min_length=1)
+    user_prompt_template: str | None = Field(default=None, min_length=1)
+    output_schema_json: dict | None = None
+    version: str | None = Field(default=None, min_length=1, max_length=40)
+    source_file_path: str | None = Field(default=None, max_length=500)
+    source_file_hash: str | None = Field(default=None, max_length=128)
+    migration_batch_id: str | None = Field(default=None, max_length=120)
+    parent_template_id: UUID | None = None
+    change_summary: str | None = None
     validation_status: str | None = Field(default=None, max_length=40)
     validation_errors_json: dict | None = None
 
@@ -84,3 +123,7 @@ class LLMPromptTemplateResponse(BaseModel):
 class LLMPromptTemplateListResponse(BaseModel):
     items: list[LLMPromptTemplateResponse]
     total: int
+
+
+class LLMPromptTemplateDraftDetailResponse(LLMPromptTemplateResponse):
+    audit_summary: dict = Field(default_factory=dict)
