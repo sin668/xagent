@@ -1,8 +1,8 @@
 # Story P5-E1-S6：第五阶段数据 migration contract tests
 
-状态：未开始  
-Sprint：Sprint 1  
-优先级：P0  
+状态：已完成
+Sprint：Sprint 1
+优先级：P0
 Epic：P5-E1（数据底座）
 
 ## 用户故事
@@ -190,3 +190,37 @@ contract 测试已在真实 PostgreSQL 上查询 `alembic_version`、`informatio
 修正结果：
 
 - 无需修正。
+
+## 2026-06-05 复核收口记录
+
+本次复核未新增业务代码。当前工作树中 `app.migration_contracts.phase5` 和 `tests/test_phase5_migration_contracts.py` 已存在，并已由历史提交 `fe38a1c8 test: add phase5 migration contracts` 纳入当前分支；后续提交 `1c540828`、`0efba7ac` 已将 contract 覆盖范围继续扩展到 `20260605_0035`。
+
+复核命令：
+
+```bash
+cd apps/api
+/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_migration_contracts.py -q
+/opt/miniconda3/envs/booking-room/bin/python -m alembic current
+```
+
+复核结果：
+
+```text
+3 passed in 0.77s
+20260605_0035 (head)
+```
+
+当前 contract 覆盖：
+
+- `20260605_0029_extend_llm_prompt_templates_governance.py`
+- `20260605_0030_create_email_threads_messages.py`
+- `20260605_0031_create_email_reply_drafts.py`
+- `20260605_0032_create_email_send_attempts.py`
+- `20260605_0033_create_knowledge_usage_quality.py`
+- `20260605_0034_scope_llm_prompt_default_by_provider_model.py`
+- `20260605_0035_add_knowledge_embedding_retry_metrics.py`
+
+两轮复核结论：
+
+- 第一轮：contract manifest 已覆盖第五阶段当前全部数据底座 migration，测试会检查 revision/down_revision、upgrade/downgrade、表字段、枚举值和索引，并通过真实 PostgreSQL 查询 `alembic_version`、`information_schema`、`pg_enum`、`pg_indexes`；未发现需要新增实现的缺口。
+- 第二轮：本 Story 仅验证 migration 契约和回滚策略，不新增业务表、API、Agent 或页面；回滚策略明确要求先备份/归档业务数据，未发现新的实质阻塞问题。
