@@ -97,3 +97,6 @@ docs/implementation-artifacts/
 # Added by code-review-graph / gstack
 .code-review-graph/
 .gstack/
+
+# Local git worktrees
+.worktrees/
