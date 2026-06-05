@@ -10,6 +10,8 @@ from app.models.contact_method import ContactMethod
 from app.models.customer import Customer
 from app.models.customer_followup import CustomerFollowup
 from app.models.customer_vehicle_intent import CustomerVehicleIntent
+from app.models.email_message import EmailMessage
+from app.models.email_thread import EmailThread
 from app.models.enums import (
     AITaskType,
     AgentTaskRunStatus,
@@ -27,6 +29,10 @@ from app.models.enums import (
     CustomerType,
     CustomerVehicleIntentSourceType,
     CustomerVehicleIntentStatus,
+    EmailMessageDirection,
+    EmailMessageSourceType,
+    EmailMessageStatus,
+    EmailThreadStatus,
     FailedCaseType,
     KnowledgeEmbeddingStatus,
     KnowledgeItemStatus,
@@ -101,6 +107,12 @@ __all__ = [
     "CustomerVehicleIntent",
     "CustomerVehicleIntentSourceType",
     "CustomerVehicleIntentStatus",
+    "EmailMessage",
+    "EmailMessageDirection",
+    "EmailMessageSourceType",
+    "EmailMessageStatus",
+    "EmailThread",
+    "EmailThreadStatus",
     "FailedCase",
     "FailedCaseType",
     "InventoryItem",

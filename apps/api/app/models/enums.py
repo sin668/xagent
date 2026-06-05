@@ -146,6 +146,34 @@ class OutreachStatus(StrEnum):
     CLOSED = "closed"
 
 
+class EmailThreadStatus(StrEnum):
+    OPEN = "open"
+    WAITING_REPLY = "waiting_reply"
+    REPLIED = "replied"
+    ARCHIVED = "archived"
+    BLOCKED = "blocked"
+
+
+class EmailMessageDirection(StrEnum):
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
+
+
+class EmailMessageStatus(StrEnum):
+    RECEIVED = "received"
+    PENDING_REPLY = "pending_reply"
+    DRAFTED = "drafted"
+    SENT = "sent"
+    FAILED = "failed"
+    ARCHIVED = "archived"
+
+
+class EmailMessageSourceType(StrEnum):
+    MANUAL = "manual"
+    API_IMPORT = "api_import"
+    MAILBOX_SYNC = "mailbox_sync"
+
+
 class AITaskType(StrEnum):
     LEAD_EXTRACTION = "lead_extraction"
     LEAD_GRADING = "lead_grading"
