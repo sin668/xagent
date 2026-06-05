@@ -145,5 +145,6 @@ def test_customer_api_records_rejected_outreach_and_marks_do_not_contact() -> No
     customer_response = client.get(f"/customers/{customer_id}")
     assert customer_response.status_code == 200
     customer = customer_response.json()
-    assert customer["do_not_contact"] is True
-    assert customer["status"] == "do_not_contact"
+    assert customer["do_not_contact"]["enabled"] is True
+    assert customer["do_not_contact"]["reason"] == "客户明确拒绝继续联系"
+    assert customer["profile"]["status"] == "do_not_contact"

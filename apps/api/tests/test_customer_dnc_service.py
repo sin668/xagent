@@ -88,7 +88,12 @@ async def test_unmark_do_not_contact_requires_reason_and_records_actor() -> None
             service.unmark_do_not_contact(customer_id=customer.id, unmarked_by="主管B", reason="")
         except ValueError as exc:
             empty_reason_error = str(exc)
-        updated = service.unmark_do_not_contact(customer_id=customer.id, unmarked_by="主管B", reason="客户重新同意沟通")
+        updated = service.unmark_do_not_contact(
+            customer_id=customer.id,
+            unmarked_by="主管B",
+            reason="客户重新同意沟通",
+            actor_role="admin",
+        )
         return empty_reason_error, updated
 
     empty_reason_error, updated = await run_with_session(act)
