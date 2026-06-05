@@ -184,3 +184,31 @@ class KnowledgeSearchResponse(BaseModel):
     items: list[KnowledgeSearchResultResponse]
     search_mode: str
     fallback_reason: str | None = None
+
+
+class KnowledgeRetrievalFilterRequest(BaseModel):
+    query: str | None = None
+    language: str = Field(min_length=1, max_length=20)
+    channel: str | None = None
+    content_types: list[str] = Field(default_factory=list)
+    business_scene: str | None = None
+    auto_send_candidate: bool = False
+    market: str | None = None
+    tone: str | None = None
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+class KnowledgeRetrievalFilterResultResponse(BaseModel):
+    knowledge_item_id: UUID
+    version: str
+    similarity_score: float
+    title: str
+    content_type: str | None = None
+    business_scene: str | None = None
+    filter_conditions: dict
+
+
+class KnowledgeRetrievalFilterResponse(BaseModel):
+    items: list[KnowledgeRetrievalFilterResultResponse]
+    total: int
+    rejection_reason: str | None = None

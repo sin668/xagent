@@ -1,6 +1,6 @@
 # Story P5-E3-S4：知识库召回过滤 API
 
-状态：未开始  
+状态：已完成
 Sprint：Sprint 3  
 优先级：P0  
 Epic：P5-E3（Q&A/邮件回复知识库）
@@ -69,3 +69,71 @@ Epic：P5-E3（Q&A/邮件回复知识库）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## 执行记录
+
+### TDD 红灯
+
+- 新增 `apps/api/tests/test_phase5_knowledge_retrieval_filter_api.py`。
+- 覆盖 EMAIL_REPLY 专用召回过滤：
+  - 自动发送候选只召回 `active + approved + embedding ready + auto_reply_allowed=true`。
+  - 强制按语言、渠道、内容类型、业务场景和市场过滤。
+  - 排除未 ready embedding、manual only、blocked 风险和不同语言知识。
+  - 同语言 `embedding_ready` 知识缺失时返回明确原因。
+  - 结果包含 `knowledge_item_id`、`version`、`similarity_score` 和 `filter_conditions`。
+- 首次运行：`/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_knowledge_retrieval_filter_api.py -q`
+- 红灯修正过程：
+  - 第一次失败为测试夹具错误：真实 pgvector 列固定 1536 维，测试误写 3 维向量，触发 `expected 1536 dimensions, not 3`。
+  - 修正测试夹具为 1536 维向量后重新运行，红灯落在目标缺口：`/knowledge/retrieval-filter` 返回 404。
+
+### 实现摘要
+
+- 新增专用请求/响应 schema：
+  - `KnowledgeRetrievalFilterRequest`
+  - `KnowledgeRetrievalFilterResultResponse`
+  - `KnowledgeRetrievalFilterResponse`
+- 在 `KnowledgeSearchService` 中新增 EMAIL_REPLY 专用召回过滤：
+  - `retrieve_for_email_reply`
+  - `retrieval_filter_conditions`
+  - `KnowledgeRetrievalFilterResult`
+- 新增 API：
+  - `POST /knowledge/retrieval-filter`
+- 召回硬门槛：
+  - `KnowledgeItem.status=active`
+  - `KnowledgeItem.review_status=approved`
+  - `KnowledgeEmbedding.embedding_status=ready`
+  - `KnowledgeItem.language` 与请求语言一致
+  - 自动发送候选要求 `auto_reply_allowed=true`
+  - 排除 `risk_level` 为 `blocked`、`Forbidden`、`High` 的知识
+  - 按 `channel`、`content_types`、`business_scene`、`market`、`tone` 继续过滤
+- 返回结构包含召回过滤条件，供 EMAIL_REPLY Agent 后续审计和自动发送判断链路使用。
+
+### 真实 PostgreSQL / API 验证
+
+- 当前 Story 单测：
+  - `/opt/miniconda3/envs/booking-room/bin/python -m pytest tests/test_phase5_knowledge_retrieval_filter_api.py -q`
+  - 结果：`2 passed, 34 warnings`。
+- 已知 warning：
+  - 知识库服务仍使用 `datetime.utcnow()`，触发 Python 3.12 deprecation warning，非本 Story 行为阻塞。
+
+## 两轮独立多维度评审
+
+### 第一轮评审：召回硬门槛、同语言缺失和自动发送边界
+
+- 结论：P5-E3-S4 已提供 EMAIL_REPLY 专用召回过滤 API，自动发送候选不会复用较宽松的通用 `/knowledge/search`。
+- 发现项 1：如果继续使用通用 `/knowledge/search`，keyword fallback 可能召回未生成 ready embedding 的知识。
+- 修正结果 1：新增 `/knowledge/retrieval-filter`，查询时强制 join `knowledge_embeddings` 且要求 `embedding_status=ready`。
+- 发现项 2：如果只按业务字段过滤，不按语言过滤，会让 EMAIL_REPLY 在语言不确定或缺少同语言知识时继续生成回复。
+- 修正结果 2：查询层强制 `KnowledgeItem.language == request.language`；同语言 ready 知识完全缺失时返回 `缺少同语言 embedding_ready 知识，不能自动发送。`。
+- 发现项 3：自动发送候选不得召回 `auto_reply_allowed=false` 或 blocked/High/Forbidden 风险知识。
+- 修正结果 3：`auto_send_candidate=true` 时强制 `auto_reply_allowed=true`，并排除 blocked/High/Forbidden 风险等级。
+
+### 第二轮评审：兼容性、范围控制和可审计性
+
+- 结论：第二轮未发现新增实质阻塞问题；当前实现只覆盖 P5-E3-S4，没有执行 embedding worker、RAG 测试 API、知识质量统计或 EMAIL_REPLY Agent。
+- 发现项 1：P5-E3-S4 需要保留原 `/knowledge/search` 兼容性，避免破坏已有第一阶段/第五阶段知识库测试。
+- 修正结果 1：新增专用接口而非改造通用接口；通用搜索仍保留原 search mode 和 fallback 行为。
+- 发现项 2：召回结果如果只返回 item，不便于 EMAIL_REPLY 后续记录知识命中和过滤上下文。
+- 修正结果 2：专用结果返回 `knowledge_item_id`、`version`、`similarity_score` 和 `filter_conditions`。
+- 发现项 3：测试使用真实 PostgreSQL + pgvector，若维度不匹配会在 fixture 阶段失败，不能证明接口行为。
+- 修正结果 3：测试 embedding 使用 1536 维向量，与真实库列定义一致。

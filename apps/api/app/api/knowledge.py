@@ -19,6 +19,9 @@ from app.schemas.knowledge import (
     KnowledgeReviewActionRequest,
     KnowledgeReviewLogListResponse,
     KnowledgeReviewLogResponse,
+    KnowledgeRetrievalFilterRequest,
+    KnowledgeRetrievalFilterResponse,
+    KnowledgeRetrievalFilterResultResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
     KnowledgeSearchResultResponse,
@@ -102,6 +105,19 @@ def serialize_review_log(log) -> KnowledgeReviewLogResponse:
         result=log.result,
         error_message=log.error_message,
         created_at=log.created_at.isoformat(),
+    )
+
+
+def serialize_retrieval_filter_result(result) -> KnowledgeRetrievalFilterResultResponse:
+    metadata = result.item.metadata_json or {}
+    return KnowledgeRetrievalFilterResultResponse(
+        knowledge_item_id=result.item.id,
+        version=result.item.version,
+        similarity_score=result.similarity_score,
+        title=result.item.title,
+        content_type=metadata.get("content_type"),
+        business_scene=metadata.get("business_scene"),
+        filter_conditions=result.filter_conditions,
     )
 
 
@@ -395,6 +411,23 @@ async def import_phase_one_knowledge(
             skipped_count=result.skipped_count,
             collection_names=result.collection_names,
             item_titles=result.item_titles,
+        )
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/retrieval-filter", response_model=KnowledgeRetrievalFilterResponse)
+async def retrieval_filter_knowledge(
+    request: KnowledgeRetrievalFilterRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeRetrievalFilterResponse:
+    def run(sync_session):
+        service = KnowledgeSearchService(sync_session)
+        results, rejection_reason = service.retrieve_for_email_reply(**request.model_dump())
+        return KnowledgeRetrievalFilterResponse(
+            items=[serialize_retrieval_filter_result(result) for result in results],
+            total=len(results),
+            rejection_reason=rejection_reason,
         )
 
     return await async_session.run_sync(run)

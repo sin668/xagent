@@ -19,8 +19,16 @@ class KnowledgeSearchResult:
     search_mode: str
 
 
+@dataclass(frozen=True)
+class KnowledgeRetrievalFilterResult:
+    item: KnowledgeItem
+    similarity_score: float
+    filter_conditions: dict
+
+
 class KnowledgeSearchService:
     BLOCKED_RISK_LEVELS = {"blocked", "Forbidden", "High"}
+    MISSING_LANGUAGE_READY_REASON = "缺少同语言 embedding_ready 知识，不能自动发送。"
 
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -261,3 +269,91 @@ class KnowledgeSearchService:
             ),
             mode,
         )
+
+    @staticmethod
+    def retrieval_filter_conditions(
+        *,
+        language: str,
+        channel: str | None,
+        content_types: list[str],
+        business_scene: str | None,
+        auto_send_candidate: bool,
+        market: str | None,
+        tone: str | None,
+    ) -> dict:
+        conditions = {
+            "language": language,
+            "channel": channel,
+            "content_types": content_types,
+            "business_scene": business_scene,
+            "auto_send_candidate": auto_send_candidate,
+            "market": market,
+        }
+        if tone is not None:
+            conditions["tone"] = tone
+        return conditions
+
+    def retrieve_for_email_reply(
+        self,
+        *,
+        query: str | None,
+        language: str,
+        channel: str | None,
+        content_types: list[str],
+        business_scene: str | None,
+        auto_send_candidate: bool,
+        market: str | None,
+        tone: str | None,
+        limit: int,
+    ) -> tuple[list[KnowledgeRetrievalFilterResult], str | None]:
+        filter_conditions = self.retrieval_filter_conditions(
+            language=language,
+            channel=channel,
+            content_types=content_types,
+            business_scene=business_scene,
+            auto_send_candidate=auto_send_candidate,
+            market=market,
+            tone=tone,
+        )
+        statement = (
+            select(KnowledgeItem)
+            .join(KnowledgeEmbedding)
+            .options(selectinload(KnowledgeItem.collection))
+            .where(KnowledgeItem.status == KnowledgeItemStatus.ACTIVE)
+            .where(KnowledgeItem.review_status == KnowledgeReviewStatus.APPROVED)
+            .where(KnowledgeEmbedding.embedding_status == KnowledgeEmbeddingStatus.READY)
+            .where(KnowledgeItem.language == language)
+        )
+        items = list(self.session.scalars(statement).unique().all())
+        if not items:
+            return [], self.MISSING_LANGUAGE_READY_REASON
+
+        results: list[KnowledgeRetrievalFilterResult] = []
+        for item in items:
+            metadata = item.metadata_json or {}
+            if metadata.get("risk_level") in self.BLOCKED_RISK_LEVELS:
+                continue
+            if auto_send_candidate and metadata.get("auto_reply_allowed") is not True:
+                continue
+            if channel and channel not in (item.applicable_channels or []):
+                continue
+            if content_types and metadata.get("content_type") not in content_types:
+                continue
+            if business_scene and metadata.get("business_scene") != business_scene:
+                continue
+            if market and metadata.get("market") != market:
+                continue
+            if tone and metadata.get("tone") != tone:
+                continue
+            score = self.keyword_score(item, query)
+            if query and score <= 0:
+                continue
+            results.append(
+                KnowledgeRetrievalFilterResult(
+                    item=item,
+                    similarity_score=score if score > 0 else 1.0,
+                    filter_conditions=filter_conditions,
+                )
+            )
+
+        return sorted(results, key=lambda result: result.similarity_score, reverse=True)[:limit], None
