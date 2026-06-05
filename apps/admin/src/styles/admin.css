@@ -256,6 +256,7 @@ body {
 .phase3-card,
 .prompt-governance-card,
 .knowledge-governance-card,
+.email-reply-card,
 .llm-card {
   margin-top: 18px;
 }
@@ -647,6 +648,109 @@ body {
 }
 
 .knowledge-action-list strong {
+  font-size: 13px;
+}
+
+.email-reply-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.email-reply-summary article {
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.email-reply-summary strong {
+  display: block;
+  font-size: 24px;
+}
+
+.email-reply-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.email-reply-grid,
+.email-review-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.85fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.reply-editor {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.subject-line {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1.4;
+}
+
+.body-text {
+  max-height: 170px;
+  overflow: auto;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.mail-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mail-rule-grid article {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.mail-rule-grid strong {
+  display: block;
+  font-size: 13px;
+}
+
+.mail-rule-grid span {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.email-action-list {
+  display: grid;
+  gap: 10px;
+}
+
+.email-action-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.email-action-list strong {
   font-size: 13px;
 }
 

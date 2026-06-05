@@ -1,6 +1,6 @@
 # Story P5-E5-S3：apps/admin 邮件回复审核台页面
 
-状态：未开始  
+状态：已完成
 Sprint：Sprint 5  
 优先级：P0  
 Epic：P5-E5（apps/admin 后台管理页面）
@@ -68,3 +68,69 @@ Epic：P5-E5（apps/admin 后台管理页面）
 - DNC/勿扰、Watch/Invalid（对外 D/E 级）、语言不确定、知识召回不足、缺少知识证据、价格/付款/合同/发票/税务/法律/交付/出口管制等场景不得自动发送。
 - LLM 输出必须结构化；缺失字段输出 `Unknown`、`null` 或空数组，不得编造。
 - AI 建议回复和最终发送内容必须分开保存并可审计。
+
+## TDD 执行记录
+
+### 红灯
+
+- 新增 `apps/admin/tests/emailReplyReview.test.mjs`，覆盖邮件回复审核台视图、审核队列筛选、真实 API 拉取、编辑最终正文、发送前检查和人工动作入口。
+- 红灯命令：`export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH && node --test apps/admin/tests/emailReplyReview.test.mjs`
+- 红灯结果：失败，原因是 `apps/admin/src/services/emailReplyReview.js` 不存在，测试正确捕获本 Story 缺失的服务层契约。
+
+### 绿灯实现
+
+- 新增 `apps/admin/src/services/emailReplyReview.js`：
+  - `buildEmailReplyReviewView` 汇总待回复邮件、自动发送候选、人工确认、硬拦截，并规范化客户上下文、来信、AI 建议、最终正文、知识命中和风险判断。
+  - `buildEmailReplyDraftsQuery` 映射审核台筛选到 `/email-reply/drafts` 查询参数。
+  - `fetchEmailReplyReview` 接入真实 `/email-reply/drafts` API。
+  - `updateEmailReplyFinalBody`、`requestEmailSendCheck`、`triggerEmailReplyReviewAction` 分别接入编辑最终正文、后端发送前检查、确认发送/标记已发送/拒绝/阻断/转合规。
+  - 人工发送动作请求体显式携带 `send_check_required: true`，避免前端自行判断发送准入。
+- 更新 `apps/admin/src/App.vue`：
+  - 新增侧边栏 `邮件审核` 入口。
+  - 新增邮件自动回复审核台页面，展示待审核队列、当前回复草稿、客户上下文、来信、AI 建议、知识命中、硬拦截和人工动作入口。
+  - 页面使用真实 API 结果构建视图，不使用 seed 静态数据。
+- 更新 `apps/admin/src/styles/admin.css` 与 `apps/admin/package.json`：
+  - 新增邮件审核台布局、草稿编辑预览、知识/风险卡片和动作入口样式。
+  - 将 `emailReplyReview.js` 加入 `check:syntax`。
+
+## 验证记录
+
+- `export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH && node --test apps/admin/tests/emailReplyReview.test.mjs`：通过，5 个测试全部通过。
+- `export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH && npm --prefix apps/admin test`：通过，37 个测试全部通过。
+- `export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH && npm --prefix apps/admin run check:syntax`：通过。
+- `export PATH=/Users/linhuanbin/.reflex/.nvm/versions/node/v22.22.0/bin:$PATH && npm --prefix apps/admin run build`：通过。
+
+## 第一轮独立多维度评审
+
+### 结论
+
+通过。当前实现满足本 Story 的核心验收标准：后台邮件回复审核台可查看客户上下文、来信、最近触达历史、AI 建议、知识命中和硬拦截，并提供编辑最终正文、确认发送、标记已发送、拒绝、阻断和转合规入口。
+
+### 发现项
+
+- 产品维度：审核台以风险优先队列和当前草稿详情为主，符合原型对“待人工确认列表 + 草稿审核”的结构要求。
+- 技术维度：服务层接入 `/email-reply/drafts` 与 `/internal/email-reply/auto-send-check` 等真实 API 路径，未使用 seed 静态数据。
+- 风控维度：发送前检查由后端 API 执行，人工发送动作显式携带 `send_check_required: true`，前端不自行判断自动发送准入。
+- 测试维度：测试覆盖普通审核角色、只读角色、筛选 URL、最终正文编辑、发送前检查和人工动作请求体。
+
+### 修正结果
+
+- 发现项：硬拦截统计最初把“含硬拦截原因但 route 为人工确认”的草稿也计入硬拦截，口径偏宽。
+- 修正结果：硬拦截统计改为只统计后端 `route = block` 的草稿，人工确认草稿仍在风险原因中展示硬拦截原因。
+
+## 第二轮独立多维度评审
+
+### 结论
+
+通过。独立复核后未发现新增实质阻塞问题，可以收口本 Story。
+
+### 发现项
+
+- 数据一致性维度：页面字段均来自邮件回复草稿 API；缺失字段显示 `Unknown`、空正文或空列表，不编造客户信息和邮件内容。
+- 权限维度：`viewer` 角色只读，编辑、发送、阻断和转合规入口禁用；运营/客服/销售/合规角色按审核台入口展示。
+- 审计维度：AI 建议回复和最终发送正文分开展示，符合第五阶段“AI 建议和最终发送内容必须分开保存并可审计”的规则。
+- 构建维度：admin 单测、语法检查和生产构建均已通过。
+
+### 修正结果
+
+第二轮未发现新增实质阻塞问题，无需修正。
