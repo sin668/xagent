@@ -13,6 +13,7 @@ from app.api.customers import router as customers_router
 from app.api.customer_followups import router as customer_followups_router
 from app.api.customer_vehicle_intents import router as customer_vehicle_intents_router
 from app.api.dashboard import router as dashboard_router
+from app.api.email_replies import router as email_replies_router
 from app.api.failed_cases import router as failed_cases_router
 from app.api.inventory import router as inventory_router
 from app.api.knowledge import router as knowledge_router
@@ -76,6 +77,7 @@ app.include_router(customers_router)
 app.include_router(customer_followups_router)
 app.include_router(customer_vehicle_intents_router)
 app.include_router(dashboard_router)
+app.include_router(email_replies_router)
 app.include_router(failed_cases_router)
 app.include_router(inventory_router)
 app.include_router(knowledge_router)

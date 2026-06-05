@@ -169,7 +169,7 @@ const statusIndex = ref(0);
 const owner = ref('当前用户');
 const nextAction = ref('等待回复');
 const summary = ref('已人工发送俄语触达草稿。');
-const bottomTabs = buildBottomTabs('ai');
+const bottomTabs = buildBottomTabs('email');
 const emptyLead = {
   id: '',
   customerName: 'Unknown',
