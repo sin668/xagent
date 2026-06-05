@@ -152,6 +152,31 @@ class Settings(BaseSettings):
             "AGENT_EMAIL_REPLY_HTTP_ACTIVE_ENABLED",
         ),
     )
+    email_sender_provider: str = Field(
+        default="fake",
+        validation_alias=AliasChoices("VEHICLE_LEADS_EMAIL_SENDER_PROVIDER", "EMAIL_SENDER_PROVIDER"),
+    )
+    email_sender_from_email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_EMAIL_SENDER_FROM_EMAIL", "EMAIL_SENDER_FROM_EMAIL"),
+    )
+    smtp_host: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_SMTP_HOST", "SMTP_HOST"))
+    smtp_port: int = Field(default=587, validation_alias=AliasChoices("VEHICLE_LEADS_SMTP_PORT", "SMTP_PORT"))
+    smtp_username: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_SMTP_USERNAME", "SMTP_USERNAME"))
+    smtp_password: SecretStr | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_SMTP_PASSWORD", "SMTP_PASSWORD"))
+    smtp_use_tls: bool = Field(default=True, validation_alias=AliasChoices("VEHICLE_LEADS_SMTP_USE_TLS", "SMTP_USE_TLS"))
+    smtp_timeout_seconds: int = Field(default=30, ge=1, validation_alias=AliasChoices("VEHICLE_LEADS_SMTP_TIMEOUT_SECONDS", "SMTP_TIMEOUT_SECONDS"))
+    sendgrid_api_key: SecretStr | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_SENDGRID_API_KEY", "SENDGRID_API_KEY"))
+    mailgun_api_key: SecretStr | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_MAILGUN_API_KEY", "MAILGUN_API_KEY"))
+    mailgun_domain: str | None = Field(default=None, validation_alias=AliasChoices("VEHICLE_LEADS_MAILGUN_DOMAIN", "MAILGUN_DOMAIN"))
+    enterprise_mail_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_ENTERPRISE_MAIL_API_KEY", "ENTERPRISE_MAIL_API_KEY"),
+    )
+    enterprise_mail_base_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_ENTERPRISE_MAIL_BASE_URL", "ENTERPRISE_MAIL_BASE_URL"),
+    )
     lead_enrichment_daily_quota_per_lead: int = Field(
         default=2,
         validation_alias=AliasChoices(
