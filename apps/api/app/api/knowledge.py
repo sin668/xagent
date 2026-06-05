@@ -22,9 +22,12 @@ from app.schemas.knowledge import (
     KnowledgeRetrievalFilterRequest,
     KnowledgeRetrievalFilterResponse,
     KnowledgeRetrievalFilterResultResponse,
+    KnowledgeQualitySummaryResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
     KnowledgeSearchResultResponse,
+    KnowledgeUsageRecordCreate,
+    KnowledgeUsageRecordResponse,
     PhaseOneKnowledgeImportRequest,
     PhaseOneKnowledgeImportResponse,
 )
@@ -118,6 +121,27 @@ def serialize_retrieval_filter_result(result) -> KnowledgeRetrievalFilterResultR
         content_type=metadata.get("content_type"),
         business_scene=metadata.get("business_scene"),
         filter_conditions=result.filter_conditions,
+    )
+
+
+def serialize_usage_record(record) -> KnowledgeUsageRecordResponse:
+    return KnowledgeUsageRecordResponse(
+        id=record.id,
+        knowledge_item_id=record.knowledge_item_id,
+        knowledge_version=record.knowledge_version,
+        email_reply_draft_id=record.email_reply_draft_id,
+        retrieval_query=record.retrieval_query,
+        similarity_score=record.similarity_score,
+        rank=record.rank,
+        filters_json=record.filters_json,
+        outcome=record.outcome.value,
+        adopted=record.adopted,
+        edit_distance_ratio=record.edit_distance_ratio,
+        caused_bounce=record.caused_bounce,
+        customer_replied=record.customer_replied,
+        suggest_deprecate=record.suggest_deprecate,
+        suggest_deprecate_reason=record.suggest_deprecate_reason,
+        created_at=record.created_at.isoformat(),
     )
 
 
@@ -412,6 +436,40 @@ async def import_phase_one_knowledge(
             collection_names=result.collection_names,
             item_titles=result.item_titles,
         )
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/items/{item_id:uuid}/usage-records", response_model=KnowledgeUsageRecordResponse)
+async def create_item_usage_record(
+    item_id: UUID,
+    request: KnowledgeUsageRecordCreate,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeUsageRecordResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            record = service.create_usage_record(item_id, payload=request.model_dump())
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_usage_record(record)
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/items/{item_id:uuid}/quality-summary", response_model=KnowledgeQualitySummaryResponse)
+async def get_item_quality_summary(
+    item_id: UUID,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeQualitySummaryResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            summary = service.quality_summary(item_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return KnowledgeQualitySummaryResponse(**summary)
 
     return await async_session.run_sync(run)
 

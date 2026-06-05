@@ -212,3 +212,55 @@ class KnowledgeRetrievalFilterResponse(BaseModel):
     items: list[KnowledgeRetrievalFilterResultResponse]
     total: int
     rejection_reason: str | None = None
+
+
+class KnowledgeUsageRecordCreate(BaseModel):
+    email_reply_draft_id: UUID | None = None
+    retrieval_query: str | None = None
+    similarity_score: float | None = None
+    rank: int | None = None
+    filters_json: dict = Field(default_factory=dict)
+    outcome: str = Field(
+        default="retrieved",
+        pattern="^(retrieved|adopted|edited|rejected|customer_replied|bounced|suggest_deprecate)$",
+    )
+    adopted: bool = False
+    edit_distance_ratio: float | None = None
+    caused_bounce: bool = False
+    customer_replied: bool = False
+    suggest_deprecate: bool = False
+    suggest_deprecate_reason: str | None = None
+
+
+class KnowledgeUsageRecordResponse(BaseModel):
+    id: UUID
+    knowledge_item_id: UUID
+    knowledge_version: str
+    email_reply_draft_id: UUID | None = None
+    retrieval_query: str | None = None
+    similarity_score: float | None = None
+    rank: int | None = None
+    filters_json: dict
+    outcome: str
+    adopted: bool
+    edit_distance_ratio: float | None = None
+    caused_bounce: bool
+    customer_replied: bool
+    suggest_deprecate: bool
+    suggest_deprecate_reason: str | None = None
+    created_at: str
+
+
+class KnowledgeQualitySummaryResponse(BaseModel):
+    knowledge_item_id: UUID
+    knowledge_version: str
+    retrieval_count: int
+    adoption_count: int
+    adoption_rate: float
+    average_edit_distance_ratio: float | None = None
+    bounce_count: int
+    bounce_rate: float
+    customer_reply_count: int
+    customer_reply_rate: float
+    suggest_deprecate: bool
+    suggest_deprecate_reason: str | None = None

@@ -6,8 +6,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import KnowledgeCollection, KnowledgeEmbedding, KnowledgeItem
-from app.models.enums import KnowledgeEmbeddingStatus, KnowledgeItemStatus, KnowledgeReviewStatus
+from app.models import KnowledgeCollection, KnowledgeEmbedding, KnowledgeItem, KnowledgeUsageRecord
+from app.models.email_reply_draft import EmailReplyDraft
+from app.models.enums import KnowledgeEmbeddingStatus, KnowledgeItemStatus, KnowledgeReviewStatus, KnowledgeUsageOutcome
 from app.models.review_log import ReviewLog
 
 
@@ -245,6 +246,63 @@ class KnowledgeService:
             ).all()
         )
 
+    def create_usage_record(self, item_id: UUID, *, payload: dict) -> KnowledgeUsageRecord:
+        item = self._require_item(item_id)
+        email_reply_draft_id = payload.get("email_reply_draft_id")
+        if email_reply_draft_id is not None and self.session.get(EmailReplyDraft, email_reply_draft_id) is None:
+            raise ValueError("email reply draft 不存在。")
+        record = KnowledgeUsageRecord(
+            knowledge_item_id=item.id,
+            knowledge_version=item.version,
+            email_reply_draft_id=email_reply_draft_id,
+            retrieval_query=payload.get("retrieval_query"),
+            similarity_score=payload.get("similarity_score"),
+            rank=payload.get("rank"),
+            filters_json=payload.get("filters_json") or {},
+            outcome=KnowledgeUsageOutcome(payload.get("outcome", KnowledgeUsageOutcome.RETRIEVED.value)),
+            adopted=payload.get("adopted", False),
+            edit_distance_ratio=payload.get("edit_distance_ratio"),
+            caused_bounce=payload.get("caused_bounce", False),
+            customer_replied=payload.get("customer_replied", False),
+            suggest_deprecate=payload.get("suggest_deprecate", False),
+            suggest_deprecate_reason=payload.get("suggest_deprecate_reason"),
+        )
+        self.session.add(record)
+        self.session.flush()
+        return record
+
+    def quality_summary(self, item_id: UUID) -> dict:
+        item = self._require_item(item_id)
+        records = list(
+            self.session.scalars(
+                select(KnowledgeUsageRecord)
+                .where(KnowledgeUsageRecord.knowledge_item_id == item.id)
+                .order_by(KnowledgeUsageRecord.created_at.desc())
+            ).all()
+        )
+        retrieval_count = len(records)
+        adoption_count = sum(1 for record in records if record.adopted)
+        bounce_count = sum(1 for record in records if record.caused_bounce)
+        customer_reply_count = sum(1 for record in records if record.customer_replied)
+        edit_ratios = [record.edit_distance_ratio for record in records if record.edit_distance_ratio is not None]
+        suggest_deprecate_records = [record for record in records if record.suggest_deprecate]
+        return {
+            "knowledge_item_id": item.id,
+            "knowledge_version": item.version,
+            "retrieval_count": retrieval_count,
+            "adoption_count": adoption_count,
+            "adoption_rate": self._rate(adoption_count, retrieval_count),
+            "average_edit_distance_ratio": round(sum(edit_ratios) / len(edit_ratios), 4) if edit_ratios else None,
+            "bounce_count": bounce_count,
+            "bounce_rate": self._rate(bounce_count, retrieval_count),
+            "customer_reply_count": customer_reply_count,
+            "customer_reply_rate": self._rate(customer_reply_count, retrieval_count),
+            "suggest_deprecate": bool(suggest_deprecate_records),
+            "suggest_deprecate_reason": suggest_deprecate_records[0].suggest_deprecate_reason
+            if suggest_deprecate_records
+            else None,
+        }
+
     def submit_review(self, item_id: UUID, *, actor: str, actor_role: str, review_note: str | None) -> KnowledgeItem:
         self._ensure_role(actor_role, self.REVIEW_SUBMIT_ROLES, "只有运营、管理员或知识管理员可以提交知识审核")
         item = self._require_item(item_id)
@@ -440,6 +498,12 @@ class KnowledgeService:
         role = str(actor_role or "").strip().lower()
         if role not in allowed_roles:
             raise PermissionError(message)
+
+    @staticmethod
+    def _rate(numerator: int, denominator: int) -> float:
+        if denominator == 0:
+            return 0.0
+        return round(numerator / denominator, 4)
 
     def _set_workflow_state(
         self,
