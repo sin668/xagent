@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import KnowledgeCollection, KnowledgeEmbedding, KnowledgeItem
 from app.models.enums import KnowledgeEmbeddingStatus, KnowledgeItemStatus, KnowledgeReviewStatus
+from app.models.review_log import ReviewLog
 
 
 class KnowledgeService:
@@ -26,6 +27,11 @@ class KnowledgeService:
         "market",
         "tone",
     }
+    REVIEW_SUBMIT_ROLES = {"operator", "admin", "knowledge_admin", "tech_admin"}
+    REVIEW_PUBLISH_ROLES = {"knowledge_admin", "admin", "tech_admin"}
+    RETRIEVAL_ACTIVATE_ROLES = {"tech_admin", "knowledge_admin", "admin"}
+    ARCHIVE_ROLES = {"knowledge_admin", "admin", "tech_admin"}
+    BLOCK_ROLES = {"compliance", "knowledge_admin", "admin", "tech_admin"}
 
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -229,6 +235,90 @@ class KnowledgeService:
         self.session.flush()
         return item
 
+    def list_review_logs(self, item_id: UUID) -> list[ReviewLog]:
+        return list(
+            self.session.scalars(
+                select(ReviewLog)
+                .where(ReviewLog.task_id == str(item_id))
+                .where(ReviewLog.agent_name == "knowledge_governance")
+                .order_by(ReviewLog.created_at.desc(), ReviewLog.id.desc())
+            ).all()
+        )
+
+    def submit_review(self, item_id: UUID, *, actor: str, actor_role: str, review_note: str | None) -> KnowledgeItem:
+        self._ensure_role(actor_role, self.REVIEW_SUBMIT_ROLES, "只有运营、管理员或知识管理员可以提交知识审核")
+        item = self._require_item(item_id)
+        self._set_workflow_state(
+            item,
+            workflow_state="in_review",
+            status=KnowledgeItemStatus.DRAFT,
+            review_status=KnowledgeReviewStatus.APPROVED,
+            actor=actor,
+            review_note=review_note,
+            action="knowledge_submit_review",
+        )
+        return item
+
+    def publish_item(self, item_id: UUID, *, actor: str, actor_role: str, review_note: str | None) -> KnowledgeItem:
+        self._ensure_role(actor_role, self.REVIEW_PUBLISH_ROLES, "只有知识管理员、管理员或技术管理员可以发布知识")
+        item = self._require_item(item_id)
+        self._set_workflow_state(
+            item,
+            workflow_state="pending_embedding",
+            status=KnowledgeItemStatus.DRAFT,
+            review_status=KnowledgeReviewStatus.APPROVED,
+            actor=actor,
+            review_note=review_note,
+            action="knowledge_publish",
+            extra_metadata={"published_by": actor, "published_at": datetime.utcnow().isoformat()},
+        )
+        return item
+
+    def activate_retrieval(self, item_id: UUID, *, actor: str, actor_role: str, review_note: str | None) -> KnowledgeItem:
+        self._ensure_role(actor_role, self.RETRIEVAL_ACTIVATE_ROLES, "只有技术管理员、知识管理员或管理员可以激活知识召回")
+        item = self._require_item(item_id)
+        self._set_workflow_state(
+            item,
+            workflow_state="active_for_retrieval",
+            status=KnowledgeItemStatus.ACTIVE,
+            review_status=KnowledgeReviewStatus.APPROVED,
+            actor=actor,
+            review_note=review_note,
+            action="knowledge_activate_retrieval",
+            extra_metadata={"activated_by": actor, "activated_at": datetime.utcnow().isoformat()},
+        )
+        return item
+
+    def archive_item(self, item_id: UUID, *, actor: str, actor_role: str, review_note: str | None) -> KnowledgeItem:
+        self._ensure_role(actor_role, self.ARCHIVE_ROLES, "只有知识管理员、管理员或技术管理员可以下线知识")
+        item = self._require_item(item_id)
+        self._set_workflow_state(
+            item,
+            workflow_state="archived",
+            status=KnowledgeItemStatus.DEPRECATED,
+            review_status=KnowledgeReviewStatus.APPROVED,
+            actor=actor,
+            review_note=review_note,
+            action="knowledge_archive",
+            extra_metadata={"auto_reply_allowed": False},
+        )
+        return item
+
+    def block_item(self, item_id: UUID, *, actor: str, actor_role: str, review_note: str | None) -> KnowledgeItem:
+        self._ensure_role(actor_role, self.BLOCK_ROLES, "只有合规、知识管理员、管理员或技术管理员可以阻断知识")
+        item = self._require_item(item_id)
+        self._set_workflow_state(
+            item,
+            workflow_state="blocked",
+            status=KnowledgeItemStatus.DISABLED,
+            review_status=KnowledgeReviewStatus.REJECTED,
+            actor=actor,
+            review_note=review_note,
+            action="knowledge_block",
+            extra_metadata={"risk_level": "blocked", "auto_reply_allowed": False},
+        )
+        return item
+
     def create_embedding(
         self,
         *,
@@ -338,6 +428,52 @@ class KnowledgeService:
         self.session.add(draft)
         self.session.flush()
         return draft
+
+    def _require_item(self, item_id: UUID) -> KnowledgeItem:
+        item = self.get_item(item_id)
+        if item is None:
+            raise ValueError("knowledge item 不存在。")
+        return item
+
+    @staticmethod
+    def _ensure_role(actor_role: str, allowed_roles: set[str], message: str) -> None:
+        role = str(actor_role or "").strip().lower()
+        if role not in allowed_roles:
+            raise PermissionError(message)
+
+    def _set_workflow_state(
+        self,
+        item: KnowledgeItem,
+        *,
+        workflow_state: str,
+        status: KnowledgeItemStatus,
+        review_status: KnowledgeReviewStatus,
+        actor: str,
+        review_note: str | None,
+        action: str,
+        extra_metadata: dict | None = None,
+    ) -> None:
+        metadata = dict(item.metadata_json or {})
+        metadata.update(extra_metadata or {})
+        metadata["workflow_state"] = workflow_state
+        if review_note is not None:
+            metadata["last_review_note"] = review_note
+        item.metadata_json = metadata
+        item.status = status
+        item.review_status = review_status
+        item.updated_at = datetime.utcnow()
+        self.session.add(
+            ReviewLog(
+                task_id=str(item.id),
+                agent_name="knowledge_governance",
+                action=action,
+                reviewer=actor,
+                input_ref=review_note,
+                output_ref=f"workflow_state={workflow_state};status={status.value};review_status={review_status.value}",
+                result="success",
+            )
+        )
+        self.session.flush()
 
     @classmethod
     def build_business_metadata(

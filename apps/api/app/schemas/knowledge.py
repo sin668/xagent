@@ -102,6 +102,29 @@ class KnowledgeItemListResponse(BaseModel):
     items: list[KnowledgeItemResponse]
 
 
+class KnowledgeReviewActionRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=120)
+    actor_role: str = Field(min_length=1, max_length=80)
+    review_note: str | None = None
+
+
+class KnowledgeReviewLogResponse(BaseModel):
+    id: UUID
+    item_id: str | None
+    action: str
+    reviewer: str | None
+    input_ref: str | None
+    output_ref: str | None
+    result: str
+    error_message: str | None
+    created_at: str
+
+
+class KnowledgeReviewLogListResponse(BaseModel):
+    items: list[KnowledgeReviewLogResponse]
+    total: int
+
+
 class KnowledgeEmbeddingCreate(BaseModel):
     embedding_model: str = Field(min_length=1, max_length=120)
     embedding: list[float] | None = None

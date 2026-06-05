@@ -16,6 +16,9 @@ from app.schemas.knowledge import (
     KnowledgeItemListResponse,
     KnowledgeItemResponse,
     KnowledgeItemUpdate,
+    KnowledgeReviewActionRequest,
+    KnowledgeReviewLogListResponse,
+    KnowledgeReviewLogResponse,
     KnowledgeSearchRequest,
     KnowledgeSearchResponse,
     KnowledgeSearchResultResponse,
@@ -85,6 +88,20 @@ def serialize_embedding(record) -> KnowledgeEmbeddingResponse:
         embedding_status=record.embedding_status.value,
         error_message=record.error_message,
         created_at=record.created_at.isoformat(),
+    )
+
+
+def serialize_review_log(log) -> KnowledgeReviewLogResponse:
+    return KnowledgeReviewLogResponse(
+        id=log.id,
+        item_id=log.task_id,
+        action=log.action,
+        reviewer=log.reviewer,
+        input_ref=log.input_ref,
+        output_ref=log.output_ref,
+        result=log.result,
+        error_message=log.error_message,
+        created_at=log.created_at.isoformat(),
     )
 
 
@@ -200,6 +217,147 @@ async def update_item(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         sync_session.commit()
         return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/items/{item_id:uuid}/submit-review", response_model=KnowledgeItemResponse)
+async def submit_item_review(
+    item_id: UUID,
+    request: KnowledgeReviewActionRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            item = service.submit_review(
+                item_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                review_note=request.review_note,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/items/{item_id:uuid}/publish", response_model=KnowledgeItemResponse)
+async def publish_item(
+    item_id: UUID,
+    request: KnowledgeReviewActionRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            item = service.publish_item(
+                item_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                review_note=request.review_note,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/items/{item_id:uuid}/activate-retrieval", response_model=KnowledgeItemResponse)
+async def activate_item_retrieval(
+    item_id: UUID,
+    request: KnowledgeReviewActionRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            item = service.activate_retrieval(
+                item_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                review_note=request.review_note,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/items/{item_id:uuid}/archive", response_model=KnowledgeItemResponse)
+async def archive_item(
+    item_id: UUID,
+    request: KnowledgeReviewActionRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            item = service.archive_item(
+                item_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                review_note=request.review_note,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.post("/items/{item_id:uuid}/block", response_model=KnowledgeItemResponse)
+async def block_item(
+    item_id: UUID,
+    request: KnowledgeReviewActionRequest,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeItemResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            item = service.block_item(
+                item_id,
+                actor=request.actor,
+                actor_role=request.actor_role,
+                review_note=request.review_note,
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_item(item)
+
+    return await async_session.run_sync(run)
+
+
+@router.get("/items/{item_id:uuid}/review-logs", response_model=KnowledgeReviewLogListResponse)
+async def list_item_review_logs(
+    item_id: UUID,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeReviewLogListResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        item = service.get_item(item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="knowledge item 不存在。")
+        logs = [serialize_review_log(log) for log in service.list_review_logs(item_id)]
+        return KnowledgeReviewLogListResponse(items=logs, total=len(logs))
 
     return await async_session.run_sync(run)
 
