@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
+from langgraph.graph import END, StateGraph
+
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.deep_enrichment import DeepEnrichmentAgentOutput, FieldCandidateOutput
 from app.tools.evidence_validator import filter_candidates_with_evidence
@@ -53,6 +55,20 @@ class DeepEnrichmentGraphRunner:
         self.llm_extractor = llm_extractor or NullLLMExtractor()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
+        self.compiled_graph = self._build_graph()
+
+    def _build_graph(self):
+        graph = StateGraph(DeepEnrichmentGraphState)
+        for node_name in DEEP_ENRICHMENT_NODE_SEQUENCE:
+            graph.add_node(node_name, getattr(self, node_name))
+        graph.set_entry_point(DEEP_ENRICHMENT_NODE_SEQUENCE[0])
+        for index, node_name in enumerate(DEEP_ENRICHMENT_NODE_SEQUENCE):
+            next_index = index + 1
+            graph.add_edge(
+                node_name,
+                DEEP_ENRICHMENT_NODE_SEQUENCE[next_index] if next_index < len(DEEP_ENRICHMENT_NODE_SEQUENCE) else END,
+            )
+        return graph.compile()
 
     def mark(self, node_name: str) -> None:
         self.executed_nodes.append(node_name)
@@ -133,8 +149,8 @@ class DeepEnrichmentGraphRunner:
         return state
 
     def run(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphResult:
-        for node_name in DEEP_ENRICHMENT_NODE_SEQUENCE:
-            state = getattr(self, node_name)(state)
+        invoked_state = self.compiled_graph.invoke(state)
+        state = self._state_from_graph_result(invoked_state)
         output = DeepEnrichmentAgentOutput(
             schema_version="phase3.agent.deep_enrichment.v1",
             agent_run_id=state.agent_run_id,
@@ -145,3 +161,24 @@ class DeepEnrichmentGraphRunner:
             audit=state.audit,
         )
         return DeepEnrichmentGraphResult(output=output, executed_nodes=list(self.executed_nodes))
+
+    def _state_from_graph_result(self, result: DeepEnrichmentGraphState | dict[str, Any]) -> DeepEnrichmentGraphState:
+        if isinstance(result, DeepEnrichmentGraphState):
+            return result
+        return DeepEnrichmentGraphState(
+            agent_run_id=result["agent_run_id"],
+            staging_lead_id=result["staging_lead_id"],
+            lead_snapshot=result["lead_snapshot"],
+            missing_fields=list(result.get("missing_fields") or []),
+            requested_actions=list(result.get("requested_actions") or []),
+            keywords=list(result.get("keywords") or []),
+            public_sources=list(result.get("public_sources") or []),
+            page_snapshots=list(result.get("page_snapshots") or []),
+            raw_candidates=list(result.get("raw_candidates") or []),
+            field_candidates=[
+                item if isinstance(item, FieldCandidateOutput) else FieldCandidateOutput(**item)
+                for item in result.get("field_candidates") or []
+            ],
+            recommended_next_action=result.get("recommended_next_action") or "manual_review",
+            audit=dict(result.get("audit") or {}),
+        )

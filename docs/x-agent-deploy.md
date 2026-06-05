@@ -715,6 +715,73 @@ AGENT_SCHEDULER_LOCK_TTL_SECONDS=300
 
 ---
 
+## 5.12 第四阶段 apps/agents 本地小范围运行
+
+第四阶段新增 `apps/agents` 独立 FastAPI 服务，用于 LangGraph Agent 平行迁移和小范围运行。该服务与 `apps/api` 同机同环境运行，但通过 HTTP API 交互，不做本地包注入。
+
+默认端口：
+
+| 服务 | 默认端口 | 职责 |
+|---|---:|---|
+| `apps/api` | `8000` | 业务入口、权限、人工审核、业务表写入、合规硬规则 |
+| `apps/agents` | `8010` | LangGraph Agent API、运行状态、重试和审计摘要 |
+
+`apps/api` 环境变量：
+
+```bash
+AGENTS_BASE_URL=http://127.0.0.1:8010
+AGENTS_API_KEY=change_me_for_local_only
+AGENTS_TIMEOUT_SECONDS=120
+```
+
+`apps/agents` 环境变量：
+
+```bash
+AGENTS_API_KEY=change_me_for_local_only
+```
+
+本地启动示例：
+
+```bash
+cd apps/api
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+```bash
+cd apps/agents
+AGENTS_API_KEY=change_me_for_local_only \
+uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+```
+
+健康检查：
+
+```bash
+curl http://127.0.0.1:8010/health
+```
+
+OpenAPI 文档：
+
+```text
+http://127.0.0.1:8010/docs
+```
+
+鉴权策略：
+
+- 受保护的 Agent Run API 使用 Header：`X-Agents-Api-Key: <AGENTS_API_KEY>`。
+- `apps/api` 与 `apps/agents` 必须配置同一组 `AGENTS_API_KEY`。
+- `/health` 保持公开，用于本机或内网健康检查。
+- 第四阶段不做用户级 JWT / RBAC；用户权限仍由 `apps/api` 控制。
+
+部署边界：
+
+- 第四阶段本地小范围运行不要求 Docker Compose。
+- 不要把 `apps/agents` 暴露到公网。
+- 不要让前端或外部客户端直接调用 `apps/agents`。
+- 不要让 `apps/api` 通过本地 Python 包 import `apps/agents`。
+- `apps/agents` 不写 `customers`、`lead_sources`、`contact_methods`、`staging_leads` 等 core 业务表。
+
+---
+
 ## 6. apps/admin 部署 (Vue3 管理后台)
 
 ### 6.1 项目结构

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>邮件自动回复审核</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div><i class="fa-solid fa-book-open mr-2"></i>知识库</div>
+        <div class="active"><i class="fa-solid fa-envelope mr-2"></i>邮件回复</div>
+        <div><i class="fa-solid fa-robot mr-2"></i>EMAIL_REPLY</div>
+        <div><i class="fa-solid fa-shield-halved mr-2"></i>合规审计</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>邮件自动回复审核台</h2><p>AI 建议和最终发送内容分开存；自动发送只允许白名单、固定 FAQ、首次触达和低风险场景。</p></div>
+        <span class="tag amber"><i class="fa-solid fa-user-check"></i>11 待人工确认</span>
+      </div>
+      <section class="admin-grid-cards">
+        <div class="admin-card"><strong>18</strong><span>待回复邮件</span></div>
+        <div class="admin-card"><strong class="text-emerald-700">7</strong><span>自动发送候选</span></div>
+        <div class="admin-card"><strong class="text-amber-700">11</strong><span>人工确认</span></div>
+        <div class="admin-card"><strong class="text-red-700">3</strong><span>硬拦截</span></div>
+      </section>
+      <section class="editor-grid">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-3"><h3 class="font-black text-lg">待审核队列</h3><span class="tag blue">风险优先</span></div>
+          <table class="table">
+            <thead><tr><th>客户</th><th>主题</th><th>语言</th><th>判断</th><th>原因</th></tr></thead>
+            <tbody>
+              <tr><td>Sibir Motors</td><td>Цена и доставка</td><td>ru</td><td><span class="tag amber">人工</span></td><td>价格/付款/交付</td></tr>
+              <tr><td>AutoCity Vladivostok</td><td>Cooperation</td><td>en</td><td><span class="tag green">自动</span></td><td>白名单 + FAQ</td></tr>
+              <tr><td>Baltic Auto</td><td>Stop contacting</td><td>en</td><td><span class="tag red">阻断</span></td><td>DNC</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-3">当前回复草稿</h3>
+          <div class="reply-editor">
+            <div class="subject-line">Тема: Обсуждение поставок и дальнейшие шаги</div>
+            <div class="body-text">Здравствуйте! Спасибо за ваш запрос. Точная цена, сроки доставки и условия оплаты требуют дополнительной проверки нашей командой...</div>
+          </div>
+          <div class="mail-rule-grid mt-3">
+            <div class="mail-rule"><i class="fa-solid fa-book"></i><strong>3 条知识</strong><span>RU · ready · 0.94</span></div>
+            <div class="mail-rule"><i class="fa-solid fa-ban"></i><strong>硬拦截</strong><span>价格/付款/交付</span></div>
+          </div>
+          <div class="action-row"><div class="btn">编辑</div><div class="btn primary">确认发送</div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

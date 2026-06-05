@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Q&A 与邮件知识库</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div><i class="fa-solid fa-code-branch mr-2"></i>Prompt 治理</div>
+        <div class="active"><i class="fa-solid fa-book-open mr-2"></i>知识库</div>
+        <div><i class="fa-solid fa-envelope mr-2"></i>邮件回复</div>
+        <div><i class="fa-solid fa-chart-line mr-2"></i>质量指标</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>Q&A 与邮件回复知识库</h2><p>统一知识底座，按内容类型、语言、场景、风险等级和 auto_reply_allowed 管理。</p></div>
+        <span class="tag green"><i class="fa-solid fa-vector-square"></i>pgvector ready 96%</span>
+      </div>
+      <div class="admin-tabs"><div class="admin-tab active">全部</div><div class="admin-tab">Q&A</div><div class="admin-tab">邮件模板</div><div class="admin-tab">合规话术</div><div class="admin-tab">待 embedding</div></div>
+      <section class="admin-grid-cards">
+        <div class="admin-card"><strong>128</strong><span>published items</span></div>
+        <div class="admin-card"><strong class="text-emerald-700">123</strong><span>embedding ready</span></div>
+        <div class="admin-card"><strong class="text-blue-700">42</strong><span>auto reply allowed</span></div>
+        <div class="admin-card"><strong class="text-amber-700">9</strong><span>待审核草稿</span></div>
+      </section>
+      <section class="admin-split">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-3"><h3 class="font-black text-lg">知识条目</h3><span class="tag blue">草稿 → 审核 → 发布</span></div>
+          <table class="table">
+            <thead><tr><th>标题</th><th>类型</th><th>语言</th><th>场景</th><th>向量</th><th>自动回复</th></tr></thead>
+            <tbody>
+              <tr><td>合作流程介绍</td><td>qa_entry</td><td>ru</td><td>first_touch</td><td><span class="tag green">ready</span></td><td>yes</td></tr>
+              <tr><td>低承诺价格回复</td><td>email_reply_template</td><td>ru</td><td>faq_reply</td><td><span class="tag green">ready</span></td><td>yes</td></tr>
+              <tr><td>付款条款拦截</td><td>compliance_phrase</td><td>ru</td><td>compliance_review</td><td><span class="tag green">ready</span></td><td>no</td></tr>
+              <tr><td>车型资料说明</td><td>vehicle_product_note</td><td>en</td><td>low_risk_followup</td><td><span class="tag amber">pending</span></td><td>no</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-3">召回测试</h3>
+          <div class="form-card">
+            <div class="field"><label>客户问题</label><div class="control large-control">Could you explain the cooperation process and available hybrid models?</div></div>
+            <div class="field"><label>过滤条件</label><div class="control">language=en · low_risk · embedding_ready</div></div>
+            <div class="field"><label>Top hit</label><div class="control">FAQ-EN-018 · 0.89 <span class="tag green">可引用</span></div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

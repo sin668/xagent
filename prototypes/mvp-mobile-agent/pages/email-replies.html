@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>邮件回复队列</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar">
+      <div><div class="nav-title">邮件回复</div><div class="nav-subtitle">EMAIL_REPLY · 低风险自动发送</div></div>
+      <div class="nav-action"><i class="fa-solid fa-envelope-open-text"></i></div>
+    </div>
+    <main class="content">
+      <section class="metric-row">
+        <div class="metric-card"><strong>18</strong><span>待回复</span></div>
+        <div class="metric-card"><strong class="text-emerald-700">7</strong><span>可自动发</span></div>
+        <div class="metric-card"><strong class="text-amber-700">11</strong><span>需确认</span></div>
+      </section>
+      <div class="chip-row">
+        <div class="chip active">全部</div>
+        <div class="chip">自动发送候选</div>
+        <div class="chip">人工确认</div>
+        <div class="chip">硬拦截</div>
+      </div>
+      <section class="decision-band">
+        <div class="row-between"><div><div class="lead-name">自动发送准入</div><div class="lead-meta">白名单、固定 FAQ、首次触达、低风险场景；DNC 和 D/E 级 100% 阻断</div></div><span class="tag green">规则在线</span></div>
+      </section>
+      <div class="section-head"><h2>待处理邮件</h2><span>按风险排序</span></div>
+      <section class="list">
+        <article class="mail-card">
+          <div class="lead-top"><div><div class="mail-subject">Re: supply cooperation for used cars</div><div class="lead-meta">AutoCity Vladivostok · 英语 · 白名单客户</div></div><span class="tag green">可自动发</span></div>
+          <div class="mail-preview">Thanks for your message. Could you share available Japanese hybrid models and cooperation process?</div>
+          <div class="knowledge-hit mt-2"><div class="knowledge-icon"><i class="fa-solid fa-book"></i></div><div><div class="step-title">命中 FAQ-EN-012</div><div class="step-note">合作流程 · 相似度 0.91 · embedding ready</div></div><span class="tag green">低风险</span></div>
+        </article>
+        <article class="mail-card">
+          <div class="lead-top"><div><div class="mail-subject">Вопрос по цене и доставке</div><div class="lead-meta">Sibir Motors · 俄语 · B 级客户</div></div><span class="tag amber">需确认</span></div>
+          <div class="mail-preview">Просим прислать точную цену, срок доставки и условия оплаты по Toyota Alphard...</div>
+          <div class="knowledge-hit mt-2"><div class="knowledge-icon"><i class="fa-solid fa-shield-halved"></i></div><div><div class="step-title">命中硬拦截</div><div class="step-note">价格、付款、交付周期不得自动承诺</div></div><span class="tag amber">人工</span></div>
+        </article>
+        <article class="mail-card">
+          <div class="lead-top"><div><div class="mail-subject">Please stop contacting us</div><div class="lead-meta">Baltic Auto · 英语 · 客户拒绝</div></div><span class="tag red">阻断</span></div>
+          <div class="mail-preview">Remove our email from your contact list immediately.</div>
+          <div class="knowledge-hit mt-2"><div class="knowledge-icon"><i class="fa-solid fa-ban"></i></div><div><div class="step-title">触发 DNC</div><div class="step-note">不得自动发送，写入勿扰并归档</div></div><span class="tag red">blocked</span></div>
+        </article>
+      </section>
+    </main>
+    <nav class="tabbar">
+      <div class="tab"><i class="fa-solid fa-house"></i><span>首页</span></div>
+      <div class="tab"><i class="fa-solid fa-users"></i><span>客户</span></div>
+      <div class="tab active"><i class="fa-solid fa-envelope"></i><span>邮件</span></div>
+      <div class="tab"><i class="fa-solid fa-robot"></i><span>任务</span></div>
+      <div class="tab"><i class="fa-solid fa-shield-halved"></i><span>合规</span></div>
+    </nav>
+  </div>
+</body>
+</html>

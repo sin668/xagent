@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>邮件回复审核</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="island"></div>
+    <div class="status-bar"><span>9:41</span><span class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-three-quarters"></i></span></div>
+    <div class="nav-bar"><div class="nav-action"><i class="fa-solid fa-chevron-left"></i></div><div><div class="nav-title">回复审核</div><div class="nav-subtitle">AI 建议与最终发送分开审计</div></div><div class="nav-action">RU</div></div>
+    <main class="content no-tab">
+      <section class="panel">
+        <div class="lead-top"><div><div class="lead-name">Sibir Motors</div><div class="lead-meta">B 级 · Novosibirsk · 最近 5 条触达已注入</div></div><span class="tag amber">人工确认</span></div>
+      </section>
+      <div class="section-head"><h2>客户来信</h2><span>俄语 · 0.96</span></div>
+      <section class="mail-card">
+        <div class="mail-subject">Вопрос по цене и доставке</div>
+        <div class="mail-preview">Просим прислать точную цену, срок доставки и условия оплаты по Toyota Alphard. Также интересует возможность регулярных поставок.</div>
+      </section>
+      <div class="section-head"><h2>自动发送判断</h2><span>硬拦截</span></div>
+      <section class="decision-band blocked">
+        <div class="mail-rule-grid">
+          <div class="mail-rule"><i class="fa-solid fa-coins"></i><strong>价格承诺</strong><span>涉及准确价格，不允许自动回复</span></div>
+          <div class="mail-rule"><i class="fa-solid fa-file-contract"></i><strong>付款条件</strong><span>合同/付款必须人工确认</span></div>
+          <div class="mail-rule"><i class="fa-solid fa-truck-fast"></i><strong>交付周期</strong><span>不得承诺物流和清关时间</span></div>
+          <div class="mail-rule"><i class="fa-solid fa-language"></i><strong>同语知识</strong><span>RU 模板命中 3 条</span></div>
+        </div>
+      </section>
+      <div class="section-head"><h2>AI 建议回复</h2><span>email-reply-v1</span></div>
+      <section class="reply-editor">
+        <div class="subject-line">Тема: Обсуждение поставок и дальнейшие шаги</div>
+        <div class="body-text">Здравствуйте! Спасибо за ваш запрос. Мы можем обсудить возможные модели и общий процесс сотрудничества. Точная цена, сроки доставки и условия оплаты требуют дополнительной проверки нашей командой, поэтому мы подготовим информацию после уточнения деталей.</div>
+      </section>
+      <div class="section-head"><h2>知识证据</h2><span>3 hits</span></div>
+      <section class="panel">
+        <div class="knowledge-hit"><div class="knowledge-icon"><i class="fa-solid fa-envelope"></i></div><div><div class="step-title">MAIL-RU-LOW-004</div><div class="step-note">低承诺回复模板 · 0.88</div></div><span class="tag green">ready</span></div>
+        <div class="knowledge-hit"><div class="knowledge-icon"><i class="fa-solid fa-scale-balanced"></i></div><div><div class="step-title">COMPLIANCE-RU-009</div><div class="step-note">价格/付款必须人工确认 · 0.94</div></div><span class="tag amber">约束</span></div>
+      </section>
+      <div class="action-row pb-4"><div class="btn">编辑正文</div><div class="btn primary">人工确认发送</div></div>
+    </main>
+  </div>
+</body>
+</html>

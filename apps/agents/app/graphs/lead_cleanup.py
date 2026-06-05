@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
+from langgraph.graph import END, StateGraph
+
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.lead_cleanup import CleanupAgentOutput, CleanupSuggestionOutput
 from app.tools.duplicate_detector import DuplicateDetector
@@ -49,6 +51,20 @@ class LeadCleanupGraphRunner:
         self.duplicate_detector = duplicate_detector or DuplicateDetector()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
+        self.compiled_graph = self._build_graph()
+
+    def _build_graph(self):
+        graph = StateGraph(LeadCleanupGraphState)
+        for node_name in LEAD_CLEANUP_NODE_SEQUENCE:
+            graph.add_node(node_name, getattr(self, node_name))
+        graph.set_entry_point(LEAD_CLEANUP_NODE_SEQUENCE[0])
+        for index, node_name in enumerate(LEAD_CLEANUP_NODE_SEQUENCE):
+            next_index = index + 1
+            graph.add_edge(
+                node_name,
+                LEAD_CLEANUP_NODE_SEQUENCE[next_index] if next_index < len(LEAD_CLEANUP_NODE_SEQUENCE) else END,
+            )
+        return graph.compile()
 
     def mark(self, node_name: str) -> None:
         self.executed_nodes.append(node_name)
@@ -146,8 +162,8 @@ class LeadCleanupGraphRunner:
         return state
 
     def run(self, state: LeadCleanupGraphState) -> LeadCleanupGraphResult:
-        for node_name in LEAD_CLEANUP_NODE_SEQUENCE:
-            state = getattr(self, node_name)(state)
+        invoked_state = self.compiled_graph.invoke(state)
+        state = self._state_from_graph_result(invoked_state)
         output = CleanupAgentOutput(
             schema_version="phase3.agent.lead_cleanup.v1",
             cleanup_run_id=state.cleanup_run_id,
@@ -156,3 +172,20 @@ class LeadCleanupGraphRunner:
             audit=state.audit,
         )
         return LeadCleanupGraphResult(output=output, executed_nodes=list(self.executed_nodes))
+
+    def _state_from_graph_result(self, result: LeadCleanupGraphState | dict[str, Any]) -> LeadCleanupGraphState:
+        if isinstance(result, LeadCleanupGraphState):
+            return result
+        return LeadCleanupGraphState(
+            cleanup_run_id=result["cleanup_run_id"],
+            leads=list(result.get("leads") or []),
+            requested_actions=list(result.get("requested_actions") or []),
+            target_leads=list(result.get("target_leads") or []),
+            raw_suggestions=list(result.get("raw_suggestions") or []),
+            suggestions=[
+                item if isinstance(item, CleanupSuggestionOutput) else CleanupSuggestionOutput(**item)
+                for item in result.get("suggestions") or []
+            ],
+            blocked_items=list(result.get("blocked_items") or []),
+            audit=dict(result.get("audit") or {}),
+        )

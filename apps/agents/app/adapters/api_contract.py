@@ -1,6 +1,12 @@
 class ApiContractBoundary:
-    allowed_output_tables = ("lead_enrichment_field_candidates", "lead_cleanup_suggestions")
-    forbidden_core_tables = ("customers", "lead_sources", "contact_methods")
+    allowed_output_tables = (
+        "lead_enrichment_field_candidates",
+        "lead_cleanup_suggestions",
+        "shadow_source_candidates",
+        "shadow_staging_lead_candidates",
+        "shadow_lead_grading_suggestions",
+    )
+    forbidden_core_tables = ("customers", "lead_sources", "contact_methods", "lead_source_candidates", "staging_leads")
 
     def validate_output_table(self, table_name: str) -> str:
         normalized = table_name.strip()

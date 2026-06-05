@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompt 入库治理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/prototype.css">
+</head>
+<body>
+  <div class="admin-body">
+    <aside class="sidebar">
+      <h1>XAgent Ops</h1>
+      <nav class="side-nav">
+        <div><i class="fa-solid fa-chart-pie mr-2"></i>运行总览</div>
+        <div class="active"><i class="fa-solid fa-code-branch mr-2"></i>Prompt 治理</div>
+        <div><i class="fa-solid fa-book-open mr-2"></i>知识库</div>
+        <div><i class="fa-solid fa-envelope mr-2"></i>邮件回复</div>
+        <div><i class="fa-solid fa-shield-halved mr-2"></i>合规审计</div>
+      </nav>
+    </aside>
+    <main class="admin-main">
+      <div class="admin-top">
+        <div><h2>Prompt 全量入库与版本治理</h2><p>文件保留为基线，运行时读取数据库 active default；草稿编辑、发布新版本、回滚全审计。</p></div>
+        <span class="tag green"><i class="fa-solid fa-check"></i>覆盖率 100%</span>
+      </div>
+      <section class="admin-grid-cards">
+        <div class="admin-card"><strong>7</strong><span>已入库 Prompt</span></div>
+        <div class="admin-card"><strong class="text-blue-700">4</strong><span>active default</span></div>
+        <div class="admin-card"><strong class="text-amber-700">2</strong><span>草稿待校验</span></div>
+        <div class="admin-card"><strong class="text-emerald-700">0</strong><span>schema error</span></div>
+      </section>
+      <section class="editor-grid">
+        <div class="admin-card">
+          <div class="flex justify-between items-center mb-3"><h3 class="font-black text-lg">Prompt 版本</h3><span class="tag blue">发布生成新版本</span></div>
+          <table class="table">
+            <thead><tr><th>名称</th><th>任务</th><th>版本</th><th>状态</th><th>来源 hash</th><th>默认</th></tr></thead>
+            <tbody>
+              <tr><td>lead-extraction</td><td>LEAD_EXTRACTION</td><td>v1.4</td><td><span class="tag green">active</span></td><td>8fd31a</td><td>yes</td></tr>
+              <tr><td>lead-grading</td><td>LEAD_GRADING</td><td>v1.3</td><td><span class="tag green">active</span></td><td>21ac7e</td><td>yes</td></tr>
+              <tr><td>email-reply</td><td>EMAIL_REPLY_DRAFT</td><td>v0.2</td><td><span class="tag amber">draft</span></td><td>new</td><td>no</td></tr>
+              <tr><td>auto-send-check</td><td>EMAIL_REPLY_AUTO_SEND_CHECK</td><td>v0.1</td><td><span class="tag blue">review</span></td><td>new</td><td>no</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-card">
+          <h3 class="font-black text-lg mb-3">草稿校验</h3>
+          <div class="form-card">
+            <div class="field"><label>必填变量</label><div class="control">customer_context, message_body, knowledge_hits <span class="tag green">通过</span></div></div>
+            <div class="field"><label>风险提示</label><div class="control">价格/付款/合同/交付硬拦截 <span class="tag green">通过</span></div></div>
+            <div class="field"><label>发布权限</label><div class="control">admin / tech_admin <span class="tag blue">受控</span></div></div>
+          </div>
+        </div>
+      </section>
+      <section class="admin-card mt-4">
+        <div class="flex justify-between items-center mb-3"><h3 class="font-black text-lg">EMAIL_REPLY 输出 Schema</h3><span class="tag amber">draft v0.2</span></div>
+        <div class="schema-panel">{
+  "schema_version": "email-reply-v1",
+  "detected_language": "ru|en|unknown",
+  "suggested_subject": "string",
+  "suggested_body": "string",
+  "knowledge_hits": [],
+  "auto_send_allowed": false,
+  "manual_review_required": true,
+  "risk_flags": []
+}</div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

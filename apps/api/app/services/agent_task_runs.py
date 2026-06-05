@@ -7,6 +7,22 @@ from app.services.agent_retries import AgentRetryPolicy
 
 class AgentTaskRunService:
     MAX_RETRY_COUNT = 3
+    SENSITIVE_SUMMARY_KEYS = {
+        "api_key",
+        "authorization",
+        "body",
+        "content",
+        "cookie",
+        "html",
+        "input_json",
+        "page_text",
+        "password",
+        "raw_text",
+        "secret",
+        "source_text",
+        "text",
+        "token",
+    }
 
     @staticmethod
     def _now() -> datetime:
@@ -93,6 +109,69 @@ class AgentTaskRunService:
         return next_run
 
     @classmethod
+    def succeed_with_external_agent_summary(
+        cls,
+        task_run: dict,
+        *,
+        output_summary_json: dict,
+        external_agent_response: dict,
+        agents_base_url: str,
+    ) -> dict:
+        summary = cls.merge_external_agent_summary(
+            output_summary_json,
+            external_agent_response=external_agent_response,
+            agents_base_url=agents_base_url,
+        )
+        return cls.succeed(task_run, output_summary_json=summary)
+
+    @classmethod
+    def fail_with_external_agent_summary(
+        cls,
+        task_run: dict,
+        *,
+        error_message: str,
+        error: dict | None,
+        external_agent_response: dict | None,
+        agents_base_url: str,
+    ) -> dict:
+        failed = cls.fail(task_run, error_message=error_message, error=error)
+        failed["output_summary_json"] = cls.merge_external_agent_summary(
+            failed.get("output_summary_json") or {},
+            external_agent_response=external_agent_response,
+            agents_base_url=agents_base_url,
+        )
+        return failed
+
+    @classmethod
+    def merge_external_agent_summary(
+        cls,
+        output_summary_json: dict | None,
+        *,
+        external_agent_response: dict | None,
+        agents_base_url: str,
+    ) -> dict:
+        summary = cls._redact_summary(output_summary_json or {})
+        if not external_agent_response:
+            return summary
+
+        summary.update(
+            {
+                "external_agent_run_id": external_agent_response.get("agent_service_run_id"),
+                "external_agent_status": external_agent_response.get("status"),
+                "external_agent_type": external_agent_response.get("agent_type"),
+                "external_agent_mode": external_agent_response.get("agent_mode"),
+                "agents_base_url": agents_base_url,
+            }
+        )
+        if isinstance(external_agent_response.get("error"), dict):
+            summary["external_agent_error"] = cls._redact_summary(external_agent_response["error"])
+
+        audit = external_agent_response.get("audit")
+        if isinstance(audit, dict):
+            summary["external_agent_audit"] = cls._summarize_external_audit(audit)
+        return summary
+
+    @classmethod
     def mark_retry_pending(cls, task_run: dict) -> dict:
         if task_run.get("status") != AgentTaskRunStatus.FAILED:
             raise ValueError("只有 failed 状态可以进入 retry_pending")
@@ -106,3 +185,42 @@ class AgentTaskRunService:
         next_run["finished_at"] = None
         next_run["updated_at"] = now
         return next_run
+
+    @classmethod
+    def _summarize_external_audit(cls, audit: dict) -> dict:
+        executed_nodes = audit.get("executed_nodes") if isinstance(audit.get("executed_nodes"), list) else []
+        source_urls = audit.get("source_urls") if isinstance(audit.get("source_urls"), list) else []
+        summary = {
+            "writes_core_tables": audit.get("writes_core_tables"),
+            "executed_node_count": len(executed_nodes),
+            "failed_node": audit.get("failed_node"),
+            "risk_flags": cls._unique_strings(audit.get("risk_flags") if isinstance(audit.get("risk_flags"), list) else []),
+            "source_url_count": len(source_urls),
+        }
+        for key, value in audit.items():
+            if key not in {"writes_core_tables", "executed_nodes", "failed_node", "risk_flags", "source_urls"}:
+                summary[key] = "[REDACTED]" if str(key).lower() in cls.SENSITIVE_SUMMARY_KEYS else cls._redact_summary(value)
+        return summary
+
+    @classmethod
+    def _redact_summary(cls, value):
+        if isinstance(value, dict):
+            return {
+                str(key): "[REDACTED]" if str(key).lower() in cls.SENSITIVE_SUMMARY_KEYS else cls._redact_summary(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._redact_summary(item) for item in value]
+        return value
+
+    @staticmethod
+    def _unique_strings(values: list) -> list[str]:
+        result: list[str] = []
+        seen: set[str] = set()
+        for item in values:
+            value = str(item)
+            if value in seen:
+                continue
+            seen.add(value)
+            result.append(value)
+        return result

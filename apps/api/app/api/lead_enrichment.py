@@ -18,7 +18,7 @@ from app.schemas.lead_enrichment import (
     LeadEnrichmentRunResponse,
     ManualEnrichmentCreate,
 )
-from app.services.lead_enrichment import LeadEnrichmentService
+from app.services.lead_enrichment import LeadEnrichmentService, select_deep_enrichment_runtime
 from app.settings import settings
 
 
@@ -69,6 +69,13 @@ async def create_lead_enrichment_run(
                 request=request,
                 daily_limit=settings.lead_enrichment_daily_quota_per_lead,
             )
+            runtime = select_deep_enrichment_runtime(settings)
+            if runtime is not None:
+                service.run_deep_enrichment_agent(
+                    enrichment_run,
+                    runtime=runtime,
+                    agents_base_url=settings.agents_base_url,
+                )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         sync_session.commit()

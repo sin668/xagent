@@ -25,12 +25,20 @@ from app.schemas.lead_enrichment_field_candidate import (
 )
 from app.services.agent_task_runs import AgentTaskRunService
 from app.services.audit_events import Phase3AuditEventService
+from app.agents.http_runtime import HttpAgentRuntime
+from app.settings import Settings, settings
 
 
 @dataclass(frozen=True)
 class LeadEnrichmentQuota:
     daily_limit: int
     used_today: int
+
+
+def select_deep_enrichment_runtime(config: Settings = settings):
+    if not config.agent_deep_enrichment_http_active_enabled or not config.http_agent_runtime_enabled:
+        return None
+    return HttpAgentRuntime(settings=config)
 
 
 class LeadEnrichmentService:
@@ -206,6 +214,7 @@ class LeadEnrichmentService:
         *,
         runtime,
         now: datetime | None = None,
+        agents_base_url: str | None = None,
     ) -> AgentTaskRun:
         timestamp = now or self._now()
         task_payload = AgentTaskRunService.build_initial_payload(
@@ -227,13 +236,21 @@ class LeadEnrichmentService:
         result.status = LeadEnrichmentResultStatus.RUNNING
         result.updated_at = timestamp
 
+        external_agent_response = None
         try:
-            output = runtime.run_deep_enrichment(
-                agent_run_id=task_run.id,
-                staging_lead_id=result.staging_lead_id,
-                lead_snapshot=result.input_snapshot_json or {},
-                missing_fields=result.missing_fields or [],
-            )
+            runtime_kwargs = {
+                "agent_run_id": task_run.id,
+                "staging_lead_id": result.staging_lead_id,
+                "lead_snapshot": result.input_snapshot_json or {},
+                "missing_fields": result.missing_fields or [],
+            }
+            if hasattr(runtime, "run_deep_enrichment_response"):
+                external_agent_response = runtime.run_deep_enrichment_response(**runtime_kwargs)
+                output = external_agent_response.get("output") if isinstance(external_agent_response, dict) else None
+            else:
+                output = runtime.run_deep_enrichment(**runtime_kwargs)
+            if not isinstance(output, dict):
+                raise ValueError("Deep Enrichment Agent 输出缺少结构化 output。")
             if output.get("schema_version") != "phase3.agent.deep_enrichment.v1":
                 raise ValueError("Deep Enrichment Agent 输出 schema_version 不正确。")
             audit = output.get("audit") or {}
@@ -275,13 +292,23 @@ class LeadEnrichmentService:
             result.missing_fields = output.get("missing_fields") or []
             result.recommended_action = output.get("recommended_next_action") or "manual_review"
             result.updated_at = timestamp
-            task_run.status = AgentTaskRunStatus.SUCCEEDED
-            task_run.output_summary_json = {
+            success_summary = {
                 "schema_version": output["schema_version"],
                 "field_candidate_count": len(candidates),
                 "evidence_links": evidence_links,
                 "writes_core_tables": False,
             }
+            if external_agent_response is not None:
+                task_payload = AgentTaskRunService.succeed_with_external_agent_summary(
+                    self._task_to_payload(task_run),
+                    output_summary_json=success_summary,
+                    external_agent_response=external_agent_response,
+                    agents_base_url=agents_base_url or getattr(getattr(runtime, "settings", None), "agents_base_url", ""),
+                )
+                self._apply_task_payload(task_run, task_payload)
+            else:
+                task_run.status = AgentTaskRunStatus.SUCCEEDED
+                task_run.output_summary_json = success_summary
             task_run.error_message = None
             task_run.finished_at = timestamp
             task_run.updated_at = timestamp
@@ -292,17 +319,55 @@ class LeadEnrichmentService:
                 "agent_task_run_id": str(task_run.id),
             }
             result.updated_at = timestamp
-            task_run.status = AgentTaskRunStatus.FAILED
-            task_run.error_message = str(exc)
-            task_run.output_summary_json = {
-                "error": str(exc),
-                "writes_core_tables": False,
-            }
+            if external_agent_response is not None:
+                task_payload = AgentTaskRunService.fail_with_external_agent_summary(
+                    self._task_to_payload(task_run),
+                    error_message=str(exc),
+                    error={"type": "schema_validation_error", "message": str(exc), "retryable": False},
+                    external_agent_response=external_agent_response,
+                    agents_base_url=agents_base_url or getattr(getattr(runtime, "settings", None), "agents_base_url", ""),
+                )
+                self._apply_task_payload(task_run, task_payload)
+            else:
+                task_run.status = AgentTaskRunStatus.FAILED
+                task_run.error_message = str(exc)
+                task_run.output_summary_json = {
+                    "error": str(exc),
+                    "writes_core_tables": False,
+                }
             task_run.finished_at = timestamp
             task_run.updated_at = timestamp
 
         self.session.flush()
         return task_run
+
+    @staticmethod
+    def _task_to_payload(task_run: AgentTaskRun) -> dict:
+        return {
+            "task_type": task_run.task_type,
+            "status": task_run.status,
+            "trigger_source": task_run.trigger_source,
+            "input_json": task_run.input_json,
+            "output_summary_json": task_run.output_summary_json,
+            "llm_provider": task_run.llm_provider,
+            "llm_model": task_run.llm_model,
+            "prompt_template_id": task_run.prompt_template_id,
+            "prompt_version": task_run.prompt_version,
+            "token_usage_json": task_run.token_usage_json,
+            "latency_ms": task_run.latency_ms,
+            "error_message": task_run.error_message,
+            "retry_count": task_run.retry_count,
+            "started_at": task_run.started_at,
+            "finished_at": task_run.finished_at,
+            "created_at": task_run.created_at,
+            "updated_at": task_run.updated_at,
+        }
+
+    @staticmethod
+    def _apply_task_payload(task_run: AgentTaskRun, payload: dict) -> None:
+        for key, value in payload.items():
+            if hasattr(task_run, key):
+                setattr(task_run, key, value)
 
     @staticmethod
     def _average_confidence(values: list[float | None]) -> float | None:
@@ -488,6 +553,7 @@ class LeadEnrichmentService:
         now: datetime | None = None,
     ) -> LeadEnrichmentFieldCandidate:
         accepted = self.accept_field_candidate(candidate, request=request, now=now)
+        self.apply_accepted_field_candidate_to_staging_lead(accepted, now=accepted.accepted_at or now)
         Phase3AuditEventService.record_event(
             self.session,
             event_name="lead_enrichment_field_accepted",
@@ -506,6 +572,25 @@ class LeadEnrichmentService:
             occurred_at=accepted.accepted_at,
         )
         return accepted
+
+    def apply_accepted_field_candidate_to_staging_lead(
+        self,
+        candidate: LeadEnrichmentFieldCandidate,
+        *,
+        now: datetime | None = None,
+    ) -> StagingLead | None:
+        lead = self.session.get(StagingLead, candidate.staging_lead_id)
+        if lead is None or not hasattr(lead, candidate.field_name):
+            return lead
+
+        setattr(lead, candidate.field_name, candidate.candidate_value)
+        lead.missing_fields = [
+            field_name
+            for field_name in (lead.missing_fields or [])
+            if field_name != candidate.field_name
+        ]
+        lead.updated_at = now or self._now()
+        return lead
 
     def reject_field_candidate_with_audit(
         self,

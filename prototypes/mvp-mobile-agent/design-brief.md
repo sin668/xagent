@@ -1,7 +1,7 @@
-# 第一阶段小范围运行原型设计说明
+# 海外车辆采购 AI 获客系统原型设计说明
 
 创建日期：2026-05-29
-更新日期：2026-06-02
+更新日期：2026-06-05
 
 ## 0. 第二阶段原型更新说明
 
@@ -11,6 +11,15 @@
 - `docs/product/2026-06-02-海外车辆采购AI获客系统-第二阶段小范围运行方案与产品技术设计.md`
 
 第二阶段原型重点从“线索复核和小范围运行”扩展到“真实 LLM 连接、Source Discovery Agent 自动新增来源、来源候选审核、LEAD_EXTRACTION 自动消费和任务审计治理”。
+
+## 0.1 第五阶段原型更新说明
+
+本次更新基于：
+
+- `docs/brainstorm/brainstorming-session-2026-06-05-第五阶段小范围运行-Prompt与邮件自动回复知识库.md`
+- `docs/product/2026-06-05-海外车辆采购AI获客系统-第五阶段小范围运行方案与产品技术设计.md`
+
+第五阶段原型重点从“客户承接和 Agent 服务化”扩展到“Prompt 全量入库治理、邮件自动回复内容管理、Q&A 后台知识库、pgvector 语义召回、EMAIL_REPLY Agent 和真实邮件发送受控闭环”。
 
 ## 1. 用户体验分析
 
@@ -48,6 +57,15 @@
 4. 跟进记录页服务客服和销售的日常工作，记录人工触达、客户反馈、下一步动作和勿扰/合规状态。
 5. 客户触达仍然是人工确认模式，系统可以生成草稿和记录历史，但不得自动发送私信、邮件或社媒消息。
 
+第五阶段新增核心交互逻辑：
+
+1. 邮件回复队列展示待回复邮件、自动发送候选、人工确认和硬拦截，不把自动发送隐藏在后台任务里。
+2. 邮件回复审核详情同时展示客户来信、AI 建议、知识命中、自动发送判断和硬拦截原因。
+3. 白名单客户、固定 FAQ、首次邮件触达和低风险场景允许自动发送，但 DNC、D/E 级、价格/付款/合同/交付等硬风险必须转人工。
+4. Prompt 入库治理后台展示来源文件 hash、版本、草稿校验、发布新版本和回滚，不直接覆盖线上 active 版本。
+5. Q&A 与邮件回复内容共用知识库底座，按内容类型、语言、场景、风险等级和 `auto_reply_allowed` 管理。
+6. 邮件质量看板同时展示 Prompt 入库覆盖率、embedding ready、AI 生成成功率、人工采纳率、DNC/D/E 阻断和风险事件。
+
 ## 2. 产品界面规划
 
 移动端页面：
@@ -83,6 +101,18 @@
 
 - `admin-phase2.html`：第二阶段运行看板，展示来源新增、自动抽取、High 审核积压、LLM 成本、任务流和暂停阈值。
 - `admin-llm.html`：LLM 与 Prompt 治理，展示 Provider 健康状态、prompt template 版本、fallback 边界和 Source Discovery 输出 schema。
+
+第五阶段新增移动端页面：
+
+- `email-replies.html`：邮件回复队列，展示待回复邮件、自动发送候选、人工确认和硬拦截。
+- `email-reply-detail.html`：邮件回复审核详情，展示客户来信、AI 建议回复、知识命中、自动发送判断、硬拦截和人工确认发送。
+
+第五阶段新增管理后台页面：
+
+- `admin-prompt-governance.html`：Prompt 入库治理，展示文件 Prompt 入库覆盖率、版本、来源 hash、草稿校验和 EMAIL_REPLY 输出 schema。
+- `admin-knowledge-base.html`：Q&A 与邮件回复知识库，展示内容类型、语言、业务场景、embedding 状态、自动回复开关和召回测试。
+- `admin-email-replies.html`：邮件自动回复审核台，展示待回复邮件、自动发送候选、人工确认、硬拦截和回复草稿。
+- `admin-email-quality.html`：第五阶段质量指标和 Go/No-Go 看板，展示 Prompt、embedding、Agent、风险和业务观察指标。
 
 ## 3. 高保真 UI 方向
 
@@ -124,6 +154,48 @@
 - 客户详情读取单个客户完整档案，包括从 `staging_leads` 晋级时保存的来源证据、AI 摘要和缺失字段补全结果。
 - 跟进记录读取并写入 `outreach_records` 或后续 CRM follow-up 表；记录人工发送状态时必须再次检查勿扰状态。
 - C 级客户在报价、合同或实质交易前必须显示合规复核状态，不能只依赖客户等级标签。
+
+第五阶段页面落地建议：
+
+- 移动端 `email-replies.html` 可拆为 uni-app `pages/email-replies/index.vue`，读取 `email_messages` 待回复队列和 `email_reply_drafts` 摘要。
+- 移动端 `email-reply-detail.html` 可拆为 uni-app `pages/email-replies/detail.vue`，聚合客户上下文、来信、AI 建议、知识命中、自动发送判断和人工确认动作。
+- 后台 `admin-prompt-governance.html` 可拆为 Vue 管理后台 Prompt 入库治理页面，对接 `llm_prompt_templates` 真实 API。
+- 后台 `admin-knowledge-base.html` 可拆为 Vue 管理后台知识库页面，对接 `knowledge_collections`、`knowledge_items`、`knowledge_embeddings` 和召回测试 API。
+- 后台 `admin-email-replies.html` 可拆为 Vue 管理后台邮件回复审核页，对接待回复邮件、AI 回复草稿、发送确认和硬拦截 API。
+- 后台 `admin-email-quality.html` 可拆为 Vue 管理后台第五阶段质量看板页面，对接知识命中、采纳率、退信率、风险拦截和 Go/No-Go 指标 API。
+- `EMAIL_REPLY` Agent 页面和邮件发送动作必须通过 `apps/api` 内部接口，不得让 `apps/agents` 直接写业务表。
+- 自动发送按钮在真实开发中必须经过后端准入和硬拦截结果，不允许前端仅凭页面状态直接发送。
+
+## 7. 第五阶段新增页面双轮评审记录
+
+### 第一轮评审：需求覆盖与信息架构
+
+结论：通过。
+
+发现项：
+
+- 原型已覆盖第五阶段新增移动端邮件回复队列和邮件回复审核详情。
+- 原型已覆盖后台 Prompt 入库治理、Q&A 与邮件回复知识库、邮件回复审核台和质量指标页面。
+- `index.html` 继续使用 iframe 平铺展示，并已从第二阶段说明升级为第五阶段说明。
+
+修正结果：
+
+- 已补充第五阶段新增页面到产品界面规划和开发落地建议。
+- 已在移动端和后台页面显式表达自动发送只限白名单、固定 FAQ、首次触达和低风险场景。
+
+### 第二轮评审：合规、视觉与开发可落地性
+
+结论：通过。
+
+发现项：
+
+- DNC、D/E 级、价格/付款/合同/交付周期等硬拦截在页面中有可见表达。
+- AI 建议和最终发送内容分开审计的业务语义已体现在邮件审核页。
+- 新增页面沿用 iPhone 17 Pro 设备框、状态栏、底部 Tab Bar、FontAwesome 图标和当前管理后台风格，视觉连续性良好。
+
+修正结果：
+
+- 已在第五阶段开发落地建议中明确真实 API、PostgreSQL、`apps/api` 业务权威和 `apps/agents` 不直接写业务表的实现边界。
 
 ## 5. 第二阶段双轮评审记录
 

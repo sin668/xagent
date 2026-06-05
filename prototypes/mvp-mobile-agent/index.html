@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>第二阶段小范围运行 · 移动智能体与管理后台原型</title>
+  <title>第五阶段小范围运行 · 移动智能体与管理后台原型</title>
   <link rel="stylesheet" href="css/prototype.css">
 </head>
 <body class="prototype-index">
   <header class="index-hero">
     <div>
-      <h1>海外车辆采购 AI 获客系统 · 第二阶段小范围运行原型</h1>
-      <p>面向线索运营、客服、销售、合规和管理员的高保真原型。第二阶段聚焦真实 LLM 连接、Source Discovery Agent 自动新增来源、移动端来源审核、LEAD_EXTRACTION 自动消费、PostgreSQL 审计和风险治理闭环。</p>
+      <h1>海外车辆采购 AI 获客系统 · 第五阶段小范围运行原型</h1>
+      <p>面向线索运营、客服、销售、合规和管理员的高保真原型。第五阶段聚焦 Prompt 全量入库治理、邮件自动回复内容、Q&A 知识库、pgvector 语义召回、EMAIL_REPLY Agent 和真实邮件发送受控闭环。</p>
     </div>
     <div class="index-badge">iPhone 17 Pro · iframe 平铺 · 可拆分开发</div>
   </header>
@@ -61,39 +61,63 @@
       <div class="phone-frame"><iframe src="pages/outreach.html"></iframe></div>
     </section>
     <section class="screen-card">
-      <div class="screen-title">12 车源匹配 <span>inventory.html</span></div>
+      <div class="screen-title">12 邮件回复队列 <span>email-replies.html</span></div>
+      <div class="phone-frame"><iframe src="pages/email-replies.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">13 邮件回复审核 <span>email-reply-detail.html</span></div>
+      <div class="phone-frame"><iframe src="pages/email-reply-detail.html"></iframe></div>
+    </section>
+    <section class="screen-card">
+      <div class="screen-title">14 车源匹配 <span>inventory.html</span></div>
       <div class="phone-frame"><iframe src="pages/inventory.html"></iframe></div>
     </section>
     <section class="screen-card">
-      <div class="screen-title">13 数据洞察 <span>analytics.html</span></div>
+      <div class="screen-title">15 数据洞察 <span>analytics.html</span></div>
       <div class="phone-frame"><iframe src="pages/analytics.html"></iframe></div>
     </section>
     <section class="screen-card">
-      <div class="screen-title">14 设置与合规 <span>settings.html</span></div>
+      <div class="screen-title">16 设置与合规 <span>settings.html</span></div>
       <div class="phone-frame"><iframe src="pages/settings.html"></iframe></div>
     </section>
   </main>
 
   <section class="admin-grid">
     <div class="screen-card">
-      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">15 运行总览 <span>admin-dashboard.html</span></div>
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">17 运行总览 <span>admin-dashboard.html</span></div>
       <div class="desktop-frame"><iframe src="pages/admin-dashboard.html"></iframe></div>
     </div>
     <div class="screen-card">
-      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">16 渠道风险与计划 <span>admin-risk.html</span></div>
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">18 渠道风险与计划 <span>admin-risk.html</span></div>
       <div class="desktop-frame"><iframe src="pages/admin-risk.html"></iframe></div>
     </div>
     <div class="screen-card">
-      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">17 入库、知识库与审计 <span>admin-sync.html</span></div>
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">19 入库、知识库与审计 <span>admin-sync.html</span></div>
       <div class="desktop-frame"><iframe src="pages/admin-sync.html"></iframe></div>
     </div>
     <div class="screen-card">
-      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">18 第二阶段运行看板 <span>admin-phase2.html</span></div>
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">20 第二阶段运行看板 <span>admin-phase2.html</span></div>
       <div class="desktop-frame"><iframe src="pages/admin-phase2.html"></iframe></div>
     </div>
     <div class="screen-card">
-      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">19 LLM 与 Prompt 治理 <span>admin-llm.html</span></div>
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">21 LLM 与 Prompt 治理 <span>admin-llm.html</span></div>
       <div class="desktop-frame"><iframe src="pages/admin-llm.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">22 Prompt 入库治理 <span>admin-prompt-governance.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-prompt-governance.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">23 Q&A 与邮件知识库 <span>admin-knowledge-base.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-knowledge-base.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">24 邮件回复审核台 <span>admin-email-replies.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-email-replies.html"></iframe></div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-title" style="width:min(1180px, calc(100vw - 84px));">25 邮件质量指标 <span>admin-email-quality.html</span></div>
+      <div class="desktop-frame"><iframe src="pages/admin-email-quality.html"></iframe></div>
     </div>
   </section>
 </body>

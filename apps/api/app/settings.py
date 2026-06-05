@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -74,6 +74,33 @@ class Settings(BaseSettings):
             "AGENT_RETRY_WORKER_INTERVAL_SECONDS",
         ),
     )
+    agents_base_url: str = Field(
+        default="http://localhost:8010",
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENTS_BASE_URL", "AGENTS_BASE_URL"),
+    )
+    agents_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENTS_API_KEY", "AGENTS_API_KEY"),
+    )
+    agents_timeout_seconds: int = Field(
+        default=120,
+        ge=1,
+        validation_alias=AliasChoices("VEHICLE_LEADS_AGENTS_TIMEOUT_SECONDS", "AGENTS_TIMEOUT_SECONDS"),
+    )
+    agent_deep_enrichment_http_active_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_AGENT_DEEP_ENRICHMENT_HTTP_ACTIVE_ENABLED",
+            "AGENT_DEEP_ENRICHMENT_HTTP_ACTIVE_ENABLED",
+        ),
+    )
+    agent_lead_cleanup_http_active_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_AGENT_LEAD_CLEANUP_HTTP_ACTIVE_ENABLED",
+            "AGENT_LEAD_CLEANUP_HTTP_ACTIVE_ENABLED",
+        ),
+    )
     lead_enrichment_daily_quota_per_lead: int = Field(
         default=2,
         validation_alias=AliasChoices(
@@ -134,6 +161,17 @@ class Settings(BaseSettings):
             if origin not in merged:
                 merged.append(origin)
         return merged
+
+    @property
+    def http_agent_runtime_enabled(self) -> bool:
+        return bool(self.agents_api_key and self.agents_api_key.get_secret_value().strip())
+
+    @field_validator("agents_api_key", mode="before")
+    @classmethod
+    def blank_agents_api_key_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 

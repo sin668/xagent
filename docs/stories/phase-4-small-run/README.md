@@ -19,6 +19,16 @@
 - 必须执行必要的前后端或服务间真实联调，不允许只验证 seed 静态页面。
 - 所有过程、结果、注解和文档使用中文。
 
+第四阶段本地运行约定：
+
+- `apps/api` 默认使用 `8000`。
+- `apps/agents` 默认使用 `8010`。
+- `apps/api` 调用 `apps/agents` 时配置 `AGENTS_BASE_URL=http://127.0.0.1:8010`。
+- `apps/api` 和 `apps/agents` 使用同一组 `AGENTS_API_KEY`，受保护 Agent Run API 通过 `X-Agents-Api-Key` header 校验。
+- `/health` 保持公开，用于本机健康检查。
+- 第四阶段本地小范围运行不要求 Docker Compose；默认两个服务独立进程运行。
+- `apps/agents` 不得暴露公网，不得被前端或外部客户端直接调用。
+
 通用风控边界：
 
 - `apps/api` 中现有 LLM Agent 保持不变，不在第四阶段直接替换生产入口。
@@ -112,6 +122,16 @@
 4. 再执行 P4-E4，完成 Deep Enrichment 和 Lead Cleanup 的 HTTP active_run。
 5. 再执行 P4-E5 和 P4-E6，分别完成 Source Discovery 与 Lead Extraction/Grading 的 shadow 对照。
 6. 最后执行 P4-E7，汇总指标、失败案例和下一阶段 Go/No-Go 决策。
+
+## 第四阶段执行收口
+
+- P4-E7 已输出最终报告：`docs/reports/phase-4/phase4-go-no-go-report.md`。
+- Deep Enrichment：Go，继续小范围 active_run，仍只输出字段候选并由 `apps/api` 人工审核后采纳。
+- Lead Cleanup：Go，继续小范围 active_run，仍只输出清洗建议，不自动归并、不自动恢复 Invalid。
+- Source Discovery：No-Go，保持 shadow_run；Forbidden 误放修正前不得进入 active_run。
+- Lead Extraction/Grading：No-Go，保持 shadow_run；硬规则不一致、证据和联系方式问题修正前不得切换。
+- `apps/api` retry worker：No-Go，下一阶段暂不开始废弃；废弃必须作为独立阶段或独立 Story 设计和验证。
+- 本次收口不执行生产切换、不删除 retry worker、不自动调整任何 Agent 开关。
 
 ## 本次拆分复核记录
 

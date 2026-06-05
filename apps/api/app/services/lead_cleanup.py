@@ -18,6 +18,8 @@ from app.models.enums import (
 )
 from app.services.agent_task_runs import AgentTaskRunService
 from app.services.permissions import Phase3PermissionService
+from app.agents.http_runtime import HttpAgentRuntime
+from app.settings import Settings, settings
 
 
 @dataclass(slots=True)
@@ -28,6 +30,12 @@ class LeadCleanupSuggestionQueryFilters:
     max_confidence: float | None = None
     lead_id: UUID | None = None
     limit: int = 100
+
+
+def select_lead_cleanup_runtime(config: Settings = settings):
+    if not config.agent_lead_cleanup_http_active_enabled or not config.http_agent_runtime_enabled:
+        return None
+    return HttpAgentRuntime(settings=config)
 
 
 class LeadCleanupSuggestionService:
@@ -170,6 +178,7 @@ class LeadCleanupSuggestionService:
         leads: list[dict],
         runtime,
         now: datetime | None = None,
+        agents_base_url: str | None = None,
     ) -> AgentTaskRun:
         timestamp = now or datetime.now(UTC)
         task_payload = AgentTaskRunService.build_initial_payload(
@@ -191,8 +200,16 @@ class LeadCleanupSuggestionService:
         cleanup_run.started_at = timestamp
         cleanup_run.updated_at = timestamp
 
+        external_agent_response = None
         try:
-            output = runtime.run_lead_cleanup(cleanup_run_id=cleanup_run.id, leads=leads)
+            runtime_kwargs = {"cleanup_run_id": cleanup_run.id, "leads": leads}
+            if hasattr(runtime, "run_lead_cleanup_response"):
+                external_agent_response = runtime.run_lead_cleanup_response(**runtime_kwargs)
+                output = external_agent_response.get("output") if isinstance(external_agent_response, dict) else None
+            else:
+                output = runtime.run_lead_cleanup(**runtime_kwargs)
+            if not isinstance(output, dict):
+                raise ValueError("Lead Cleanup Agent 输出缺少结构化 output。")
             if output.get("schema_version") != "phase3.agent.lead_cleanup.v1":
                 raise ValueError("Lead Cleanup Agent 输出 schema_version 不正确。")
             audit = output.get("audit") or {}
@@ -230,8 +247,17 @@ class LeadCleanupSuggestionService:
             }
             cleanup_run.finished_at = timestamp
             cleanup_run.updated_at = timestamp
-            task_run.status = AgentTaskRunStatus.SUCCEEDED
-            task_run.output_summary_json = cleanup_run.output_summary_json
+            if external_agent_response is not None:
+                task_payload = AgentTaskRunService.succeed_with_external_agent_summary(
+                    self._task_to_payload(task_run),
+                    output_summary_json=cleanup_run.output_summary_json,
+                    external_agent_response=external_agent_response,
+                    agents_base_url=agents_base_url or getattr(getattr(runtime, "settings", None), "agents_base_url", ""),
+                )
+                self._apply_task_payload(task_run, task_payload)
+            else:
+                task_run.status = AgentTaskRunStatus.SUCCEEDED
+                task_run.output_summary_json = cleanup_run.output_summary_json
             task_run.error_message = None
             task_run.finished_at = timestamp
             task_run.updated_at = timestamp
@@ -244,14 +270,52 @@ class LeadCleanupSuggestionService:
             }
             cleanup_run.finished_at = timestamp
             cleanup_run.updated_at = timestamp
-            task_run.status = AgentTaskRunStatus.FAILED
-            task_run.error_message = str(exc)
-            task_run.output_summary_json = cleanup_run.output_summary_json
+            if external_agent_response is not None:
+                task_payload = AgentTaskRunService.fail_with_external_agent_summary(
+                    self._task_to_payload(task_run),
+                    error_message=str(exc),
+                    error={"type": "schema_validation_error", "message": str(exc), "retryable": False},
+                    external_agent_response=external_agent_response,
+                    agents_base_url=agents_base_url or getattr(getattr(runtime, "settings", None), "agents_base_url", ""),
+                )
+                self._apply_task_payload(task_run, task_payload)
+            else:
+                task_run.status = AgentTaskRunStatus.FAILED
+                task_run.error_message = str(exc)
+                task_run.output_summary_json = cleanup_run.output_summary_json
             task_run.finished_at = timestamp
             task_run.updated_at = timestamp
 
         self.session.flush()
         return task_run
+
+    @staticmethod
+    def _task_to_payload(task_run: AgentTaskRun) -> dict:
+        return {
+            "task_type": task_run.task_type,
+            "status": task_run.status,
+            "trigger_source": task_run.trigger_source,
+            "input_json": task_run.input_json,
+            "output_summary_json": task_run.output_summary_json,
+            "llm_provider": task_run.llm_provider,
+            "llm_model": task_run.llm_model,
+            "prompt_template_id": task_run.prompt_template_id,
+            "prompt_version": task_run.prompt_version,
+            "token_usage_json": task_run.token_usage_json,
+            "latency_ms": task_run.latency_ms,
+            "error_message": task_run.error_message,
+            "retry_count": task_run.retry_count,
+            "started_at": task_run.started_at,
+            "finished_at": task_run.finished_at,
+            "created_at": task_run.created_at,
+            "updated_at": task_run.updated_at,
+        }
+
+    @staticmethod
+    def _apply_task_payload(task_run: AgentTaskRun, payload: dict) -> None:
+        for key, value in payload.items():
+            if hasattr(task_run, key):
+                setattr(task_run, key, value)
 
     def review_suggestion(
         self,
