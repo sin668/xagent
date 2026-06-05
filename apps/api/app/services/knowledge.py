@@ -65,12 +65,18 @@ class KnowledgeService:
         embedding_dimensions: int = 1536,
         error_message: str | None = None,
     ) -> dict:
+        if error_message:
+            embedding_status = KnowledgeEmbeddingStatus.FAILED
+        elif embedding is None:
+            embedding_status = KnowledgeEmbeddingStatus.PENDING
+        else:
+            embedding_status = KnowledgeEmbeddingStatus.READY
         return {
             "item_id": UUID(str(item_id)),
             "embedding_model": embedding_model,
             "embedding": embedding,
             "embedding_dimensions": embedding_dimensions,
-            "embedding_status": KnowledgeEmbeddingStatus.FAILED if error_message else KnowledgeEmbeddingStatus.READY,
+            "embedding_status": embedding_status,
             "error_message": error_message,
         }
 
@@ -399,6 +405,18 @@ class KnowledgeService:
             created_at=datetime.utcnow(),
         )
         self.session.add(record)
+        self.session.flush()
+        return record
+
+    def retry_embedding(self, embedding_id: UUID) -> KnowledgeEmbedding:
+        record = self.session.get(KnowledgeEmbedding, embedding_id)
+        if record is None:
+            raise ValueError("embedding 任务不存在。")
+        if record.embedding_status != KnowledgeEmbeddingStatus.FAILED:
+            raise PermissionError("只有 failed 状态的 embedding 任务可以重试。")
+        record.embedding_status = KnowledgeEmbeddingStatus.PENDING
+        record.embedding = None
+        record.error_message = None
         self.session.flush()
         return record
 

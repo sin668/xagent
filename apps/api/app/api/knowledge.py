@@ -421,6 +421,25 @@ async def create_embedding(
     return await async_session.run_sync(run)
 
 
+@router.post("/embeddings/{embedding_id:uuid}/retry", response_model=KnowledgeEmbeddingResponse)
+async def retry_embedding(
+    embedding_id: UUID,
+    async_session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeEmbeddingResponse:
+    def run(sync_session):
+        service = KnowledgeService(sync_session)
+        try:
+            record = service.retry_embedding(embedding_id)
+        except PermissionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sync_session.commit()
+        return serialize_embedding(record)
+
+    return await async_session.run_sync(run)
+
+
 @router.post("/import/phase-one", response_model=PhaseOneKnowledgeImportResponse)
 async def import_phase_one_knowledge(
     request: PhaseOneKnowledgeImportRequest,
