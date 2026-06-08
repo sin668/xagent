@@ -7,6 +7,7 @@ from langgraph.graph import END, StateGraph
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.deep_enrichment import DeepEnrichmentAgentOutput, FieldCandidateOutput
 from app.services.agent_logging import run_logged_node
+from app.services.llm_client import LLMClient
 from app.tools.evidence_validator import filter_candidates_with_evidence
 from app.tools.public_search import EmptyPublicSearchTool, validate_public_search_actions
 
@@ -45,17 +46,71 @@ class DeepEnrichmentGraphResult:
     executed_nodes: list[str]
 
 
-class NullLLMExtractor:
+class LLMDeepEnrichmentExtractor:
+    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client or LLMClient()
+        self.last_audit: dict[str, Any] = {}
+
     def extract(self, state: DeepEnrichmentGraphState) -> list[dict]:
-        return []
+        result = self.llm_client.generate_json(
+            task_type="DEEP_ENRICHMENT",
+            system_prompt=(
+                "你是线索深挖补全 Agent。只从公开页面快照抽取候选字段。"
+                "缺失字段返回空数组，禁止编造；每个候选必须包含 source_url 和 evidence_note。"
+            ),
+            user_prompt=(
+                f"线索快照：{state.lead_snapshot}\n"
+                f"缺失字段：{state.missing_fields}\n"
+                f"公开页面快照：{state.page_snapshots}"
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "field_candidates": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field_name": {"type": "string"},
+                                "candidate_value": {},
+                                "source_type": {"type": "string"},
+                                "source_url": {"type": ["string", "null"]},
+                                "evidence_note": {"type": "string"},
+                                "confidence_score": {"type": ["number", "null"]},
+                            },
+                            "required": ["field_name", "candidate_value", "source_type", "source_url", "evidence_note"],
+                        },
+                    }
+                },
+                "required": ["field_candidates"],
+            },
+        )
+        self.last_audit = {
+            "used": result.error is None,
+            "provider": result.provider,
+            "model": result.model,
+            "token_usage": result.token_usage,
+        }
+        if result.error:
+            self.last_audit["error"] = result.error
+            return []
+        output = result.output_json if isinstance(result.output_json, dict) else {}
+        candidates = output.get("field_candidates") if isinstance(output.get("field_candidates"), list) else []
+        return [item for item in candidates if isinstance(item, dict)]
 
 
 class DeepEnrichmentGraphRunner:
     agent_type = "deep_enrichment"
 
-    def __init__(self, *, search_tool=None, llm_extractor=None, boundary: ApiContractBoundary | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        search_tool=None,
+        llm_extractor: LLMDeepEnrichmentExtractor | None = None,
+        boundary: ApiContractBoundary | None = None,
+    ) -> None:
         self.search_tool = search_tool or EmptyPublicSearchTool()
-        self.llm_extractor = llm_extractor or NullLLMExtractor()
+        self.llm_extractor = llm_extractor or LLMDeepEnrichmentExtractor()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -122,11 +177,16 @@ class DeepEnrichmentGraphRunner:
     def extract_candidates(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphState:
         self.mark("extract_candidates")
         state.raw_candidates = list(self.llm_extractor.extract(state))
+        state.audit["llm_extractor"] = dict(self.llm_extractor.last_audit)
         return state
 
     def validate_evidence(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphState:
         self.mark("validate_evidence")
-        state.field_candidates = [FieldCandidateOutput(**item) for item in filter_candidates_with_evidence(state.raw_candidates)]
+        state.field_candidates = [
+            FieldCandidateOutput(**item)
+            for item in filter_candidates_with_evidence(state.raw_candidates)
+            if self.has_page_text_evidence(state, item)
+        ]
         return state
 
     def write_enrichment_candidates(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphState:
@@ -193,3 +253,17 @@ class DeepEnrichmentGraphRunner:
             recommended_next_action=result.get("recommended_next_action") or "manual_review",
             audit=dict(result.get("audit") or {}),
         )
+
+    @staticmethod
+    def has_page_text_evidence(state: DeepEnrichmentGraphState, candidate: dict) -> bool:
+        value = str(candidate.get("candidate_value") or "").strip()
+        source_url = str(candidate.get("source_url") or "").strip()
+        if not value or not source_url:
+            return False
+        for page in state.page_snapshots:
+            if str(page.get("source_url") or "").strip() != source_url:
+                continue
+            text = str(page.get("text") or "")
+            if value.lower() in text.lower():
+                return True
+        return False

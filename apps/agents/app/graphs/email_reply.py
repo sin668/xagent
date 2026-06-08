@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from app.adapters.email_reply_api import EmailReplyApiClient
 from app.schemas.email_reply import EMAIL_REPLY_SCHEMA_VERSION, EmailReplyAgentOutput, EmailReplyKnowledgeHit, EmailReplyRequestEnvelope
+from app.services.llm_client import LLMClient, LLMClientResult
 from app.settings import get_settings
 
 
@@ -60,6 +61,100 @@ class NullEmailReplyDrafter:
         }
 
 
+class LLMEmailReplyDrafter:
+    task_type = "EMAIL_REPLY"
+
+    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client or LLMClient()
+
+    def draft(self, *, context: dict, knowledge_hits: list[EmailReplyKnowledgeHit], prompt: dict, options: dict) -> dict:
+        result = self.llm_client.generate_json(
+            task_type=self.task_type,
+            system_prompt=self._system_prompt(prompt),
+            user_prompt=self._user_prompt(context=context, knowledge_hits=knowledge_hits, prompt=prompt, options=options),
+            output_schema=EmailReplyAgentOutput.model_json_schema(),
+        )
+        if result.error or not isinstance(result.output_json, dict):
+            return self._manual_review_fallback(result=result, options=options)
+        return self._with_audit(result.output_json, result)
+
+    @staticmethod
+    def _system_prompt(prompt: dict) -> str:
+        configured = prompt.get("system_prompt") or prompt.get("system")
+        if configured:
+            return str(configured)
+        return (
+            "你是海外车辆采购邮件回复 Agent。只能基于客户上下文和已审核知识生成结构化 JSON，"
+            "不得编造事实，不得承诺价格、合同、税务、法律、交付或出口管制事项。"
+            "缺失字段输出 Unknown、null 或空数组。不得写入业务 core 表。"
+        )
+
+    @staticmethod
+    def _user_prompt(
+        *,
+        context: dict,
+        knowledge_hits: list[EmailReplyKnowledgeHit],
+        prompt: dict,
+        options: dict,
+    ) -> str:
+        payload = {
+            "context": context,
+            "knowledge_hits": [item.model_dump(mode="json") for item in knowledge_hits],
+            "prompt": prompt,
+            "options": options,
+            "requirements": [
+                "输出 schema_version=email-reply-v1。",
+                "audit.writes_core_tables 必须为 false。",
+                "知识证据不足、语言不确定、DNC/D/E 或敏感承诺场景必须 manual_review_required=true。",
+                "auto_send_allowed 只能作为候选建议，最终发送必须由 apps/api 决策。",
+            ],
+        }
+        import json
+
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+    @staticmethod
+    def _with_audit(output_json: dict, result: LLMClientResult) -> dict:
+        output = dict(output_json)
+        audit = dict(output.get("audit") or {})
+        audit.update(
+            {
+                "writes_core_tables": False,
+                "llm_provider": result.provider,
+                "llm_model": result.model,
+                "llm_base_url": result.base_url,
+                "latency_ms": result.latency_ms,
+                "token_usage": result.token_usage,
+            }
+        )
+        output["audit"] = audit
+        return output
+
+    @staticmethod
+    def _manual_review_fallback(*, result: LLMClientResult, options: dict) -> dict:
+        return {
+            "schema_version": EMAIL_REPLY_SCHEMA_VERSION,
+            "reply_language": str(options.get("language") or "Unknown"),
+            "detected_language": None,
+            "suggested_subject": "Unknown",
+            "suggested_body": "Unknown",
+            "knowledge_hits": [],
+            "risk_flags": ["llm_unavailable"],
+            "auto_send_allowed": False,
+            "manual_review_required": True,
+            "next_action": "hold_for_manual_review",
+            "audit": {
+                "writes_core_tables": False,
+                "llm_provider": result.provider,
+                "llm_model": result.model,
+                "llm_base_url": result.base_url,
+                "latency_ms": result.latency_ms,
+                "token_usage": result.token_usage,
+                "llm_error": result.error or {"type": "parse_error", "message": "LLM output is not a JSON object."},
+            },
+        }
+
+
 class EmailReplyGraphRunner:
     def __init__(self, *, api_client: EmailReplyApiClient | None = None, llm_drafter=None) -> None:
         settings = get_settings()
@@ -67,7 +162,7 @@ class EmailReplyGraphRunner:
             base_url=self._api_base_url_from_options(settings),
             api_key=settings.agents_api_key,
         )
-        self.llm_drafter = llm_drafter or NullEmailReplyDrafter()
+        self.llm_drafter = llm_drafter or LLMEmailReplyDrafter()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
 

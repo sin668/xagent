@@ -15,6 +15,7 @@ from app.schemas.lead_extraction import (
     LeadExtractionFieldName,
 )
 from app.services.agent_logging import run_logged_node
+from app.services.llm_client import LLMClient
 
 
 LEAD_EXTRACTION_NODE_SEQUENCE = (
@@ -60,10 +61,58 @@ class LeadExtractionGraphResult:
     executed_nodes: list[str]
 
 
+class LLMLeadFieldExtractor:
+    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client or LLMClient()
+        self.last_audit: dict[str, Any] = {}
+
+    def extract(self, *, source_url: str, source_content: str) -> dict[str, str | None]:
+        result = self.llm_client.generate_json(
+            task_type="LEAD_EXTRACTION",
+            system_prompt=(
+                "你是公开网页线索抽取 Agent。只从输入文本抽取字段；缺失字段必须返回 null，禁止编造。"
+                "输出字段只能包含 company_name、email、phone、country、city、vehicle_interest、export_intent、website。"
+            ),
+            user_prompt=f"来源链接：{source_url}\n公开文本：\n{source_content}",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "fields": {
+                        "type": "object",
+                        "properties": {field_name: {"type": ["string", "null"]} for field_name in FIELD_NAMES},
+                    }
+                },
+                "required": ["fields"],
+            },
+        )
+        self.last_audit = {
+            "used": result.error is None,
+            "provider": result.provider,
+            "model": result.model,
+            "token_usage": result.token_usage,
+        }
+        if result.error:
+            self.last_audit["error"] = result.error
+            return {}
+        output = result.output_json if isinstance(result.output_json, dict) else {}
+        fields = output.get("fields") if isinstance(output.get("fields"), dict) else {}
+        extracted: dict[str, str | None] = {}
+        for field_name in FIELD_NAMES:
+            value = fields.get(field_name)
+            extracted[field_name] = str(value).strip() if value not in (None, "") else None
+        return extracted
+
+
 class LeadExtractionGraphRunner:
     agent_type = "lead_extraction"
 
-    def __init__(self, *, boundary: ApiContractBoundary | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        llm_field_extractor: LLMLeadFieldExtractor | None = None,
+        boundary: ApiContractBoundary | None = None,
+    ) -> None:
+        self.llm_field_extractor = llm_field_extractor or LLMLeadFieldExtractor()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -109,7 +158,7 @@ class LeadExtractionGraphRunner:
     def extract_candidate_fields(self, state: LeadExtractionGraphState) -> LeadExtractionGraphState:
         self.mark("extract_candidate_fields")
         text = self.normalize_text(state.source_content)
-        state.raw_fields = {
+        rule_fields: dict[str, str | None] = {
             "company_name": self.extract_company_name(text),
             "email": self.first_match(EMAIL_PATTERN, text),
             "phone": self.extract_phone(text),
@@ -118,6 +167,12 @@ class LeadExtractionGraphRunner:
             "vehicle_interest": self.extract_vehicle_interest(text),
             "export_intent": self.extract_export_intent(text),
             "website": self.first_match(URL_PATTERN, text) or state.source_url,
+        }
+        llm_fields = self.llm_field_extractor.extract(source_url=state.source_url, source_content=state.source_content)
+        state.audit["llm_field_extractor"] = dict(self.llm_field_extractor.last_audit)
+        state.raw_fields = {
+            field_name: llm_fields.get(field_name) or rule_fields.get(field_name)
+            for field_name in FIELD_NAMES
         }
         self.set_node_summary(
             state,

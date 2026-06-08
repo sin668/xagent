@@ -9,6 +9,7 @@ from langgraph.graph import END, StateGraph
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.lead_cleanup import CleanupAgentOutput, CleanupSuggestionOutput
 from app.services.agent_logging import run_logged_node
+from app.services.llm_client import LLMClient
 from app.tools.duplicate_detector import DuplicateDetector
 
 
@@ -17,6 +18,7 @@ LEAD_CLEANUP_NODE_SEQUENCE = (
     "detect_duplicates",
     "classify_invalid_reason",
     "find_restore_candidates",
+    "review_cleanup_with_llm",
     "write_cleanup_suggestions",
     "wait_human_review",
 )
@@ -42,6 +44,56 @@ class LeadCleanupGraphResult:
     executed_nodes: list[str]
 
 
+class LLMLeadCleanupReviewer:
+    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client or LLMClient()
+        self.last_audit: dict[str, Any] = {}
+
+    def review(self, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        result = self.llm_client.generate_json(
+            task_type="LEAD_CLEANUP",
+            system_prompt=(
+                "你是 Watch/Invalid 线索清洗复核 Agent。只能输出人工复核建议，"
+                "禁止自动删除、自动恢复 Invalid、自动执行清洗。"
+            ),
+            user_prompt=f"待清洗线索：{leads}",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "suggestions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "staging_lead_id": {"type": "string"},
+                                "suggestion_type": {"type": "string"},
+                                "target_lead_id": {"type": ["string", "null"]},
+                                "confidence_score": {"type": ["number", "null"]},
+                                "reason": {"type": "string"},
+                                "evidence_json": {"type": "object"},
+                                "recommended_action": {"type": "string"},
+                            },
+                            "required": ["staging_lead_id", "suggestion_type", "reason", "recommended_action"],
+                        },
+                    }
+                },
+                "required": ["suggestions"],
+            },
+        )
+        self.last_audit = {
+            "used": result.error is None,
+            "provider": result.provider,
+            "model": result.model,
+            "token_usage": result.token_usage,
+        }
+        if result.error:
+            self.last_audit["error"] = result.error
+            return []
+        output = result.output_json if isinstance(result.output_json, dict) else {}
+        suggestions = output.get("suggestions") if isinstance(output.get("suggestions"), list) else []
+        return [item for item in suggestions if isinstance(item, dict)]
+
+
 class LeadCleanupGraphRunner:
     agent_type = "lead_cleanup"
 
@@ -49,9 +101,11 @@ class LeadCleanupGraphRunner:
         self,
         *,
         duplicate_detector: DuplicateDetector | None = None,
+        llm_reviewer: LLMLeadCleanupReviewer | None = None,
         boundary: ApiContractBoundary | None = None,
     ) -> None:
         self.duplicate_detector = duplicate_detector or DuplicateDetector()
+        self.llm_reviewer = llm_reviewer or LLMLeadCleanupReviewer()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -150,6 +204,12 @@ class LeadCleanupGraphRunner:
                     "recommended_action": "人工复核新证据后决定是否恢复线索",
                 }
             )
+        return state
+
+    def review_cleanup_with_llm(self, state: LeadCleanupGraphState) -> LeadCleanupGraphState:
+        self.mark("review_cleanup_with_llm")
+        state.raw_suggestions.extend(self.llm_reviewer.review(state.target_leads))
+        state.audit["llm_reviewer"] = dict(self.llm_reviewer.last_audit)
         return state
 
     def write_cleanup_suggestions(self, state: LeadCleanupGraphState) -> LeadCleanupGraphState:
