@@ -10,13 +10,13 @@
 <claude-mem-context>
 # Memory Context
 
-# [xagent] recent context, 2026-05-29 9:19pm GMT+8
+# [xagent] recent context, 2026-06-08 4:06pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 18 obs (7,454t read) | 0t work
+Stats: 33 obs (14,155t read) | 0t work
 
 ### May 25, 2026
 692 2:57p ✅ Added failure case library concept to overseas vehicle procurement AI acquisition system
@@ -38,4 +38,21 @@ Stats: 18 obs (7,454t read) | 0t work
 761 2:56p 🔵 Successful screenshot automation using Chrome headless
 762 " 🔵 Playwright screenshot automation failures
 763 " 🔵 Python HTTP server permission error
+### Jun 1, 2026
+825 1:59p 🔵 Project structure discovery for overseas vehicle leads AI system
+826 2:00p 🔵 Comprehensive LLM integration architecture in vehicle leads AI system
+827 2:01p 🔵 Existing comprehensive deployment documentation found in docs/deploy directory
+828 " 🔵 Mobile and admin application architecture discovery
+830 " 🔵 Comprehensive agent exploration reveals complete system architecture and missing LLM configuration
+829 " 🔵 Mobile app configuration and CSV validation infrastructure discovered
+831 2:03p 🔵 Comprehensive LLM prompt engineering system discovered for lead extraction and grading
+832 " ✅ Deployment documentation for LLM integration requested
+834 2:04p 🔵 Complete API architecture and data models documented for AI lead generation system
+836 " 🟣 Implemented comprehensive seed data generator for XAgent API
+833 2:07p 🔵 AI-powered lead generation system architecture documented
+835 2:09p ✅ Deploy documentation and seed data generation tasks initiated
+837 2:14p 🔴 Fixed IndexError in seed data customer grade assignment
+S135 Fixed IndexError in seed data script - customer grade array access now uses modulo to prevent index out of range (Jun 1 at 2:14 PM)
+838 4:18p 🔵 Discovered LLM agent integration configuration gap between .env and Settings
+839 4:20p 🔵 Confirmed LLM integration architecture uses external agent processing with no internal API client
 </claude-mem-context>

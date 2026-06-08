@@ -90,7 +90,6 @@ _bmad/
 _bmad-output/
 outputs/
 scripts/
-tests/
 docs/poc/
 docs/crm/
 docs/database/
