@@ -108,6 +108,7 @@ def test_lead_cleanup_api_returns_unified_envelope_and_records_run(
         "detect_duplicates",
         "classify_invalid_reason",
         "find_restore_candidates",
+        "review_cleanup_with_llm",
         "write_cleanup_suggestions",
         "wait_human_review",
     ]

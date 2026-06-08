@@ -177,7 +177,7 @@ class DeepEnrichmentGraphRunner:
     def extract_candidates(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphState:
         self.mark("extract_candidates")
         state.raw_candidates = list(self.llm_extractor.extract(state))
-        state.audit["llm_extractor"] = dict(self.llm_extractor.last_audit)
+        state.audit["llm_extractor"] = dict(getattr(self.llm_extractor, "last_audit", {}))
         return state
 
     def validate_evidence(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphState:

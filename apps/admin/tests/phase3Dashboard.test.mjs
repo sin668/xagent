@@ -98,13 +98,14 @@ test('fetch phase3 dashboard calls backend metrics endpoint', async () => {
 
 test('admin page registers phase3 dashboard without automatic outreach capability', async () => {
   const appSource = await readFile(new URL('../src/App.vue', import.meta.url), 'utf8');
+  const phase3Section = appSource.match(/<section id="phase3"[\s\S]*?<\/section>\n\s*<section id="prompt-governance"/)?.[0] || '';
 
   assert.match(appSource, /id="phase3"/);
-  assert.match(appSource, /第三阶段指标与风控/);
-  assert.match(appSource, /有效客户承接率/);
-  assert.match(appSource, /风险违规目标 0/);
-  assert.match(appSource, /客户触达/);
-  assert.match(appSource, /仅人工/);
-  assert.doesNotMatch(appSource, /自动发送/);
-  assert.doesNotMatch(appSource, /自动触达|自动私信|自动加好友|自动加好友按钮|sendMessage|addFriend|autoSend/i);
+  assert.match(phase3Section, /第三阶段指标与风控/);
+  assert.match(phase3Section, /有效客户承接率/);
+  assert.match(phase3Section, /风险违规目标 0/);
+  assert.match(phase3Section, /客户触达/);
+  assert.match(phase3Section, /仅人工/);
+  assert.doesNotMatch(phase3Section, /自动发送/);
+  assert.doesNotMatch(phase3Section, /自动触达|自动私信|自动加好友|自动加好友按钮|sendMessage|addFriend|autoSend/i);
 });

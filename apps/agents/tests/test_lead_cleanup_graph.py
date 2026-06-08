@@ -15,6 +15,7 @@ def test_lead_cleanup_graph_declares_required_node_sequence() -> None:
         "detect_duplicates",
         "classify_invalid_reason",
         "find_restore_candidates",
+        "review_cleanup_with_llm",
         "write_cleanup_suggestions",
         "wait_human_review",
     )

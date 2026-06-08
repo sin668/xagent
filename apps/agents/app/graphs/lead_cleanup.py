@@ -209,7 +209,7 @@ class LeadCleanupGraphRunner:
     def review_cleanup_with_llm(self, state: LeadCleanupGraphState) -> LeadCleanupGraphState:
         self.mark("review_cleanup_with_llm")
         state.raw_suggestions.extend(self.llm_reviewer.review(state.target_leads))
-        state.audit["llm_reviewer"] = dict(self.llm_reviewer.last_audit)
+        state.audit["llm_reviewer"] = dict(getattr(self.llm_reviewer, "last_audit", {}))
         return state
 
     def write_cleanup_suggestions(self, state: LeadCleanupGraphState) -> LeadCleanupGraphState:

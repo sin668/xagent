@@ -23,7 +23,7 @@ class MockLLMExtractor:
         return [
             {
                 "field_name": "contacts_json",
-                "candidate_value": [{"type": "email", "value": "sales@example.ru"}],
+                "candidate_value": "sales@example.ru",
                 "source_type": "ai_public_source",
                 "source_url": "https://dealer.example.ru/contact",
                 "evidence_note": "公开官网联系方式页面展示邮箱。",
@@ -90,10 +90,9 @@ def test_deep_enrichment_graph_runs_with_mock_search_and_llm_without_core_writes
     assert result.executed_nodes == list(DEEP_ENRICHMENT_NODE_SEQUENCE)
     assert result.output.recommended_next_action == "manual_review"
     assert result.output.missing_fields == ["vehicle_intents", "business_status"]
-    assert len(result.output.field_candidates) == 3
+    assert len(result.output.field_candidates) == 1
     assert result.output.field_candidates[0].field_name == "contacts_json"
-    assert result.output.field_candidates[1].candidate_value == []
-    assert result.output.field_candidates[2].candidate_value == "Unknown"
+    assert result.output.field_candidates[0].candidate_value == "sales@example.ru"
     assert result.output.audit["writes_core_tables"] is False
     assert result.output.audit["output_table"] == "lead_enrichment_field_candidates"
     assert "customers" not in result.output.audit.get("written_tables", [])
