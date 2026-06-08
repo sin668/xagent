@@ -9,6 +9,7 @@ from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.lead_extraction import LeadExtractionCandidate
 from app.schemas.lead_grading import LeadGradingAgentOutput, LeadGradingSuggestion
 from app.services.agent_logging import run_logged_node
+from app.services.llm_client import LLMClient
 
 
 LEAD_GRADING_NODE_SEQUENCE = (
@@ -44,10 +45,58 @@ class LeadGradingGraphResult:
     executed_nodes: list[str]
 
 
+class LLMLeadGradingExplainer:
+    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client or LLMClient()
+        self.last_audit: dict[str, Any] = {}
+
+    def explain(self, *, lead: LeadExtractionCandidate, recommended_grade: str, reasons: list[str]) -> dict[str, str]:
+        result = self.llm_client.generate_json(
+            task_type="LEAD_GRADING",
+            system_prompt=(
+                "你是线索分级解释 Agent。只能基于已抽取字段、硬规则分级和原因生成解释，"
+                "不得覆盖推荐等级、不得建议自动晋级客户。"
+            ),
+            user_prompt=(
+                f"硬规则推荐等级：{recommended_grade}\n"
+                f"硬规则原因：{reasons}\n"
+                f"线索：{lead.model_dump()}"
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "explanations": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                    }
+                },
+                "required": ["explanations"],
+            },
+        )
+        self.last_audit = {
+            "used": result.error is None,
+            "provider": result.provider,
+            "model": result.model,
+            "token_usage": result.token_usage,
+        }
+        if result.error:
+            self.last_audit["error"] = result.error
+            return {}
+        output = result.output_json if isinstance(result.output_json, dict) else {}
+        explanations = output.get("explanations") if isinstance(output.get("explanations"), dict) else {}
+        return {str(key): str(value) for key, value in explanations.items() if str(value).strip()}
+
+
 class LeadGradingGraphRunner:
     agent_type = "lead_grading"
 
-    def __init__(self, *, boundary: ApiContractBoundary | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        llm_explainer: LLMLeadGradingExplainer | None = None,
+        boundary: ApiContractBoundary | None = None,
+    ) -> None:
+        self.llm_explainer = llm_explainer or LLMLeadGradingExplainer()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -168,6 +217,13 @@ class LeadGradingGraphRunner:
             )
         else:
             state.explanations["grade_delta_from_existing"] = "现有等级为空或与 shadow 建议一致。"
+        llm_explanations = self.llm_explainer.explain(
+            lead=self.lead(state),
+            recommended_grade=state.recommended_grade or "C",
+            reasons=state.reasons,
+        )
+        state.explanations.update(llm_explanations)
+        state.audit["llm_explainer"] = dict(self.llm_explainer.last_audit)
         self.set_node_summary(state, "explain_grade_delta", {"explanation_count": len(state.explanations)})
         return state
 

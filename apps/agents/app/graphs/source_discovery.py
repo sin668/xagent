@@ -9,6 +9,7 @@ from langgraph.graph import END, StateGraph
 from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.source_discovery import SourceCandidateOutput, SourceDiscoveryAgentOutput
 from app.services.agent_logging import run_logged_node
+from app.services.llm_client import LLMClient
 
 
 SOURCE_DISCOVERY_NODE_SEQUENCE = (
@@ -57,11 +58,57 @@ class EmptySourceSearchTool:
         return []
 
 
+class LLMSourceDiscoveryQueryPlanner:
+    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client or LLMClient()
+        self.last_audit: dict[str, Any] = {}
+
+    def plan(self, *, market: str, channel_strategy: dict[str, Any], fallback_queries: list[str]) -> list[str]:
+        result = self.llm_client.generate_json(
+            task_type="SOURCE_DISCOVERY",
+            system_prompt=(
+                "你是海外车辆采购获客系统的来源发现 Agent。"
+                "只基于公开 Low/Medium 风险渠道生成搜索查询，不生成登录、私域、反爬或自动写入动作。"
+            ),
+            user_prompt=(
+                f"目标市场：{market}\n"
+                f"渠道策略：{channel_strategy}\n"
+                f"规则兜底查询：{fallback_queries}\n"
+                "请扩展可用于公开搜索的来源发现查询。"
+            ),
+            output_schema={
+                "type": "object",
+                "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
+                "required": ["queries"],
+            },
+        )
+        self.last_audit = {
+            "used": result.error is None,
+            "provider": result.provider,
+            "model": result.model,
+            "token_usage": result.token_usage,
+        }
+        if result.error:
+            self.last_audit["error"] = result.error
+            return fallback_queries
+        output = result.output_json if isinstance(result.output_json, dict) else {}
+        queries = [str(item).strip() for item in output.get("queries") or [] if str(item).strip()]
+        self.last_audit["queries"] = queries
+        return queries or fallback_queries
+
+
 class SourceDiscoveryGraphRunner:
     agent_type = "source_discovery"
 
-    def __init__(self, *, search_tool=None, boundary: ApiContractBoundary | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        search_tool=None,
+        llm_query_planner: LLMSourceDiscoveryQueryPlanner | None = None,
+        boundary: ApiContractBoundary | None = None,
+    ) -> None:
         self.search_tool = search_tool or EmptySourceSearchTool()
+        self.llm_query_planner = llm_query_planner or LLMSourceDiscoveryQueryPlanner()
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -110,7 +157,13 @@ class SourceDiscoveryGraphRunner:
         keywords = [str(item).strip() for item in strategy.get("keywords") or [] if str(item).strip()]
         segments = [str(item).strip() for item in strategy.get("target_segments") or [] if str(item).strip()]
         base_terms = keywords or segments or ["used cars dealer"]
-        state.discovery_queries = [f"{state.market} {term}".strip() for term in base_terms]
+        fallback_queries = [f"{state.market} {term}".strip() for term in base_terms]
+        state.discovery_queries = self.llm_query_planner.plan(
+            market=state.market,
+            channel_strategy=strategy,
+            fallback_queries=fallback_queries,
+        )
+        state.audit["llm_query_planner"] = dict(self.llm_query_planner.last_audit)
         self.set_node_summary(state, "build_discovery_queries", {"query_count": len(state.discovery_queries)})
         return state
 
