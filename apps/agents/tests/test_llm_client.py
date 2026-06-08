@@ -75,3 +75,39 @@ def test_agents_llm_client_missing_api_key_returns_configuration_error_without_h
     assert result.error is not None
     assert result.error["type"] == "configuration_error"
     assert "API key" in result.error["message"]
+
+
+def test_agents_llm_client_default_client_ignores_environment_proxy(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured["client_kwargs"] = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def post(self, url, *, json, headers):
+            captured["url"] = url
+            request = httpx.Request("POST", url)
+            return httpx.Response(
+                200,
+                request=request,
+                json={
+                    "choices": [{"message": {"content": '{"ok": true}'}}],
+                    "usage": {"total_tokens": 1},
+                },
+            )
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+
+    client = LLMClient(settings=build_settings())
+    result = client.generate_json("SOURCE_DISCOVERY", "system", "user", {"type": "object"})
+
+    assert result.error is None
+    assert result.output_json == {"ok": True}
+    assert captured["client_kwargs"]["trust_env"] is False
+    assert captured["url"] == "https://api.deepseek.com/v1/chat/completions"

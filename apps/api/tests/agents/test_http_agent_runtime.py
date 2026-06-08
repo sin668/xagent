@@ -21,6 +21,52 @@ def build_settings(api_key: str | None = "agents-test-key") -> Settings:
     )
 
 
+@pytest.mark.asyncio
+async def test_http_agent_runtime_default_client_ignores_environment_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs):
+            captured["client_kwargs"] = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return None
+
+        async def post(self, url, *, json, headers):
+            captured["url"] = url
+            return httpx.Response(
+                200,
+                json={
+                    "schema_version": "phase4.agent.run.v1",
+                    "agent_service_run_id": "44444444-4444-4444-4444-444444444444",
+                    "request_id": "11111111-1111-1111-1111-111111111111",
+                    "status": "succeeded",
+                    "agent_type": "source_discovery",
+                    "agent_mode": "shadow",
+                    "output": {},
+                    "audit": {"writes_core_tables": False, "executed_nodes": []},
+                    "error": None,
+                },
+            )
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+
+    runtime = HttpAgentRuntime(settings=build_settings())
+    await runtime.run_agent(
+        "source-discovery",
+        request_id="11111111-1111-1111-1111-111111111111",
+        trigger_source="scheduler",
+        agent_mode="shadow",
+        input_payload={},
+    )
+
+    assert captured["client_kwargs"]["trust_env"] is False
+    assert captured["url"] == "http://agents.local:8010/agent-runs/source-discovery"
+
+
 def test_http_agent_runtime_error_message_includes_422_detail_list() -> None:
     request = httpx.Request("POST", "http://agents.local:8010/agent-runs/source-discovery")
     response = httpx.Response(

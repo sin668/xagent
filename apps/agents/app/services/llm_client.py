@@ -68,7 +68,7 @@ class LLMClient:
             if self.http_client is not None:
                 response = self.http_client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
             else:
-                with httpx.Client(timeout=self.timeout_seconds) as client:
+                with httpx.Client(timeout=self.timeout_seconds, trust_env=False) as client:
                     response = client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
             response.raise_for_status()
             raw_response = response.json()

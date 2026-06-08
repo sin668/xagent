@@ -179,7 +179,7 @@ class HttpAgentRuntime:
             if self.http_client is not None:
                 response = await self.http_client.post(url, json=payload, headers=headers)
             else:
-                async with httpx.AsyncClient(timeout=self.settings.agents_timeout_seconds) as client:
+                async with httpx.AsyncClient(timeout=self.settings.agents_timeout_seconds, trust_env=False) as client:
                     response = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException as exc:
             raise HttpAgentRuntimeTimeoutError(str(exc)) from exc
@@ -212,7 +212,7 @@ class HttpAgentRuntime:
             if self.http_client is not None:
                 response = await self.http_client.get(url, headers=headers)
             else:
-                async with httpx.AsyncClient(timeout=self.settings.agents_timeout_seconds) as client:
+                async with httpx.AsyncClient(timeout=self.settings.agents_timeout_seconds, trust_env=False) as client:
                     response = await client.get(url, headers=headers)
         except httpx.TimeoutException as exc:
             raise HttpAgentRuntimeTimeoutError(str(exc)) from exc
