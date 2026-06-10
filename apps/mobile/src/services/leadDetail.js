@@ -12,6 +12,15 @@ function isDoNotContact(lead) {
   return Boolean(lead?.doNotContact || lead?.do_not_contact || lead?.status === 'do_not_contact');
 }
 
+function hasEmailContact(lead) {
+  const contacts = Array.isArray(lead?.contacts) ? lead.contacts : [];
+  return contacts.some((contact) => {
+    const type = String(contact?.type || '').trim().toLowerCase();
+    const value = String(contact?.value || '').trim();
+    return Boolean(value) && (type === 'email' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+  });
+}
+
 function formatConfidence(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -40,6 +49,17 @@ export function markLeadDoNotContact(lead, { actor, reason, markedAt } = {}) {
     doNotContactReason: reason || 'Unknown',
     doNotContactMarkedBy: actor || 'Unknown',
     doNotContactMarkedAt: markedAt || new Date().toISOString(),
+  };
+}
+
+export function unmarkLeadDoNotContact(lead, { actor, reason } = {}) {
+  return {
+    ...lead,
+    status: 'pending',
+    doNotContact: false,
+    doNotContactReason: `取消勿扰：${reason || 'Unknown'}`,
+    doNotContactMarkedBy: actor || 'Unknown',
+    doNotContactMarkedAt: '',
   };
 }
 
@@ -75,6 +95,7 @@ export function buildLeadDetailViewModel(lead = {}) {
       : '';
   const gateAllowsPromotion = Boolean(coreGate.canPromoteToCore) && hasViewableEvidence && !duplicateBlocksPromotion;
   const canEnterQueue = canEnterOutreachQueue(lead) && gateAllowsPromotion;
+  const canCreateDraft = canEnterQueue && hasEmailContact(lead);
 
   return {
     id: lead.id,
@@ -100,6 +121,7 @@ export function buildLeadDetailViewModel(lead = {}) {
     hasViewableEvidence,
     contacts: Array.isArray(lead.contacts) ? lead.contacts : [],
     followUps: Array.isArray(lead.followUps) ? lead.followUps : [],
+    doNotContactCustomerId: lead.doNotContactCustomerId || lead.do_not_contact_customer_id || '',
     inventoryEntry: lead.inventoryMatch || {
       label: '查看匹配车源',
       path: `/pages/inventory/index?leadId=${encodeURIComponent(lead.id || '')}`,
@@ -118,8 +140,9 @@ export function buildLeadDetailViewModel(lead = {}) {
     duplicateSignals,
     duplicateLabel,
     canEnterOutreachQueue: canEnterQueue,
+    canCreateOutreachDraft: canCreateDraft,
     outreachActionLabel: canEnterQueue
-      ? (lead.coreGate ? '晋级core' : '生成草稿')
+      ? '晋级客户'
       : (duplicateBlocksPromotion ? '重复待处理' : (isDoNotContact(lead) ? '已排除触达' : '待补证据')),
     autoSendEnabled: false,
   };

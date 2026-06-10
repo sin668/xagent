@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  buildOutreachEmailPayload,
   buildOutreachDraftViewModel,
   canRecordManualSend,
   createManualSendRecord,
+  createOutreachEmailService,
+  firstEmailContact,
   hasForbiddenCommitments,
 } from '../src/services/outreachDraft.js';
 
@@ -103,4 +106,56 @@ test('manual send can only be recorded after human confirmation', () => {
   assert.equal(record.status, 'sent_manual');
   assert.equal(record.autoSend, false);
   assert.equal(record.sender, 'Anna');
+});
+
+test('outreach email payload uses customer email, editable subject/body, and real send endpoint', async () => {
+  assert.equal(
+    firstEmailContact([
+      { type: 'telegram', value: '@dealer' },
+      { type: 'Email', value: 'buyer@example.ru' },
+    ]).value,
+    'buyer@example.ru',
+  );
+  assert.deepEqual(buildOutreachEmailPayload({
+    toEmail: ' buyer@example.ru ',
+    subject: ' Привет ',
+    body: ' Здравствуйте ',
+    sender: 'Anna',
+  }), {
+    to_email: 'buyer@example.ru',
+    subject: 'Привет',
+    body: 'Здравствуйте',
+    sender: 'Anna',
+    human_confirmed: true,
+  });
+
+  const calls = [];
+  const service = createOutreachEmailService({
+    client: {
+      post(endpoint, body) {
+        calls.push({ endpoint, body });
+        return Promise.resolve({ status: 'sent', provider: 'fake' });
+      },
+    },
+  });
+  const result = await service.sendEmail('customer-1', {
+    toEmail: 'buyer@example.ru',
+    subject: 'Привет',
+    body: 'Здравствуйте',
+    sender: 'Anna',
+  });
+
+  assert.equal(result.status, 'sent');
+  assert.deepEqual(calls, [
+    {
+      endpoint: '/outreach-drafts/customer-1/send-email',
+      body: {
+        to_email: 'buyer@example.ru',
+        subject: 'Привет',
+        body: 'Здравствуйте',
+        sender: 'Anna',
+        human_confirmed: true,
+      },
+    },
+  ]);
 });

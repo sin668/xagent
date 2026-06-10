@@ -98,9 +98,10 @@ test('fetch phase3 dashboard calls backend metrics endpoint', async () => {
 
 test('admin page registers phase3 dashboard without automatic outreach capability', async () => {
   const appSource = await readFile(new URL('../src/App.vue', import.meta.url), 'utf8');
-  const phase3Section = appSource.match(/<section id="phase3"[\s\S]*?<\/section>\n\s*<section id="prompt-governance"/)?.[0] || '';
+  const phase3Section = await readFile(new URL('../src/pages/Phase3Page.vue', import.meta.url), 'utf8');
 
-  assert.match(appSource, /id="phase3"/);
+  assert.match(appSource, /Phase3Page/);
+  assert.match(phase3Section, /id="phase3"/);
   assert.match(phase3Section, /第三阶段指标与风控/);
   assert.match(phase3Section, /有效客户承接率/);
   assert.match(phase3Section, /风险违规目标 0/);

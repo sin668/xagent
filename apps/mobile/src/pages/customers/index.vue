@@ -28,39 +28,25 @@
           <text class="customers-hero-kicker">线索完善后进入客户池</text>
           <text class="customers-hero-title">{{ customers.length }} 个有效客户正在跟进</text>
           <text class="customers-hero-desc">
-            B/C 级 {{ bcCount }} · 今日待跟进 {{ todayCount }} · 有车型意向 {{ intentCount }} · 合规待复核 {{ complianceCount }}
+            A/B/C级客户 {{ abcCount }} · 今日待跟进 {{ todayCount }} · 有车型意向 {{ intentCount }} · 合规待复核 {{ complianceCount }}
           </text>
         </view>
       </section>
 
       <view class="customers-metric-row">
-        <view class="customers-metric-card">
-          <text class="customers-metric-number">{{ bcCount }}</text>
-          <text class="customers-metric-label">B/C 级客户</text>
-        </view>
-        <view class="customers-metric-card">
-          <text class="customers-metric-number customers-number-green">{{ intentCount }}</text>
-          <text class="customers-metric-label">车型意向</text>
-        </view>
-        <view class="customers-metric-card">
-          <text class="customers-metric-number customers-number-amber">{{ todayCount }}</text>
-          <text class="customers-metric-label">今日跟进</text>
+        <view
+          v-for="stat in customerStats"
+          :key="stat.key"
+          :class="['customers-metric-card', activeFilter === stat.filterKey ? 'customers-metric-active' : '']"
+          @click="selectCustomerStat(stat)"
+        >
+          <text :class="['customers-metric-number', stat.className]">{{ stat.count }}</text>
+          <text class="customers-metric-label">{{ stat.label }}</text>
         </view>
       </view>
 
-      <scroll-view scroll-x class="customers-chip-row">
-        <text
-          v-for="tab in tabs"
-          :key="tab.key"
-          :class="['customers-chip', activeFilter === tab.key ? 'customers-chip-active' : '']"
-          @click="setActiveFilter(tab.key)"
-        >
-          {{ tab.label }} {{ tab.count }}
-        </text>
-      </scroll-view>
-
       <view class="section-head">
-        <text class="section-title">重点客户</text>
+        <text class="section-title">{{ activeFilterTitle }}</text>
         <text class="section-note">按下一步动作排序</text>
       </view>
 
@@ -81,14 +67,16 @@
           </view>
 
           <view class="customer-contact-strip">
-            <text>{{ card.contactSummaryText }}</text>
+            <text class="customer-clamped-text">{{ clipText(card.contactSummaryText, 72) }}</text>
             <text>{{ card.ownerText }}</text>
           </view>
 
           <view class="customer-intent-card">
             <view class="customer-card-main">
-              <text class="customer-intent-title">{{ card.vehicleIntentText }}</text>
-              <text class="customer-intent-subtitle">来源证据：{{ card.evidenceNote || '已晋级客户来源' }}</text>
+              <text class="customer-intent-title customer-clamped-text">{{ clipText(card.vehicleIntentText, 96) }}</text>
+              <text class="customer-intent-subtitle customer-clamped-text">
+                来源证据：{{ clipText(card.evidenceNote || '已晋级客户来源', 120) }}
+              </text>
             </view>
             <text :class="['customer-tag', card.grade === 'C' ? 'customer-tag-amber' : 'customer-tag-blue']">
               {{ card.grade === 'C' ? '合规关注' : '人工跟进' }}
@@ -98,7 +86,7 @@
           <view class="customer-next">
             <view>
               <text class="customer-mini-label">下一步</text>
-              <text class="customer-mini-value">{{ card.nextAction }}</text>
+              <text class="customer-mini-value customer-clamped-text">{{ clipText(card.nextAction, 120) }}</text>
             </view>
             <button class="customer-detail-button">进入详情</button>
           </view>
@@ -124,7 +112,7 @@
 import { computed, onMounted, ref } from 'vue';
 
 import { buildBottomTabs, navigateBottomTab } from '../../services/bottomTabs.js';
-import { buildCustomerFilterTabs, customersService, filterCustomers, getCustomerCardViewModel } from '../../services/customers.js';
+import { buildCustomerStats, customersService, filterCustomers, getCustomerCardViewModel } from '../../services/customers.js';
 import '../../styles/home.css';
 import '../../styles/customers.css';
 
@@ -133,11 +121,14 @@ const isLoading = ref(false);
 const errorMessage = ref('');
 const activeFilter = ref('all');
 const bottomTabs = buildBottomTabs('customers');
-const customerFilterKeys = ['all', 'today', 'c_compliance', 'has_intent', 'unassigned'];
 
-const tabs = computed(() => buildCustomerFilterTabs(customers.value));
+const customerStats = computed(() => buildCustomerStats(customers.value));
 const cards = computed(() => filterCustomers(customers.value, activeFilter.value).map(getCustomerCardViewModel));
-const bcCount = computed(() => customers.value.filter((customer) => ['B', 'C'].includes(customer.grade)).length);
+const activeFilterTitle = computed(() => {
+  const activeStat = customerStats.value.find((stat) => stat.filterKey === activeFilter.value);
+  return activeStat ? activeStat.label : '重点客户';
+});
+const abcCount = computed(() => filterCustomers(customers.value, 'grade_abc').length);
 const todayCount = computed(() => filterCustomers(customers.value, 'today').length);
 const intentCount = computed(() => filterCustomers(customers.value, 'has_intent').length);
 const complianceCount = computed(() => filterCustomers(customers.value, 'c_compliance').length);
@@ -165,8 +156,17 @@ function openCustomer(customerId) {
   globalThis.uni.navigateTo({ url: `/pages/customers/detail?id=${encodeURIComponent(customerId)}` });
 }
 
-function setActiveFilter(filterKey) {
-  activeFilter.value = customerFilterKeys.includes(filterKey) ? filterKey : 'all';
+function selectCustomerStat(stat) {
+  const filterKey = stat?.filterKey || 'all';
+  activeFilter.value = activeFilter.value === filterKey ? 'all' : filterKey;
+}
+
+function clipText(value, maxLength = 120) {
+  const text = String(value || '').trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}......`;
 }
 
 function openTab(tab) {

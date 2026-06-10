@@ -14,6 +14,24 @@
   padding: 0 16px calc(92px + var(--safe-bottom, 0px));
 }
 
+.source-nav-centered {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+}
+
+.source-nav-title-block {
+  min-width: 0;
+  text-align: center;
+}
+
+.source-nav-title-block .nav-title,
+.source-nav-title-block .nav-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .source-summary-card,
 .source-card {
   border: 1px solid rgba(148, 163, 184, 0.24);
@@ -57,8 +75,15 @@
 .source-tile {
   min-height: 72px;
   padding: 12px;
+  border: 1px solid transparent;
   border-radius: 15px;
   background: #f8fafc;
+}
+
+.source-summary-tile-active {
+  border-color: rgba(29, 78, 216, 0.35);
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.08);
 }
 
 .source-kicker {
@@ -75,6 +100,7 @@
   line-height: 1;
   font-weight: 950;
   color: #334155;
+  white-space: nowrap;
 }
 
 .source-number-green {
@@ -87,91 +113,6 @@
 
 .source-number-red {
   color: #b91c1c;
-}
-
-.source-chip-row {
-  display: flex;
-  gap: 8px;
-  max-width: 100%;
-  margin: 14px 0 12px;
-  padding-bottom: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.source-chip-row::-webkit-scrollbar {
-  display: none;
-}
-
-.source-chip {
-  flex: 0 0 auto;
-  height: 34px;
-  padding: 0 13px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  border-radius: 17px;
-  background: #ffffff;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 850;
-  line-height: 34px;
-}
-
-.source-chip-active {
-  border-color: #1d4ed8;
-  background: #1d4ed8;
-  color: #ffffff;
-}
-
-.risk-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.risk-pill {
-  min-height: 58px;
-  padding: 10px 6px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 15px;
-  background: #ffffff;
-  text-align: center;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-}
-
-.risk-count {
-  display: block;
-  font-size: 17px;
-  font-weight: 950;
-}
-
-.risk-pill text:last-child {
-  display: block;
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  margin-top: 12px;
-}
-
-.filter-select {
-  height: 38px;
-  padding: 0 12px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 15px;
-  background: #ffffff;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 850;
-  line-height: 38px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .source-list {

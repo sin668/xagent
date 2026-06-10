@@ -5,9 +5,13 @@ from fastapi import APIRouter, HTTPException, Query
 from app.schemas.outreach_draft import (
     ManualSendRecordRequest,
     ManualSendRecordResponse,
+    OutreachEmailSendRequest,
+    OutreachEmailSendResponse,
     OutreachDraftResponse,
 )
+from app.services.email_sender import EmailMessagePayload, EmailSender, EmailSenderError
 from app.services.outreach_draft import OutreachDraftService
+from app.settings import settings
 
 router = APIRouter(prefix="/outreach-drafts", tags=["outreach-drafts"])
 
@@ -62,3 +66,42 @@ def record_manual_send(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return ManualSendRecordResponse(**record)
+
+
+@router.post("/{customer_id:uuid}/send-email", response_model=OutreachEmailSendResponse)
+def send_outreach_email(
+    customer_id: UUID,
+    request: OutreachEmailSendRequest,
+) -> OutreachEmailSendResponse:
+    if not request.human_confirmed:
+        raise HTTPException(status_code=400, detail="邮件发送需要人工确认。")
+    if not settings.email_sender_from_email:
+        raise HTTPException(status_code=500, detail="邮件发送服务缺少发件邮箱配置。")
+
+    try:
+        result = EmailSender.from_settings(settings).send(
+            EmailMessagePayload(
+                from_email=settings.email_sender_from_email,
+                to_emails=[request.to_email],
+                subject=request.subject,
+                body_text=request.body,
+                metadata={
+                    "customer_id": str(customer_id),
+                    "actor": request.sender,
+                    "business_scene": "first_outreach",
+                    "manual_confirmed": request.human_confirmed,
+                },
+            ),
+        )
+    except EmailSenderError as exc:
+        raise HTTPException(status_code=500, detail=f"邮件发送失败：{exc}") from exc
+
+    return OutreachEmailSendResponse(
+        customer_id=customer_id,
+        status=result.status,
+        provider=result.provider,
+        provider_message_id=result.provider_message_id,
+        to_email=request.to_email,
+        subject=request.subject,
+        auto_send=False,
+    )

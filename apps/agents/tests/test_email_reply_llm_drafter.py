@@ -4,6 +4,7 @@ from app.graphs.email_reply import LLMEmailReplyDrafter
 from app.schemas.email_reply import EmailReplyKnowledgeHit
 from app.services.llm_client import LLMClient
 from app.settings import AgentSettings
+from tests.prompt_helpers import StaticPromptRepository
 
 
 def test_email_reply_llm_drafter_uses_llm_client_and_preserves_audit_metadata() -> None:
@@ -44,7 +45,10 @@ def test_email_reply_llm_drafter_uses_llm_client_and_preserves_audit_metadata() 
         llm_email_reply_model="deepseek-email",
     )
     with httpx.Client(transport=httpx.MockTransport(handler)) as http_client:
-        drafter = LLMEmailReplyDrafter(llm_client=LLMClient(settings=settings, http_client=http_client))
+        drafter = LLMEmailReplyDrafter(
+            llm_client=LLMClient(settings=settings, http_client=http_client),
+            prompt_repository=StaticPromptRepository(output_schema_json={}),
+        )
         draft = drafter.draft(
             context={
                 "customer": {"name": "Moscow Auto Dealer"},
@@ -78,7 +82,10 @@ def test_email_reply_llm_drafter_falls_back_to_manual_review_when_llm_is_not_con
         llm_api_key="",
         llm_base_url="https://api.deepseek.com/v1",
     )
-    drafter = LLMEmailReplyDrafter(llm_client=LLMClient(settings=settings))
+    drafter = LLMEmailReplyDrafter(
+        llm_client=LLMClient(settings=settings),
+        prompt_repository=StaticPromptRepository(output_schema_json={}),
+    )
 
     draft = drafter.draft(context={}, knowledge_hits=[], prompt={}, options={"language": "ru"})
 

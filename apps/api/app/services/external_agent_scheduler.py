@@ -12,7 +12,12 @@ logger = logging.getLogger("uvicorn.error")
 
 
 class ExternalAgentSchedulerService:
-    REQUIRED_JOBS = ("external_source_discovery", "external_lead_extraction_grading")
+    REQUIRED_JOBS = (
+        "external_source_discovery",
+        "external_lead_extraction_grading",
+        "external_deep_enrichment",
+        "external_lead_cleanup",
+    )
 
     def __init__(
         self,
@@ -42,6 +47,14 @@ class ExternalAgentSchedulerService:
             "external_lead_extraction_grading": {
                 "enabled": settings.external_agent_lead_extraction_grading_enabled,
                 "interval_seconds": settings.external_agent_lead_extraction_grading_interval_seconds,
+            },
+            "external_deep_enrichment": {
+                "enabled": settings.external_agent_deep_enrichment_enabled,
+                "interval_seconds": settings.external_agent_deep_enrichment_interval_seconds,
+            },
+            "external_lead_cleanup": {
+                "enabled": settings.external_agent_lead_cleanup_enabled,
+                "interval_seconds": settings.external_agent_lead_cleanup_interval_seconds,
             },
         }
 

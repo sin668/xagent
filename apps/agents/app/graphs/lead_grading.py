@@ -10,6 +10,7 @@ from app.schemas.lead_extraction import LeadExtractionCandidate
 from app.schemas.lead_grading import LeadGradingAgentOutput, LeadGradingSuggestion
 from app.services.agent_logging import run_logged_node
 from app.services.llm_client import LLMClient
+from app.services.llm_prompt_repository import LLMPromptRepository, LLMPromptTemplateNotFound
 
 
 LEAD_GRADING_NODE_SEQUENCE = (
@@ -46,38 +47,42 @@ class LeadGradingGraphResult:
 
 
 class LLMLeadGradingExplainer:
-    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, *, llm_client: LLMClient | None = None, prompt_repository: LLMPromptRepository | None = None) -> None:
         self.llm_client = llm_client or LLMClient()
+        self.prompt_repository = prompt_repository or LLMPromptRepository()
         self.last_audit: dict[str, Any] = {}
 
     def explain(self, *, lead: LeadExtractionCandidate, recommended_grade: str, reasons: list[str]) -> dict[str, str]:
+        task_type = "LEAD_GRADING"
+        model = self.llm_client._model_for_task(task_type)
+        try:
+            prompt = self.prompt_repository.load_active_default(
+                task_type=task_type,
+                provider=self.llm_client.settings.llm_provider,
+                model=model,
+            )
+        except LLMPromptTemplateNotFound as exc:
+            self.last_audit = {
+                "used": False,
+                "provider": self.llm_client.settings.llm_provider,
+                "model": model,
+                "error": {"type": exc.error_type, "message": str(exc)},
+            }
+            raise
         result = self.llm_client.generate_json(
-            task_type="LEAD_GRADING",
-            system_prompt=(
-                "你是线索分级解释 Agent。只能基于已抽取字段、硬规则分级和原因生成解释，"
-                "不得覆盖推荐等级、不得建议自动晋级客户。"
+            task_type=task_type,
+            system_prompt=prompt.system_prompt,
+            user_prompt=prompt.render_user_prompt(
+                {"recommended_grade": recommended_grade, "reasons": reasons, "lead": lead.model_dump()}
             ),
-            user_prompt=(
-                f"硬规则推荐等级：{recommended_grade}\n"
-                f"硬规则原因：{reasons}\n"
-                f"线索：{lead.model_dump()}"
-            ),
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "explanations": {
-                        "type": "object",
-                        "additionalProperties": {"type": "string"},
-                    }
-                },
-                "required": ["explanations"],
-            },
+            output_schema=prompt.output_schema_json,
         )
         self.last_audit = {
             "used": result.error is None,
             "provider": result.provider,
             "model": result.model,
             "token_usage": result.token_usage,
+            **prompt.audit,
         }
         if result.error:
             self.last_audit["error"] = result.error
@@ -94,9 +99,10 @@ class LeadGradingGraphRunner:
         self,
         *,
         llm_explainer: LLMLeadGradingExplainer | None = None,
+        prompt_repository: LLMPromptRepository | None = None,
         boundary: ApiContractBoundary | None = None,
     ) -> None:
-        self.llm_explainer = llm_explainer or LLMLeadGradingExplainer()
+        self.llm_explainer = llm_explainer or LLMLeadGradingExplainer(prompt_repository=prompt_repository)
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -131,11 +137,11 @@ class LeadGradingGraphRunner:
 
     def load_extracted_lead(self, state: LeadGradingGraphState) -> LeadGradingGraphState:
         self.mark("load_extracted_lead")
-        if state.agent_mode != "shadow":
-            raise ValueError("Lead Grading 第四阶段只允许 shadow_run。")
+        if state.agent_mode not in {"active", "shadow"}:
+            raise ValueError("Lead Grading agent_mode 只允许 active 或 shadow。")
         if not isinstance(state.extracted_lead, LeadExtractionCandidate):
             state.extracted_lead = LeadExtractionCandidate(**state.extracted_lead)
-        state.audit.update({"agent_mode": "shadow", "source_url": state.extracted_lead.source_url})
+        state.audit.update({"agent_mode": state.agent_mode, "source_url": state.extracted_lead.source_url})
         self.set_node_summary(state, "load_extracted_lead", {"source_url": state.extracted_lead.source_url})
         return state
 
@@ -258,7 +264,7 @@ class LeadGradingGraphRunner:
         output = LeadGradingAgentOutput(
             schema_version="phase4.agent.lead_grading.v1",
             grading_run_id=state.grading_run_id,
-            agent_mode="shadow",
+            agent_mode=state.agent_mode,
             suggestions=[state.suggestion] if state.suggestion else [],
             audit=state.audit,
         )

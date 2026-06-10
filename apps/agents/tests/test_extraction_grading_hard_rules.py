@@ -12,6 +12,7 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.agent_service_run import AgentServiceRun
 from app.settings import get_settings
+from tests.prompt_helpers import seed_prompt_templates
 
 
 VALID_SOURCE_TEXT = """
@@ -32,6 +33,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("LEAD_EXTRACTION", "LEAD_GRADING"))
     try:
         yield db
     finally:

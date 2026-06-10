@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from app.graphs.lead_extraction import (
     LEAD_EXTRACTION_NODE_SEQUENCE,
+    LLMLeadFieldExtractor,
     LeadExtractionGraphRunner,
     LeadExtractionGraphState,
 )
@@ -15,6 +16,15 @@ Contact: sales@autocity.example, +971 50 123 4567.
 Located in Dubai, United Arab Emirates. Website: https://autocity.example.
 The company says it can arrange export documentation and shipping.
 """
+
+
+class StubLeadFieldExtractor(LLMLeadFieldExtractor):
+    def __init__(self, output):
+        self.output = output
+        self.last_audit = {"used": True, "provider": "stub", "model": "stub"}
+
+    def extract(self, *, source_url: str, source_content: str):
+        return self.output
 
 
 def test_lead_extraction_graph_declares_required_node_sequence() -> None:
@@ -84,18 +94,18 @@ def test_lead_extraction_graph_keeps_missing_reason_for_absent_key_fields() -> N
     assert result.output.validation_errors == []
 
 
-def test_lead_extraction_graph_rejects_active_mode_and_empty_content() -> None:
+def test_lead_extraction_graph_accepts_active_mode_and_rejects_empty_content() -> None:
     runner = LeadExtractionGraphRunner()
 
-    with pytest.raises(ValueError, match="Lead Extraction 第四阶段只允许 shadow_run"):
-        runner.run(
-            LeadExtractionGraphState(
-                extraction_run_id="22222222-2222-2222-2222-222222222222",
-                source_url="https://autocity.example",
-                source_content=PUBLIC_SOURCE_TEXT,
-                agent_mode="active",
-            )
+    active_result = runner.run(
+        LeadExtractionGraphState(
+            extraction_run_id="22222222-2222-2222-2222-222222222222",
+            source_url="https://autocity.example",
+            source_content=PUBLIC_SOURCE_TEXT,
+            agent_mode="active",
         )
+    )
+    assert active_result.output.agent_mode == "active"
 
     with pytest.raises(ValueError, match="Lead Extraction 需要输入公开来源文本或来源内容"):
         runner.run(
@@ -141,3 +151,92 @@ def test_lead_extraction_output_schema_rejects_field_without_evidence_or_missing
         )
 
     assert "字段 company_name 必须包含证据引用或缺失原因" in str(exc_info.value)
+
+
+def test_lead_extraction_graph_collects_all_public_contact_methods_from_one_source() -> None:
+    source_text = """
+    Avtogermes sells new and used cars in Moscow, Russia. Website: https://www.avtogermes.ru/.
+    Contact sales: info@avtogermes.ru, sale@avtogermes.ru.
+    Phones: +7 495 777 7777 and +7 495 223 3333.
+    """
+    runner = LeadExtractionGraphRunner(llm_field_extractor=StubLeadFieldExtractor({}))
+
+    result = runner.run(
+        LeadExtractionGraphState(
+            extraction_run_id="22222222-2222-2222-2222-222222222222",
+            source_url="https://www.avtogermes.ru/",
+            source_content=source_text,
+            agent_mode="active",
+        )
+    )
+
+    candidate = result.output.candidates[0]
+    assert candidate.email.value == "info@avtogermes.ru"
+    assert candidate.phone.value == "+7 495 777 7777"
+    assert [contact.value for contact in candidate.contacts] == [
+        "info@avtogermes.ru",
+        "sale@avtogermes.ru",
+        "+7 495 777 7777",
+        "+7 495 223 3333",
+    ]
+    assert [contact.contact_type for contact in candidate.contacts] == ["email", "email", "phone", "phone"]
+
+
+def test_lead_extraction_graph_accepts_llm_leads_array_and_outputs_multiple_candidates() -> None:
+    source_text = """
+    Alpha Motors exports Toyota Land Cruiser from Dubai. Email alpha@example.com. Phone +971 50 111 1111.
+    Beta Cars exports Lexus LX from Dubai. Email beta@example.com. Phone +971 50 222 2222.
+    """
+    runner = LeadExtractionGraphRunner(
+        llm_field_extractor=StubLeadFieldExtractor(
+            {
+                "leads": [
+                    {
+                        "fields": {
+                            "company_name": "Alpha Motors",
+                            "email": "alpha@example.com",
+                            "phone": "+971 50 111 1111",
+                            "country": "United Arab Emirates",
+                            "city": "Dubai",
+                            "vehicle_interest": "Toyota Land Cruiser",
+                            "export_intent": "exports Toyota Land Cruiser",
+                            "website": "https://alpha.example",
+                        },
+                        "contacts": [
+                            {"type": "email", "value": "alpha@example.com"},
+                            {"type": "phone", "value": "+971 50 111 1111"},
+                        ],
+                    },
+                    {
+                        "fields": {
+                            "company_name": "Beta Cars",
+                            "email": "beta@example.com",
+                            "phone": "+971 50 222 2222",
+                            "country": "United Arab Emirates",
+                            "city": "Dubai",
+                            "vehicle_interest": "Lexus LX",
+                            "export_intent": "exports Lexus LX",
+                            "website": "https://beta.example",
+                        },
+                        "contacts": [
+                            {"type": "email", "value": "beta@example.com"},
+                            {"type": "phone", "value": "+971 50 222 2222"},
+                        ],
+                    },
+                ]
+            }
+        )
+    )
+
+    result = runner.run(
+        LeadExtractionGraphState(
+            extraction_run_id="22222222-2222-2222-2222-222222222222",
+            source_url="https://market.example/dealers",
+            source_content=source_text,
+            agent_mode="active",
+        )
+    )
+
+    assert [candidate.company_name.value for candidate in result.output.candidates] == ["Alpha Motors", "Beta Cars"]
+    assert [candidate.email.value for candidate in result.output.candidates] == ["alpha@example.com", "beta@example.com"]
+    assert result.output.audit["candidate_count"] == 2

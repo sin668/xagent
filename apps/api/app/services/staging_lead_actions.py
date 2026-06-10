@@ -134,7 +134,7 @@ class StagingLeadActionService:
         lead.recommended_reason = request.reason
         lead.requires_compliance_review = grade == CustomerGrade.C
         if grade in {CustomerGrade.WATCH, CustomerGrade.INVALID}:
-            lead.review_status = StagingReviewStatus.REJECTED
+            lead.review_status = StagingReviewStatus.PENDING_REVIEW
             lead.queue_status = StagingQueueStatus.NOT_ELIGIBLE
             lead.requires_compliance_review = False
         else:

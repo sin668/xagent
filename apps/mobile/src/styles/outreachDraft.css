@@ -107,3 +107,129 @@
   font-size: 12px;
   font-weight: 850;
 }
+
+.outreach-assistant-content {
+  padding-bottom: calc(112px + var(--safe-bottom, 0px));
+}
+
+.outreach-send-page {
+  position: relative;
+  width: 100%;
+  max-width: var(--phone-width, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow-x: hidden;
+  background: #eef3f8;
+  color: #132033;
+}
+
+.outreach-send-content {
+  overflow-x: hidden;
+  padding: 0 16px calc(112px + var(--safe-bottom, 0px));
+}
+
+.outreach-send-panel {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.outreach-send-recipient {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.outreach-send-kicker,
+.outreach-send-label {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.outreach-send-customer {
+  display: block;
+  margin-top: 5px;
+  color: #132033;
+  font-size: 18px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outreach-send-status {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 13px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 26px;
+}
+
+.outreach-send-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.outreach-send-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.outreach-send-input,
+.outreach-send-textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #132033;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.outreach-send-input {
+  height: 42px;
+  padding: 0 12px;
+}
+
+.outreach-send-textarea {
+  min-height: 220px;
+  padding: 12px;
+  line-height: 1.65;
+}
+
+.outreach-send-alert,
+.outreach-send-success {
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.55;
+}
+
+.outreach-send-alert {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.outreach-send-success {
+  border: 1px solid rgba(22, 163, 74, 0.24);
+  background: #dcfce7;
+  color: #047857;
+}

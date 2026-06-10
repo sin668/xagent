@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   mapAdminOverviewToHomeData,
+  mapCustomerDetailToLeadDetail,
   mapCustomerListToLeadPool,
   mapCustomerSummaryToLeadDetail,
   mapInventoryItems,
@@ -136,6 +137,80 @@ test('customer summary maps to detail shape and preserves missing values as Unkn
   assert.equal(detail.complianceReviewStatus, 'required');
 });
 
+test('customer detail aggregate maps to lead detail page shape without losing profile fields', () => {
+  const detail = mapCustomerDetailToLeadDetail({
+    id: 'customer-1',
+    profile: {
+      id: 'customer-1',
+      external_id: 'staging:staging-lead-1',
+      name: 'AutoCity Vladivostok',
+      country: 'Russia',
+      city: 'Vladivostok',
+      customer_type: 'local_dealer_secondary_dealer',
+      grade: 'C',
+      status: 'ready_for_sales',
+      owner_team: 'export_sales',
+    },
+    contacts: [
+      {
+        type: 'email',
+        value: 'sales@autocity-vl.example',
+        label: 'primary',
+        source_url: 'https://autocity.example/contact',
+        evidence_note: '官网联系页公开邮箱',
+      },
+    ],
+    sources: [
+      {
+        platform: 'official_website',
+        source_url: 'https://autocity.example',
+        source_title: 'AutoCity',
+        evidence_note: '官网展示车辆销售业务和联系页',
+        risk_level: 'Low',
+      },
+    ],
+    followups: [
+      {
+        team: 'customer_service',
+        content: '确认采购频率和目标价位',
+        next_action: '今日待跟进',
+      },
+    ],
+    do_not_contact: {
+      enabled: true,
+      reason: '客户拒绝继续联系',
+      marked_by: 'cs-a',
+      marked_at: '2026-06-04T09:00:00+08:00',
+    },
+    pending_fields: ['budget_range', 'delivery_city'],
+    next_action: '勿扰客户，不得触达',
+  });
+
+  assert.equal(detail.id, 'customer-1');
+  assert.equal(detail.entityType, 'customer');
+  assert.equal(detail.customerId, 'customer-1');
+  assert.equal(detail.stagingLeadId, 'staging-lead-1');
+  assert.equal(detail.customerName, 'AutoCity Vladivostok');
+  assert.equal(detail.country, 'Russia');
+  assert.equal(detail.city, 'Vladivostok');
+  assert.equal(detail.customerType, 'local_dealer_secondary_dealer');
+  assert.equal(detail.grade, 'C');
+  assert.equal(detail.status, 'pending');
+  assert.equal(detail.riskLevel, 'Low');
+  assert.equal(detail.operatingSummary, '官网展示车辆销售业务和联系页');
+  assert.deepEqual(detail.aiRecommendation.missingInfo, ['budget_range', 'delivery_city']);
+  assert.equal(detail.sources[0].type, 'official_website');
+  assert.equal(detail.sources[0].url, 'https://autocity.example');
+  assert.equal(detail.sources[0].evidence, '官网展示车辆销售业务和联系页');
+  assert.equal(detail.contacts[0].type, 'email');
+  assert.equal(detail.contacts[0].value, 'sales@autocity-vl.example');
+  assert.equal(detail.contacts[0].usage, 'primary');
+  assert.equal(detail.followUps[0].detail, '确认采购频率和目标价位');
+  assert.equal(detail.doNotContact, true);
+  assert.equal(detail.doNotContactCustomerId, 'customer-1');
+  assert.equal(detail.coreGate.canPromoteToCore, false);
+});
+
 test('staging lead list maps review fields to mobile lead pool cards', () => {
   const mapped = mapStagingLeadListToLeadPool({
     items: [
@@ -216,9 +291,14 @@ test('staging lead detail maps evidence, AI audit, missing fields, and core gate
       can_promote_to_core: true,
       reasons: ['来源和证据满足进入 core 的最低要求'],
     },
+    has_do_not_contact_match: true,
+    do_not_contact_customer_id: 'customer-dnc-1',
   });
 
   assert.equal(detail.id, 's1');
+  assert.equal(detail.entityType, 'staging');
+  assert.equal(detail.stagingLeadId, 's1');
+  assert.equal(detail.customerId, '');
   assert.equal(detail.sources.length, 2);
   assert.equal(detail.sources[0].url, 'https://dealer.example.ru');
   assert.equal(detail.sources[1].evidence, '页面包含库存、地址和公开邮箱。');
@@ -226,6 +306,8 @@ test('staging lead detail maps evidence, AI audit, missing fields, and core gate
   assert.deepEqual(detail.aiRecommendation.missingInfo, ['月采购量']);
   assert.equal(detail.coreGate.canPromoteToCore, true);
   assert.equal(detail.coreGate.reasons[0], '来源和证据满足进入 core 的最低要求');
+  assert.equal(detail.doNotContact, true);
+  assert.equal(detail.doNotContactCustomerId, 'customer-dnc-1');
 });
 
 test('inventory, outreach draft, and records map backend snake_case fields to mobile camelCase shape', () => {

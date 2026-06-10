@@ -93,11 +93,41 @@ test('llm governance view exposes provider health, prompt versions, schema summa
   assert.equal(view.defaultTemplates.length, 1);
   assert.equal(view.schemaPreview.name, 'source_discovery_default');
   assert.equal(view.schemaPreview.schemaText.includes('"candidates"'), true);
+  assert.equal(view.promptWorkbench.selectedTemplateId, 'template-source');
+  assert.equal(view.promptWorkbench.promptInputText.includes('只允许公开来源发现'), true);
+  assert.equal(view.promptWorkbench.schemaOutputText.includes('"blocked_candidates"'), true);
 
   assert.equal(view.fallbackBoundaries.length, 4);
   assert.equal(view.fallbackBoundaries[0].decisionLabel, '可 fallback');
   assert.equal(view.fallbackBoundaries[1].decisionLabel, '不 fallback');
   assert.equal(view.readOnlyNotice, '第二阶段只读：普通运营不可创建、编辑或删除 prompt template。');
+});
+
+test('llm governance view can switch prompt workbench to the selected template id', () => {
+  const view = buildLlmGovernanceView({
+    health: healthPayload,
+    templates: templatesPayload,
+    selectedTemplateId: 'template-draft',
+  });
+
+  assert.equal(view.promptWorkbench.selectedTemplateId, 'template-draft');
+  assert.equal(view.promptWorkbench.title, 'social_high_review_probe');
+  assert.equal(view.promptWorkbench.promptInputText.includes('High 风险仅人工小样本'), true);
+  assert.equal(view.promptWorkbench.promptInputText.includes('渠道：{channel}'), true);
+  assert.equal(view.promptWorkbench.schemaOutputText.includes('"blocked_candidates"'), true);
+});
+
+test('llm governance view handles empty prompt template payload without crashing', () => {
+  const view = buildLlmGovernanceView({
+    health: healthPayload,
+    templates: { total: 0, items: [] },
+  });
+
+  assert.equal(view.promptTemplates.length, 0);
+  assert.equal(view.promptWorkbench.selectedTemplateId, '');
+  assert.equal(view.promptWorkbench.title, '暂无默认 Prompt');
+  assert.equal(view.promptWorkbench.promptInputText, '暂无 Prompt 输入内容。');
+  assert.equal(view.promptWorkbench.schemaOutputText, '{}');
 });
 
 test('prompt template query supports read-only filters', () => {

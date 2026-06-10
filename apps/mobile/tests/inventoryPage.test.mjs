@@ -11,6 +11,10 @@ test('inventory page may use inventorySeed when backend inventory is unavailable
   assert.match(inventoryPage, /inventoryItems\.value = inventorySeed/);
 });
 
+test('inventory page is the insights tab destination', () => {
+  assert.match(inventoryPage, /buildBottomTabs\('insights'\)/);
+});
+
 test('seed fallback remains limited to inventory page only', () => {
   assert.doesNotMatch(leadPage, /Seed|seed/i);
   assert.doesNotMatch(homePage, /Seed|seed/i);

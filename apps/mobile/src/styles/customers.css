@@ -83,6 +83,13 @@
 .customers-metric-card {
   min-height: 72px;
   padding: 12px 8px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.customers-metric-active {
+  border-color: rgba(29, 78, 216, 0.52);
+  box-shadow: 0 14px 30px rgba(29, 78, 216, 0.14);
+  transform: translateY(-1px);
 }
 
 .customers-metric-number {
@@ -97,6 +104,10 @@
   color: #047857;
 }
 
+.customers-number-blue {
+  color: #1d4ed8;
+}
+
 .customers-number-amber {
   color: #92400e;
 }
@@ -108,39 +119,6 @@
   font-size: 11px;
   line-height: 1.25;
   font-weight: 800;
-}
-
-.customers-chip-row {
-  display: flex;
-  gap: 8px;
-  max-width: 100%;
-  margin: 14px 0 12px;
-  padding-bottom: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.customers-chip-row::-webkit-scrollbar {
-  display: none;
-}
-
-.customers-chip {
-  flex: 0 0 auto;
-  height: 34px;
-  padding: 0 13px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  border-radius: 17px;
-  background: #ffffff;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 850;
-  line-height: 34px;
-}
-
-.customers-chip-active {
-  border-color: #1d4ed8;
-  background: #1d4ed8;
-  color: #ffffff;
 }
 
 .customers-list {
@@ -281,6 +259,15 @@
   font-size: 13px;
   font-weight: 950;
   line-height: 1.35;
+}
+
+.customer-clamped-text {
+  display: -webkit-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .customer-detail-button {

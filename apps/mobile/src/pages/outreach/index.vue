@@ -1,5 +1,5 @@
 <template>
-  <view class="lead-detail-page">
+  <view class="lead-detail-page outreach-assistant-page">
     <view class="status-bar">
       <text>9:41</text>
       <view class="status-icons">
@@ -11,11 +11,14 @@
 
     <view class="nav-bar">
       <view class="nav-action" aria-label="返回" @click="goBack">‹</view>
-      <view class="nav-title">触达助手</view>
+      <view>
+        <view class="nav-title">触达助手</view>
+        <view class="nav-subtitle">AI 俄语草稿 · 人工邮件发送</view>
+      </view>
       <view class="nav-action" aria-label="语言">RU</view>
     </view>
 
-    <scroll-view scroll-y class="detail-content">
+    <scroll-view scroll-y class="detail-content outreach-assistant-content">
       <section class="detail-panel">
         <view class="pool-card-top">
           <view>
@@ -80,102 +83,42 @@
             <text class="audit-value">{{ draft.audit.outputSaved ? '是' : '否' }}</text>
           </view>
         </view>
-        <label class="confirm-row">
-          <checkbox :checked="humanConfirmed" @click="humanConfirmed = !humanConfirmed" />
-          <text>已人工审核，确认后仅记录人工发送结果</text>
-        </label>
-      </section>
-
-      <view class="detail-section-head">
-        <text class="detail-section-title">触达记录</text>
-        <text class="detail-section-note">人工登记</text>
-      </view>
-      <section class="detail-panel record-form">
-        <view class="record-field">
-          <text class="record-label">回复状态</text>
-          <picker :range="statusLabels" :value="statusIndex" @change="handleStatusChange">
-            <text class="record-input">{{ statusOptions[statusIndex].label }}</text>
-          </picker>
-        </view>
-        <view class="record-field">
-          <text class="record-label">负责人</text>
-          <input v-model="owner" class="record-input" />
-        </view>
-        <view class="record-field">
-          <text class="record-label">下一步动作</text>
-          <input v-model="nextAction" class="record-input" />
-        </view>
-        <view class="record-field">
-          <text class="record-label">结果摘要</text>
-          <textarea v-model="summary" class="record-input" auto-height />
-        </view>
-        <view v-if="recordDecision.reason" class="blocked-note">{{ recordDecision.reason }}</view>
       </section>
     </scroll-view>
 
-    <view class="tabbar">
-      <view
-        v-for="tab in bottomTabs"
-        :key="tab.label"
-        :class="['tab', tab.active ? 'tab-active' : '', tab.disabled ? 'tab-disabled' : '']"
-        @click="openTab(tab)"
-      >
-        <text class="tab-icon">{{ tab.icon }}</text>
-        <text>{{ tab.label }}</text>
-      </view>
-    </view>
-
-    <view class="action-bar action-bar-above-tabbar">
-      <button class="detail-button detail-button-secondary">编辑</button>
+    <view class="followup-action-bar followup-action-bar-above-safe-area">
+      <button class="followup-button followup-button-secondary" @click="goBack">返回</button>
       <button
-        :class="['detail-button', canRecord ? 'detail-button-primary' : 'detail-button-disabled']"
-        :disabled="!canRecord"
-        @click="recordSent"
+        :class="['followup-button', draft.canRecordSent ? 'followup-button-primary' : 'followup-button-disabled']"
+        :disabled="!draft.canRecordSent"
+        @click="openEmailSend"
       >
-        {{ sentRecord ? '已记录' : recordButtonLabel }}
+        编辑
       </button>
     </view>
   </view>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { onLoad as onUniLoad } from '@dcloudio/uni-app';
+import { computed, ref } from 'vue';
 
 import { mapOutreachDraft } from '../../services/apiAdapters.js';
 import { apiClient } from '../../services/apiClient.js';
-import { buildBottomTabs, navigateBottomTab } from '../../services/bottomTabs.js';
-import {
-  buildOutreachDraftViewModel,
-  canRecordManualSend,
-  createManualSendRecord,
-} from '../../services/outreachDraft.js';
-import {
-  buildOutreachRecordPayload,
-  canCreateOutreachRecord,
-  getOutreachStatusOptions,
-  isBackendCustomerId,
-} from '../../services/outreachRecord.js';
+import { customersService } from '../../services/customers.js';
+import { buildOutreachDraftViewModel, firstEmailContact } from '../../services/outreachDraft.js';
 import '../../styles/home.css';
 import '../../styles/leadPool.css';
 import '../../styles/leadDetail.css';
 import '../../styles/outreachDraft.css';
-import '../../styles/outreachRecord.css';
+import '../../styles/customerFollowups.css';
 
-const humanConfirmed = ref(false);
-const sentRecord = ref(null);
-const statusOptions = getOutreachStatusOptions();
-const statusLabels = statusOptions.map((option) => option.label);
-const statusIndex = ref(0);
-const owner = ref('当前用户');
-const nextAction = ref('等待回复');
-const summary = ref('已人工发送俄语触达草稿。');
-const bottomTabs = buildBottomTabs('email');
 const emptyLead = {
   id: '',
   customerName: 'Unknown',
   grade: 'Unknown',
-  channel: 'Unknown',
-  riskLevel: 'Unknown',
+  channel: 'Email',
+  riskLevel: 'Low',
   doNotContact: false,
 };
 const emptyDraft = {
@@ -195,8 +138,11 @@ const emptyDraft = {
     outputSaved: false,
   },
 };
+
 const lead = ref(emptyLead);
 const draftState = ref(emptyDraft);
+const recipientEmail = ref('');
+const customerId = ref('');
 const draft = computed(() =>
   buildOutreachDraftViewModel({
     lead: lead.value,
@@ -204,97 +150,74 @@ const draft = computed(() =>
   }),
 );
 const passedCount = computed(() => draft.value.complianceChecks.filter((check) => check.passed).length);
-const recordDecision = computed(() =>
-  canCreateOutreachRecord({
-    lead: lead.value,
-    status: statusOptions[statusIndex.value].value,
-    manualConfirmed: humanConfirmed.value,
-  }),
-);
-const canRecord = computed(
-  () => canRecordManualSend(draft.value, { humanConfirmed: humanConfirmed.value }) && recordDecision.value.allowed,
-);
-const recordButtonLabel = computed(() => `记录${statusOptions[statusIndex.value].label}`);
 
-function getCurrentLeadId() {
-  return globalThis.getCurrentPages?.()?.at(-1)?.options?.leadId || lead.value.id;
+onUniLoad((options = {}) => {
+  initializeFromOptions(options);
+});
+
+if (globalThis.location?.search) {
+  const params = new URLSearchParams(globalThis.location.search);
+  initializeFromOptions({
+    leadId: params.get('leadId') || '',
+    customerId: params.get('customerId') || '',
+  });
 }
 
-onMounted(async () => {
-  const leadId = getCurrentLeadId();
+async function initializeFromOptions(options = {}) {
+  const routeId = options.customerId || options.leadId || '';
+  if (!routeId || routeId === customerId.value) {
+    return;
+  }
+  customerId.value = routeId;
   lead.value = {
     ...emptyLead,
-    id: leadId,
+    id: routeId,
   };
+  await loadDraft(routeId);
+}
+
+async function loadDraft(id) {
   try {
-    const payload = await apiClient.get(`/outreach-drafts/${encodeURIComponent(leadId)}`);
-    draftState.value = mapOutreachDraft(payload);
+    const [draftPayload, customerDetail, stagingDetail] = await Promise.all([
+      apiClient.get(`/outreach-drafts/${encodeURIComponent(id)}`),
+      customersService.getCustomerDetail(id).catch(() => null),
+      apiClient.get(`/staging-leads/${encodeURIComponent(id)}`).catch(() => null),
+    ]);
+    const stagingLead = stagingDetail?.staging_lead || stagingDetail || {};
+    const emailContact = firstEmailContact([
+      ...(customerDetail?.contacts || []),
+      ...(stagingLead.contacts_json || stagingLead.contacts || []),
+    ]);
+    recipientEmail.value = emailContact?.value || '';
+    draftState.value = mapOutreachDraft(draftPayload);
     lead.value = {
       ...lead.value,
-      id: leadId,
-      customerName: payload.customer_name || lead.value.customerName,
+      id,
+      customerName: draftPayload.customer_name || customerDetail?.profile?.name || stagingLead.customer_name || lead.value.customerName,
+      grade: customerDetail?.profile?.grade || stagingLead.recommended_grade || lead.value.grade,
+      channel: 'Email',
+      riskLevel: customerDetail?.sources?.[0]?.riskLevel || stagingLead.source_risk_level || lead.value.riskLevel,
+      doNotContact: Boolean(customerDetail?.doNotContact?.enabled || stagingDetail?.has_do_not_contact_match),
     };
   } catch (_error) {
     draftState.value = emptyDraft;
   }
-});
-
-async function recordSent() {
-  if (!canRecord.value) {
-    return;
-  }
-
-  const backendCustomerId = draft.value.leadId;
-  const draftRecord = createManualSendRecord(draft.value, {
-    humanConfirmed: humanConfirmed.value,
-    sender: owner.value,
-    channel: draft.value.channel,
-  });
-  sentRecord.value = {
-    ...draftRecord,
-    payload: buildOutreachRecordPayload({
-      channel: draft.value.channel,
-      status: statusOptions[statusIndex.value].value,
-      sender: owner.value,
-      owner: owner.value,
-      summary: summary.value,
-      nextAction: nextAction.value,
-      manualConfirmed: humanConfirmed.value,
-      doNotContactReason: statusOptions[statusIndex.value].value === 'rejected' ? '客户明确拒绝继续联系' : null,
-      scriptVersion: draft.value.versionLabel,
-    }),
-  };
-
-  if (!isBackendCustomerId(backendCustomerId)) {
-    sentRecord.value = {
-      ...sentRecord.value,
-      syncStatus: 'local_only',
-    };
-    return;
-  }
-
-  try {
-    await apiClient.post(`/outreach-drafts/${encodeURIComponent(backendCustomerId)}/record-manual-send`, {
-      human_confirmed: humanConfirmed.value,
-      sender: owner.value,
-      channel: sentRecord.value.payload.channel,
-    });
-  } catch (_error) {
-    try {
-      await apiClient.post(`/customers/${encodeURIComponent(backendCustomerId)}/outreach-records`, sentRecord.value.payload);
-    } catch (_fallbackError) {
-      sentRecord.value = {
-        ...sentRecord.value,
-        syncStatus: 'pending',
-      };
-    }
-  }
 }
 
-function handleStatusChange(event) {
-  statusIndex.value = Number(event.detail.value);
-  if (statusOptions[statusIndex.value].value === 'rejected') {
-    nextAction.value = '标记勿扰';
+function openEmailSend() {
+  const payload = {
+    customerId: customerId.value || draft.value.leadId,
+    toEmail: recipientEmail.value,
+    subject: draft.value.subject,
+    body: draft.value.body,
+    customerName: draft.value.customerName,
+  };
+  globalThis.__xagentOutreachEmailDraft = payload;
+  if (globalThis.uni?.navigateTo) {
+    const query = new URLSearchParams({
+      customerId: payload.customerId || '',
+    }).toString();
+    globalThis.uni.navigateTo({ url: `/pages/outreach/send?${query}` });
   }
 }
 
@@ -302,9 +225,5 @@ function goBack() {
   if (globalThis.uni?.navigateBack) {
     globalThis.uni.navigateBack();
   }
-}
-
-function openTab(tab) {
-  navigateBottomTab(tab);
 }
 </script>

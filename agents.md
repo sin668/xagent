@@ -10,28 +10,16 @@
 <claude-mem-context>
 # Memory Context
 
-# [xagent] recent context, 2026-06-08 4:06pm GMT+8
+# [xagent] recent context, 2026-06-10 6:10pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 33 obs (14,155t read) | 0t work
+Stats: 50 obs (17,252t read) | 111,126t work | 84% savings
 
-### May 25, 2026
-692 2:57p ✅ Added failure case library concept to overseas vehicle procurement AI acquisition system
-698 6:06p ✅ Added cost and ROI dimension to overseas vehicle procurement AI acquisition system
 ### May 26, 2026
-700 9:31a ✅ Established cost control limits for PoC phase of overseas vehicle acquisition system
-706 9:32a ✅ Added ROI metrics hierarchy to overseas vehicle acquisition system cost framework
-695 9:33a ✅ Expanded overseas vehicle procurement AI acquisition system brainstorming with PoC/MVP roadmap
-707 9:34a ⚖️ Selected Plan B implementation approach for overseas vehicle acquisition system
-708 9:54a 🟣 Created comprehensive design specification for overseas vehicle acquisition AI system
-724 10:54a 🟣 Generated professional PowerPoint presentation for overseas vehicle procurement AI system
-726 10:59a ✅ Refined and regenerated PowerPoint presentation for overseas vehicle procurement AI acquisition system
 740 1:57p ✅ Setup implementation planning infrastructure for BMAD project
-741 " 🔵 BMAD implementation plan completed with comprehensive two-phase structure
-742 " ✅ BMAD implementation plan created with comprehensive two-phase structure
 743 2:03p ✅ BMAD implementation plan finalized with comprehensive task breakdown
 752 2:04p 🟣 MVP prototype infrastructure created for overseas vehicle leads AI system
 759 2:05p 🟣 Headless Chrome screenshot automation for prototype validation
@@ -55,4 +43,35 @@ Stats: 33 obs (14,155t read) | 0t work
 S135 Fixed IndexError in seed data script - customer grade array access now uses modulo to prevent index out of range (Jun 1 at 2:14 PM)
 838 4:18p 🔵 Discovered LLM agent integration configuration gap between .env and Settings
 839 4:20p 🔵 Confirmed LLM integration architecture uses external agent processing with no internal API client
+### Jun 10, 2026
+925 2:11p 🟣 Mobile homepage statistics display requirements identified
+926 " 🔵 Mobile app statistics tracking already implemented in homeMetrics service
+927 2:13p 🔵 Homepage statistics implementation matches user requirements via buildHomeLeadStats function
+928 2:14p 🔵 Homepage statistics pipeline uses backend summary data processed through buildHomeDashboard
+937 2:17p 🔵 Homepage cleaned leads statistic showing incorrect count
+938 2:26p 🔵 Cleaned leads count discrepancy detected on homepage
+939 " 🔴 Backend API returning incorrect total count for lead cleanup suggestions
+941 " 🔵 Second homepage statistics discrepancy discovered for A/B/C grade leads
+942 " 🔵 Homepage A/B/C级线索 count discrepancy traced to different data sources
+940 2:27p 🔵 API endpoint returning incorrect total count confirmed through testing
+943 2:31p 🟣 Customer details page enhancement with manual field completion
+944 2:59p 🔵 Current customer detail page layout and enhancement requirements identified
+946 " 🔵 Customer detail page manual enrichment enhancement requirements and implementation patterns identified
+948 " 🔵 Customer detail page enhancement test requirements defined for manual recording implementation
+945 3:00p 🔵 Customer detail page enhancement patterns identified from lead details and followups pages
+949 3:01p 🟣 Adding manual data entry for pending customer fields
+947 3:02p 🔵 Customer detail page enhancement patterns analyzed for manual recording implementation
+950 3:06p 🟣 Implemented manual field entry for customer pending fields
+951 3:08p 🟣 Manual customer field entry feature implemented and tested successfully
+952 " 🟣 CSS styling implemented for manual field entry UI components
+954 3:10p 🔵 Customer detail page enhancement requirements identified
+953 3:14p 🟣 Manual field entry feature completed with full test coverage and build verification
+955 3:45p 🔵 Build System Output Shows uniCloud Hosting
+956 4:19p 🔴 Do Not Contact Status Persistence Fixed in API Adapter
+957 4:23p 🔴 Do Not Contact State Persistence Bug Fixed Across Full Stack
+958 4:30p 🟣 Customer redirect logic re-applied to lead detail page
+959 5:29p 🟣 Mobile outreach email sending with Industrial Luxury aesthetic
+960 5:47p 🔵 Backend API datetime.utcnow() deprecation warning in outreach draft service
+
+Access 111k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

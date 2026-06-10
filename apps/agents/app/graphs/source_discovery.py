@@ -10,6 +10,7 @@ from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.source_discovery import SourceCandidateOutput, SourceDiscoveryAgentOutput
 from app.services.agent_logging import run_logged_node
 from app.services.llm_client import LLMClient
+from app.services.llm_prompt_repository import LLMPromptRepository, LLMPromptTemplateNotFound
 
 
 SOURCE_DISCOVERY_NODE_SEQUENCE = (
@@ -39,6 +40,7 @@ class SourceDiscoveryGraphState:
     requested_actions: list[str] = field(default_factory=list)
     search_results: list[dict[str, Any]] = field(default_factory=list)
     discovery_queries: list[str] = field(default_factory=list)
+    llm_candidates: list[dict[str, Any]] = field(default_factory=list)
     raw_candidates: list[dict[str, Any]] = field(default_factory=list)
     normalized_candidates: list[dict[str, Any]] = field(default_factory=list)
     deduped_candidates: list[dict[str, Any]] = field(default_factory=list)
@@ -59,42 +61,58 @@ class EmptySourceSearchTool:
 
 
 class LLMSourceDiscoveryQueryPlanner:
-    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, *, llm_client: LLMClient | None = None, prompt_repository: LLMPromptRepository | None = None) -> None:
         self.llm_client = llm_client or LLMClient()
+        self.prompt_repository = prompt_repository or LLMPromptRepository()
         self.last_audit: dict[str, Any] = {}
 
-    def plan(self, *, market: str, channel_strategy: dict[str, Any], fallback_queries: list[str]) -> list[str]:
+    def plan(self, *, market: str, channel_strategy: dict[str, Any], fallback_queries: list[str]) -> dict[str, Any]:
+        task_type = "SOURCE_DISCOVERY"
+        model = self.llm_client._model_for_task(task_type)
+        try:
+            prompt = self.prompt_repository.load_active_default(
+                task_type=task_type,
+                provider=self.llm_client.settings.llm_provider,
+                model=model,
+            )
+        except LLMPromptTemplateNotFound as exc:
+            self.last_audit = {
+                "used": False,
+                "provider": self.llm_client.settings.llm_provider,
+                "model": model,
+                "error": {"type": exc.error_type, "message": str(exc)},
+            }
+            raise
         result = self.llm_client.generate_json(
-            task_type="SOURCE_DISCOVERY",
-            system_prompt=(
-                "你是海外车辆采购获客系统的来源发现 Agent。"
-                "只基于公开 Low/Medium 风险渠道生成搜索查询，不生成登录、私域、反爬或自动写入动作。"
+            task_type=task_type,
+            system_prompt=prompt.system_prompt,
+            user_prompt=prompt.render_user_prompt(
+                {
+                    "market": market,
+                    "country": market,
+                    "city": "Unknown",
+                    "channel_strategy": channel_strategy,
+                    "fallback_queries": fallback_queries,
+                }
             ),
-            user_prompt=(
-                f"目标市场：{market}\n"
-                f"渠道策略：{channel_strategy}\n"
-                f"规则兜底查询：{fallback_queries}\n"
-                "请扩展可用于公开搜索的来源发现查询。"
-            ),
-            output_schema={
-                "type": "object",
-                "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
-                "required": ["queries"],
-            },
+            output_schema=prompt.output_schema_json,
         )
         self.last_audit = {
             "used": result.error is None,
             "provider": result.provider,
             "model": result.model,
             "token_usage": result.token_usage,
+            **prompt.audit,
         }
         if result.error:
             self.last_audit["error"] = result.error
-            return fallback_queries
+            return {"queries": fallback_queries, "candidates": []}
         output = result.output_json if isinstance(result.output_json, dict) else {}
         queries = [str(item).strip() for item in output.get("queries") or [] if str(item).strip()]
+        candidates = [item for item in output.get("candidates") or [] if isinstance(item, dict)]
         self.last_audit["queries"] = queries
-        return queries or fallback_queries
+        self.last_audit["candidate_count"] = len(candidates)
+        return {"queries": queries or fallback_queries, "candidates": candidates}
 
 
 class SourceDiscoveryGraphRunner:
@@ -105,10 +123,11 @@ class SourceDiscoveryGraphRunner:
         *,
         search_tool=None,
         llm_query_planner: LLMSourceDiscoveryQueryPlanner | None = None,
+        prompt_repository: LLMPromptRepository | None = None,
         boundary: ApiContractBoundary | None = None,
     ) -> None:
         self.search_tool = search_tool or EmptySourceSearchTool()
-        self.llm_query_planner = llm_query_planner or LLMSourceDiscoveryQueryPlanner()
+        self.llm_query_planner = llm_query_planner or LLMSourceDiscoveryQueryPlanner(prompt_repository=prompt_repository)
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -143,12 +162,12 @@ class SourceDiscoveryGraphRunner:
 
     def load_channel_strategy(self, state: SourceDiscoveryGraphState) -> SourceDiscoveryGraphState:
         self.mark("load_channel_strategy")
-        if state.agent_mode != "shadow":
-            raise ValueError("Source Discovery 第四阶段只允许 shadow_run。")
+        if state.agent_mode not in {"active", "shadow"}:
+            raise ValueError("Source Discovery agent_mode 只允许 active 或 shadow。")
         if FORBIDDEN_SOURCE_DISCOVERY_ACTIONS & set(state.requested_actions):
             raise ValueError("Source Discovery 不允许登录采集、私有数据采集、反爬规避或自动写入来源池。")
-        state.audit.update({"agent_mode": "shadow", "market": state.market})
-        self.set_node_summary(state, "load_channel_strategy", {"agent_mode": "shadow"})
+        state.audit.update({"agent_mode": state.agent_mode, "market": state.market})
+        self.set_node_summary(state, "load_channel_strategy", {"agent_mode": state.agent_mode})
         return state
 
     def build_discovery_queries(self, state: SourceDiscoveryGraphState) -> SourceDiscoveryGraphState:
@@ -158,13 +177,19 @@ class SourceDiscoveryGraphRunner:
         segments = [str(item).strip() for item in strategy.get("target_segments") or [] if str(item).strip()]
         base_terms = keywords or segments or ["used cars dealer"]
         fallback_queries = [f"{state.market} {term}".strip() for term in base_terms]
-        state.discovery_queries = self.llm_query_planner.plan(
+        plan_result = self.llm_query_planner.plan(
             market=state.market,
             channel_strategy=strategy,
             fallback_queries=fallback_queries,
         )
+        state.discovery_queries = list(plan_result.get("queries") or fallback_queries)
+        state.llm_candidates = list(plan_result.get("candidates") or [])
         state.audit["llm_query_planner"] = dict(self.llm_query_planner.last_audit)
-        self.set_node_summary(state, "build_discovery_queries", {"query_count": len(state.discovery_queries)})
+        self.set_node_summary(
+            state,
+            "build_discovery_queries",
+            {"query_count": len(state.discovery_queries), "llm_candidate_count": len(state.llm_candidates)},
+        )
         return state
 
     def search_public_sources(self, state: SourceDiscoveryGraphState) -> SourceDiscoveryGraphState:
@@ -179,8 +204,9 @@ class SourceDiscoveryGraphRunner:
             }
             for url in state.seed_urls
         ]
+        llm_candidates = [self.normalize_llm_candidate(item) for item in state.llm_candidates]
         searched = list(state.search_results or self.search_tool.search(state.discovery_queries))
-        state.raw_candidates = [*seed_candidates, *searched]
+        state.raw_candidates = [*seed_candidates, *llm_candidates, *searched]
         self.set_node_summary(state, "search_public_sources", {"raw_candidate_count": len(state.raw_candidates)})
         return state
 
@@ -299,7 +325,7 @@ class SourceDiscoveryGraphRunner:
         output = SourceDiscoveryAgentOutput(
             schema_version="phase4.agent.source_discovery.v1",
             discovery_run_id=state.discovery_run_id,
-            agent_mode="shadow",
+            agent_mode=state.agent_mode,
             candidates=state.candidates,
             blocked_items=state.blocked_items,
             audit=state.audit,
@@ -318,6 +344,7 @@ class SourceDiscoveryGraphRunner:
             requested_actions=list(result.get("requested_actions") or []),
             search_results=list(result.get("search_results") or []),
             discovery_queries=list(result.get("discovery_queries") or []),
+            llm_candidates=list(result.get("llm_candidates") or []),
             raw_candidates=list(result.get("raw_candidates") or []),
             normalized_candidates=list(result.get("normalized_candidates") or []),
             deduped_candidates=list(result.get("deduped_candidates") or []),
@@ -352,6 +379,20 @@ class SourceDiscoveryGraphRunner:
         if normalized in {"private_platform", "login_required"}:
             return "unknown"
         return "unknown"
+
+    @staticmethod
+    def normalize_llm_candidate(item: dict[str, Any]) -> dict[str, Any]:
+        url = item.get("url") or item.get("source_url") or ""
+        source_type = item.get("source_type") or item.get("platform") or item.get("channel_type") or "unknown"
+        evidence = item.get("evidence_summary") or item.get("evidence_note") or item.get("discovery_reason") or ""
+        title = item.get("title") or item.get("channel_name") or item.get("platform") or url
+        return {
+            "url": str(url).strip(),
+            "title": str(title).strip(),
+            "snippet": str(evidence).strip(),
+            "source_type": str(source_type).strip(),
+            "discovery_query": item.get("discovery_query") or item.get("query"),
+        }
 
     @staticmethod
     def evidence_summary(item: dict[str, Any]) -> str:

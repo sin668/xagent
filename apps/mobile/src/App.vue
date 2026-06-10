@@ -80,6 +80,7 @@ body {
     .customer-detail-page,
     .customer-followups-page,
     .lead-cleanup-page,
+    .outreach-send-page,
     .email-replies-page,
     .email-reply-detail-page
   ) {

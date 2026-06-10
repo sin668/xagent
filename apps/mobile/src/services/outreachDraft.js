@@ -1,3 +1,5 @@
+import { apiClient } from './apiClient.js';
+
 const BLOCKED_RISK_LEVELS = new Set(['High', 'Forbidden']);
 const FORBIDDEN_PATTERNS = [
   /финальн\w*\s+цен/i,
@@ -134,5 +136,31 @@ export function createManualSendRecord(viewModel, { humanConfirmed, sender, sent
     channel: channel || viewModel.channel,
     status: 'sent_manual',
     autoSend: false,
+  };
+}
+
+export function firstEmailContact(contacts = []) {
+  return (Array.isArray(contacts) ? contacts : []).find((contact) => {
+    const type = String(contact?.type || '').trim().toLowerCase();
+    const value = String(contact?.value || '').trim();
+    return Boolean(value) && (type === 'email' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+  }) || null;
+}
+
+export function buildOutreachEmailPayload({ toEmail, subject, body, sender = '当前用户' } = {}) {
+  return {
+    to_email: String(toEmail || '').trim(),
+    subject: String(subject || '').trim(),
+    body: String(body || '').trim(),
+    sender: sender || '当前用户',
+    human_confirmed: true,
+  };
+}
+
+export function createOutreachEmailService({ client = apiClient } = {}) {
+  return {
+    sendEmail(customerId, payload) {
+      return client.post(`/outreach-drafts/${encodeURIComponent(customerId)}/send-email`, buildOutreachEmailPayload(payload));
+    },
   };
 }

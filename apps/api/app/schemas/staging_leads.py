@@ -137,6 +137,8 @@ class StagingLeadDetailResponse(BaseModel):
     latest_page_snapshot: PageSnapshotEvidenceResponse | None = None
     ai_audit_summary: AIAuditSummaryResponse
     core_gate: CoreGateResponse
+    has_do_not_contact_match: bool = False
+    do_not_contact_customer_id: UUID | None = None
 
 
 class DuplicateResolveRequest(BaseModel):

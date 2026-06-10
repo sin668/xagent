@@ -12,6 +12,7 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.agent_service_run import AgentServiceRun
 from app.settings import get_settings
+from tests.prompt_helpers import seed_prompt_templates
 
 
 PUBLIC_SOURCE_TEXT = """
@@ -32,6 +33,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("LEAD_EXTRACTION", "LEAD_GRADING"))
     try:
         yield db
     finally:
@@ -71,6 +73,39 @@ def lead_extraction_grading_payload(*, agent_mode: str = "shadow", risk_flags: l
         },
         "options": {"max_retries": 2, "timeout_seconds": 120, "shadow_mode": True},
     }
+
+
+def lead_extraction_grading_batch_payload() -> dict:
+    payload = lead_extraction_grading_payload(agent_mode="active")
+    payload["trigger_source"] = "scheduler"
+    payload["agent_mode"] = "active"
+    payload["options"] = {"max_retries": 2, "timeout_seconds": 120, "shadow_mode": False}
+    payload["input"] = {
+        "combined_run_id": "11111111-1111-1111-1111-111111111111",
+        "source_url": "https://autocity.example",
+        "source_content": PUBLIC_SOURCE_TEXT,
+        "sources": [
+            {
+                "request_id": "33333333-3333-3333-3333-333333333331",
+                "source_candidate_id": "candidate-1",
+                "candidate_url_id": "candidate-url-1",
+                "source_url": "https://autocity.example",
+                "source_content": PUBLIC_SOURCE_TEXT,
+                "risk_flags": [],
+                "expected_contacts": {},
+            },
+            {
+                "request_id": "33333333-3333-3333-3333-333333333332",
+                "source_candidate_id": "candidate-2",
+                "candidate_url_id": "candidate-url-2",
+                "source_url": "https://autocity-second.example",
+                "source_content": PUBLIC_SOURCE_TEXT.replace("sales@autocity.example", "sales@autocity-second.example"),
+                "risk_flags": [],
+                "expected_contacts": {},
+            },
+        ],
+    }
+    return payload
 
 
 def test_lead_extraction_grading_api_requires_internal_api_key(client: TestClient) -> None:
@@ -143,6 +178,33 @@ def test_lead_extraction_grading_api_runs_shadow_combined_flow_and_records_run(
     assert persisted.audit_json["writes_core_tables"] is False
 
 
+def test_lead_extraction_grading_api_processes_sources_in_one_batch_agent_run(
+    client: TestClient,
+    session: Session,
+) -> None:
+    response = client.post(
+        "/agent-runs/lead-extraction-grading",
+        json=lead_extraction_grading_batch_payload(),
+        headers={"X-Agents-Api-Key": "phase4-secret"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "succeeded"
+    assert body["agent_type"] == "lead_extraction_grading"
+    assert body["agent_mode"] == "active"
+    output = body["output"]
+    assert len(output["batch_results"]) == 2
+    assert [item["source_candidate_id"] for item in output["batch_results"]] == ["candidate-1", "candidate-2"]
+    assert all(item["status"] == "succeeded" for item in output["batch_results"])
+    assert body["audit"]["source_urls"] == ["https://autocity.example", "https://autocity-second.example"]
+
+    persisted = session.get(AgentServiceRun, UUID(body["agent_service_run_id"]))
+    assert persisted is not None
+    assert persisted.output_summary_json["batch_source_count"] == 2
+    assert persisted.output_summary_json["batch_succeeded_count"] == 2
+
+
 def test_lead_extraction_grading_api_preserves_hard_rule_summary(client: TestClient) -> None:
     response = client.post(
         "/agent-runs/lead-extraction-grading",
@@ -164,10 +226,10 @@ def test_lead_extraction_grading_api_preserves_hard_rule_summary(client: TestCli
     }
 
 
-def test_lead_extraction_grading_api_blocks_active_mode(client: TestClient, session: Session) -> None:
+def test_lead_extraction_grading_api_blocks_dry_run_mode(client: TestClient, session: Session) -> None:
     response = client.post(
         "/agent-runs/lead-extraction-grading",
-        json=lead_extraction_grading_payload(agent_mode="active"),
+        json=lead_extraction_grading_payload(agent_mode="dry_run"),
         headers={"X-Agents-Api-Key": "phase4-secret"},
     )
 
@@ -175,10 +237,10 @@ def test_lead_extraction_grading_api_blocks_active_mode(client: TestClient, sess
     body = response.json()
     assert body["status"] == "failed"
     assert body["agent_type"] == "lead_extraction_grading"
-    assert body["agent_mode"] == "active"
+    assert body["agent_mode"] == "dry_run"
     assert body["output"] is None
     assert body["error"]["error_type"] == "risk_blocked"
-    assert "Lead Extraction/Grading 第四阶段只允许 shadow_run" in body["error"]["message"]
+    assert "Lead Extraction/Grading agent_mode 只允许 active 或 shadow" in body["error"]["message"]
 
     persisted = session.get(AgentServiceRun, UUID(body["agent_service_run_id"]))
     assert persisted is not None

@@ -121,9 +121,13 @@ def test_do_not_contact_match_blocks_manual_promotion_even_with_accepted_fields(
 
 def test_do_not_contact_lookup_matches_existing_customer_name_case_insensitively() -> None:
     lead = build_lead(customer_name="Auto City Moscow")
-    session = CapturingSession(scalar_results=[uuid4()])
+    customer_id = uuid4()
+    session = CapturingSession(scalar_results=[customer_id])
     service = CustomerPromotionService(session)
 
+    assert service.find_do_not_contact_customer_id(lead) == customer_id
+    session = CapturingSession(scalar_results=[customer_id])
+    service = CustomerPromotionService(session)
     assert service.has_do_not_contact_match(lead) is True
 
     compiled = str(session.scalars_called[0].compile(compile_kwargs={"literal_binds": True}))
@@ -133,9 +137,13 @@ def test_do_not_contact_lookup_matches_existing_customer_name_case_insensitively
 
 def test_do_not_contact_lookup_matches_contact_method_value_case_insensitively() -> None:
     lead = build_lead(customer_name="Different Dealer")
-    session = CapturingSession(scalar_results=[None, uuid4()])
+    customer_id = uuid4()
+    session = CapturingSession(scalar_results=[None, customer_id])
     service = CustomerPromotionService(session)
 
+    assert service.find_do_not_contact_customer_id(lead) == customer_id
+    session = CapturingSession(scalar_results=[None, customer_id])
+    service = CustomerPromotionService(session)
     assert service.has_do_not_contact_match(lead) is True
 
     compiled = str(session.scalars_called[1].compile(compile_kwargs={"literal_binds": True}))
@@ -148,6 +156,9 @@ def test_do_not_contact_lookup_targets_only_customers_marked_do_not_contact() ->
     session = CapturingSession(scalar_results=[None, None])
     service = CustomerPromotionService(session)
 
+    assert service.find_do_not_contact_customer_id(lead) is None
+    session = CapturingSession(scalar_results=[None, None])
+    service = CustomerPromotionService(session)
     assert service.has_do_not_contact_match(lead) is False
 
     name_statement = str(session.scalars_called[0])

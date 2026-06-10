@@ -10,6 +10,7 @@ from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.lead_cleanup import CleanupAgentOutput, CleanupSuggestionOutput
 from app.services.agent_logging import run_logged_node
 from app.services.llm_client import LLMClient
+from app.services.llm_prompt_repository import LLMPromptRepository, LLMPromptTemplateNotFound
 from app.tools.duplicate_detector import DuplicateDetector
 
 
@@ -24,6 +25,49 @@ LEAD_CLEANUP_NODE_SEQUENCE = (
 )
 
 FORBIDDEN_CLEANUP_ACTIONS = {"auto_execute_cleanup", "delete_leads", "restore_invalid"}
+VALID_SUGGESTION_TYPES = {
+    "strong_duplicate",
+    "possible_duplicate",
+    "merge_contact_method",
+    "merge_source_evidence",
+    "restore_from_watch",
+    "confirm_invalid",
+    "mark_abandoned",
+    "needs_manual_review",
+}
+SUGGESTION_TYPE_ALIASES = {
+    "keep_watch": "needs_manual_review",
+    "keep_invalid": "needs_manual_review",
+    "keep_as_watch": "needs_manual_review",
+    "keep_as_invalid": "needs_manual_review",
+    "manual_review": "needs_manual_review",
+    "review_manually": "needs_manual_review",
+    "keep": "needs_manual_review",
+    "dedup": "possible_duplicate",
+    "dedupe": "possible_duplicate",
+    "deduplicate": "possible_duplicate",
+    "duplicate": "possible_duplicate",
+    "merge_duplicate": "possible_duplicate",
+    "merge_duplicates": "possible_duplicate",
+    "potential_duplicate": "possible_duplicate",
+    "suspected_duplicate": "possible_duplicate",
+    "确认无效": "confirm_invalid",
+    "无效": "confirm_invalid",
+    "标记无效": "confirm_invalid",
+    "确认无效并隐藏": "confirm_invalid",
+    "隐藏无效": "confirm_invalid",
+    "恢复": "restore_from_watch",
+    "恢复线索": "restore_from_watch",
+    "恢复观察": "restore_from_watch",
+    "保持观察": "needs_manual_review",
+    "保留观察": "needs_manual_review",
+    "人工复核": "needs_manual_review",
+    "需要人工复核": "needs_manual_review",
+    "疑似重复": "possible_duplicate",
+    "去重": "possible_duplicate",
+    "重复": "possible_duplicate",
+    "合并重复": "possible_duplicate",
+}
 
 
 @dataclass(slots=True)
@@ -45,46 +89,40 @@ class LeadCleanupGraphResult:
 
 
 class LLMLeadCleanupReviewer:
-    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, *, llm_client: LLMClient | None = None, prompt_repository: LLMPromptRepository | None = None) -> None:
         self.llm_client = llm_client or LLMClient()
+        self.prompt_repository = prompt_repository or LLMPromptRepository()
         self.last_audit: dict[str, Any] = {}
 
     def review(self, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        task_type = "LEAD_CLEANUP"
+        model = self.llm_client._model_for_task(task_type)
+        try:
+            prompt = self.prompt_repository.load_active_default(
+                task_type=task_type,
+                provider=self.llm_client.settings.llm_provider,
+                model=model,
+            )
+        except LLMPromptTemplateNotFound as exc:
+            self.last_audit = {
+                "used": False,
+                "provider": self.llm_client.settings.llm_provider,
+                "model": model,
+                "error": {"type": exc.error_type, "message": str(exc)},
+            }
+            raise
         result = self.llm_client.generate_json(
-            task_type="LEAD_CLEANUP",
-            system_prompt=(
-                "你是 Watch/Invalid 线索清洗复核 Agent。只能输出人工复核建议，"
-                "禁止自动删除、自动恢复 Invalid、自动执行清洗。"
-            ),
-            user_prompt=f"待清洗线索：{leads}",
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "suggestions": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "staging_lead_id": {"type": "string"},
-                                "suggestion_type": {"type": "string"},
-                                "target_lead_id": {"type": ["string", "null"]},
-                                "confidence_score": {"type": ["number", "null"]},
-                                "reason": {"type": "string"},
-                                "evidence_json": {"type": "object"},
-                                "recommended_action": {"type": "string"},
-                            },
-                            "required": ["staging_lead_id", "suggestion_type", "reason", "recommended_action"],
-                        },
-                    }
-                },
-                "required": ["suggestions"],
-            },
+            task_type=task_type,
+            system_prompt=prompt.system_prompt,
+            user_prompt=prompt.render_user_prompt({"leads": leads}),
+            output_schema=prompt.output_schema_json,
         )
         self.last_audit = {
             "used": result.error is None,
             "provider": result.provider,
             "model": result.model,
             "token_usage": result.token_usage,
+            **prompt.audit,
         }
         if result.error:
             self.last_audit["error"] = result.error
@@ -102,10 +140,11 @@ class LeadCleanupGraphRunner:
         *,
         duplicate_detector: DuplicateDetector | None = None,
         llm_reviewer: LLMLeadCleanupReviewer | None = None,
+        prompt_repository: LLMPromptRepository | None = None,
         boundary: ApiContractBoundary | None = None,
     ) -> None:
         self.duplicate_detector = duplicate_detector or DuplicateDetector()
-        self.llm_reviewer = llm_reviewer or LLMLeadCleanupReviewer()
+        self.llm_reviewer = llm_reviewer or LLMLeadCleanupReviewer(prompt_repository=prompt_repository)
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -176,7 +215,7 @@ class LeadCleanupGraphRunner:
                         "invalid_reason": invalid_reason,
                         "customer_name": lead.get("customer_name") or "Unknown",
                     },
-                    "recommended_action": "人工确认无效原因后保留清洗结论",
+                    "recommended_action": "确认无效并从线索池隐藏",
                 }
             )
         return state
@@ -188,6 +227,21 @@ class LeadCleanupGraphRunner:
                 continue
             restore_signal = bool(lead.get("restore_signal") or lead.get("new_evidence"))
             if not restore_signal:
+                state.raw_suggestions.append(
+                    {
+                        "staging_lead_id": lead.get("staging_lead_id"),
+                        "suggestion_type": "needs_manual_review",
+                        "target_lead_id": None,
+                        "confidence_score": 0.6,
+                        "reason": "Watch 线索暂无新的公开恢复证据，建议保持观察并等待人工复核。",
+                        "evidence_json": {
+                            "current_grade": "Watch",
+                            "source_evidence": lead.get("source_evidence"),
+                            "contacts_json": lead.get("contacts_json") or [],
+                        },
+                        "recommended_action": "保持 Watch，等待更多公开证据或人工复核",
+                    }
+                )
                 continue
             state.raw_suggestions.append(
                 {
@@ -215,13 +269,21 @@ class LeadCleanupGraphRunner:
     def write_cleanup_suggestions(self, state: LeadCleanupGraphState) -> LeadCleanupGraphState:
         self.mark("write_cleanup_suggestions")
         output_table = self.boundary.validate_output_table("lead_cleanup_suggestions")
-        state.suggestions = [CleanupSuggestionOutput(**item) for item in state.raw_suggestions]
+        normalized_items = [self.normalize_cleanup_suggestion(item) for item in state.raw_suggestions]
+        state.suggestions = [CleanupSuggestionOutput(**item) for item in normalized_items]
         state.audit.update(
             {
                 "writes_core_tables": False,
                 "output_table": output_table,
                 "written_tables": [output_table],
                 "suggestion_count": len(state.suggestions),
+                "normalized_suggestion_type_count": len(
+                    [
+                        item
+                        for item in normalized_items
+                        if (item.get("evidence_json") or {}).get("normalized_from_suggestion_type")
+                    ]
+                ),
             }
         )
         return state
@@ -243,6 +305,36 @@ class LeadCleanupGraphRunner:
             audit=state.audit,
         )
         return LeadCleanupGraphResult(output=output, executed_nodes=list(self.executed_nodes))
+
+    @staticmethod
+    def normalize_cleanup_suggestion(item: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(item)
+        raw_type = str(normalized.get("suggestion_type") or "").strip().lower()
+        if raw_type in VALID_SUGGESTION_TYPES:
+            normalized["suggestion_type"] = raw_type
+            return normalized
+
+        mapped_type = SUGGESTION_TYPE_ALIASES.get(raw_type) or LeadCleanupGraphRunner.infer_suggestion_type(raw_type)
+        if mapped_type is None:
+            return normalized
+
+        evidence = dict(normalized.get("evidence_json") or {})
+        evidence.setdefault("normalized_from_suggestion_type", raw_type)
+        normalized["suggestion_type"] = mapped_type
+        normalized["evidence_json"] = evidence
+        return normalized
+
+    @staticmethod
+    def infer_suggestion_type(raw_type: str) -> str | None:
+        if any(token in raw_type for token in ("confirm_invalid", "invalid", "无效", "非目标")):
+            return "confirm_invalid"
+        if any(token in raw_type for token in ("restore", "恢复", "升级")):
+            return "restore_from_watch"
+        if any(token in raw_type for token in ("duplicate", "dedup", "重复", "去重", "归并", "合并")):
+            return "possible_duplicate"
+        if any(token in raw_type for token in ("review", "manual", "watch", "keep", "复核", "观察", "保留")):
+            return "needs_manual_review"
+        return None
 
     def _state_from_graph_result(self, result: LeadCleanupGraphState | dict[str, Any]) -> LeadCleanupGraphState:
         if isinstance(result, LeadCleanupGraphState):

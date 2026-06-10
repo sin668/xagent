@@ -148,7 +148,7 @@ const promptTemplateKey = ref('source_discovery_default');
 const limit = ref(50);
 const latestRun = ref({});
 const isRunning = ref(false);
-const bottomTabs = buildBottomTabs('sources');
+const bottomTabs = buildBottomTabs('insights');
 
 const agentTaskRunId = computed(() => latestRun.value.agentTaskRunId || latestRun.value.id || '');
 const taskStatus = computed(() => latestRun.value.status || '');

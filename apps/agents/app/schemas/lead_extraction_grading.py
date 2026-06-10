@@ -33,10 +33,11 @@ class LeadExtractionGradingAgentOutput(BaseModel):
 
     schema_version: Literal["phase4.agent.lead_extraction_grading.v1"]
     combined_run_id: UUID | str
-    agent_mode: Literal["shadow"] = "shadow"
+    agent_mode: Literal["active", "shadow"] = "shadow"
     extraction: LeadExtractionAgentOutput
     grading: LeadGradingAgentOutput
     hard_rule_summary: LeadExtractionGradingHardRuleSummary
     validation_summary: LeadExtractionGradingValidationSummary
     grade_delta_explanations: dict[str, str] = Field(default_factory=dict)
+    batch_results: list[dict] = Field(default_factory=list)
     audit: dict = Field(default_factory=dict)

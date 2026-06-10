@@ -37,17 +37,16 @@
       </view>
 
       <view class="metric-row">
-        <view class="metric-card">
-          <text class="metric-value">{{ dashboard.totalCandidateLeads }}</text>
-          <text class="metric-label">总候选线索</text>
+        <view v-for="stat in dashboard.leadStats" :key="stat.key" class="metric-card">
+          <text :class="['metric-value', stat.className || '']">{{ stat.count }}</text>
+          <text class="metric-label">{{ stat.label }}</text>
         </view>
-        <view class="metric-card">
-          <text class="metric-value metric-green">{{ dashboard.bGradeRatioText }}</text>
-          <text class="metric-label">B 级比例</text>
-        </view>
-        <view class="metric-card">
-          <text class="metric-value metric-blue">{{ dashboard.pendingFollowUpCount }}</text>
-          <text class="metric-label">待跟进</text>
+      </view>
+
+      <view class="customer-metric-row">
+        <view v-for="stat in dashboard.customerStats" :key="stat.key" class="metric-card customer-metric-card">
+          <text class="metric-value customer-metric-value">{{ stat.count }}</text>
+          <text class="metric-label">{{ stat.label }}</text>
         </view>
       </view>
 
@@ -80,25 +79,27 @@
         <text class="section-note">仅显示可执行风险等级</text>
       </view>
 
-      <view v-for="channel in dashboard.channelPerformance" :key="channel.name" class="channel-card">
-        <view class="channel-top">
-          <text class="channel-name">{{ channel.name }}</text>
-          <text :class="['tag', channel.riskLevel === 'Low' ? 'tag-green' : 'tag-amber']">
-            {{ channel.riskLevel === 'Low' ? '低风险' : '中风险' }}
-          </text>
-        </view>
-        <view class="channel-stats">
-          <text>B 级线索 {{ channel.bGradeLeads }} 条</text>
-          <text>有效率 {{ Math.round(channel.effectiveRate * 100) }}%</text>
-        </view>
-        <view class="progress">
-          <text
-            class="progress-fill"
-            :style="{
-              width: `${Math.round(channel.effectiveRate * 100)}%`,
-              background: channel.riskLevel === 'Low' ? '#16a34a' : '#d97706',
-            }"
-          />
+      <view class="channel-list">
+        <view v-for="channel in dashboard.channelPerformance" :key="channel.name" class="channel-card">
+          <view class="channel-top">
+            <text class="channel-name">{{ channel.name }}</text>
+            <text :class="['tag', channel.riskLevel === 'Low' ? 'tag-green' : 'tag-amber']">
+              {{ channel.riskLevel === 'Low' ? '低风险' : '中风险' }}
+            </text>
+          </view>
+          <view class="channel-stats">
+            <text>B 级线索 {{ channel.bGradeLeads }} 条</text>
+            <text>有效率 {{ Math.round(channel.effectiveRate * 100) }}%</text>
+          </view>
+          <view class="progress">
+            <text
+              class="progress-fill"
+              :style="{
+                width: `${Math.round(channel.effectiveRate * 100)}%`,
+                background: channel.riskLevel === 'Low' ? '#16a34a' : '#d97706',
+              }"
+            />
+          </view>
         </view>
       </view>
 
@@ -130,16 +131,26 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 
-import { mapAdminOverviewToHomeData } from '../../services/apiAdapters.js';
+import {
+  mapAdminOverviewToHomeData,
+  mapStagingLeadListToLeadPool,
+} from '../../services/apiAdapters.js';
 import { apiClient } from '../../services/apiClient.js';
 import { buildBottomTabs, navigateBottomTab } from '../../services/bottomTabs.js';
+import { mapCustomer } from '../../services/customers.js';
 import { buildHomeDashboard } from '../../services/homeMetrics.js';
+import { buildLeadPoolStats } from '../../services/leadPool.js';
+import { leadCleanupService } from '../../services/leadCleanup.js';
+import { sourceCandidatesService } from '../../services/sourceCandidates.js';
 import '../../styles/home.css';
+
+const CLEANED_TYPES = ['confirm_invalid', 'mark_abandoned', 'strong_duplicate', 'possible_duplicate'];
 
 const emptyDashboardInput = {
   leads: [],
   aiTasks: [],
   channels: [],
+  customers: [],
 };
 const dashboard = ref(buildHomeDashboard(emptyDashboardInput));
 const apiStatus = ref('loading');
@@ -155,14 +166,43 @@ const tabs = buildBottomTabs('home');
 
 onMounted(async () => {
   try {
-    const overview = await apiClient.get('/dashboard/admin-overview');
-    dashboard.value = buildHomeDashboard(mapAdminOverviewToHomeData(overview));
+    const [overview, customerPayload, stagingPayload, sourceCandidatesPayload, cleanedLeadsTotal] = await Promise.all([
+      apiClient.get('/dashboard/admin-overview'),
+      apiClient.get('/customers?limit=500').catch(() => ({ items: [] })),
+      apiClient.get('/staging-leads?limit=500').catch(() => ({ items: [] })),
+      sourceCandidatesService.listSourceCandidates({ limit: 1, offset: 0 }).catch(() => ({ total: 0 })),
+      loadCleanedLeadsTotal().catch(() => 0),
+    ]);
+    const homeData = mapAdminOverviewToHomeData(overview);
+    const leadPoolLeads = mapStagingLeadListToLeadPool(stagingPayload);
+    const abcLeadsTotal = buildLeadPoolStats(leadPoolLeads).find((stat) => stat.key === 'grade-abc')?.count ?? 0;
+    dashboard.value = buildHomeDashboard({
+      ...homeData,
+      leadStatsSummary: {
+        ...homeData.leadStatsSummary,
+        abcLeadsTotal,
+        sourceCandidatesTotal: sourceCandidatesPayload.total,
+        cleanedLeadsTotal,
+      },
+      customers: (customerPayload.items || []).map(mapCustomer),
+    });
     apiStatus.value = 'api';
   } catch (_error) {
     dashboard.value = buildHomeDashboard(emptyDashboardInput);
     apiStatus.value = 'error';
   }
 });
+
+async function loadCleanedLeadsTotal() {
+  const results = await Promise.all(
+    CLEANED_TYPES.map((suggestionType) => leadCleanupService.listCleanupSuggestions({
+      suggestionType,
+      reviewStatus: 'executed',
+      limit: 100,
+    })),
+  );
+  return results.reduce((sum, result) => sum + Number(result.total || 0), 0);
+}
 
 function goTo(path) {
   if (!path || !globalThis.uni?.navigateTo) {

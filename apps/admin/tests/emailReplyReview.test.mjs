@@ -122,7 +122,7 @@ test('email reply drafts query supports review filters', () => {
   assert.equal(buildEmailReplyDraftsQuery(), '?limit=100');
   assert.equal(
     buildEmailReplyDraftsQuery({ status: 'manual_review', manualReviewRequired: true, autoSendAllowed: false, limit: 50 }),
-    '?status=manual_review&manual_review_required=true&auto_send_allowed=false&limit=50',
+    '?decision=manual_review&limit=50',
   );
 });
 
@@ -134,16 +134,42 @@ test('fetch email reply review calls real review queue API', async () => {
     filters: { status: 'manual_review' },
     fetcher: async (url) => {
       requestedUrls.push(url);
-      if (url.includes('/email-reply/drafts')) {
+      if (url.includes('/email-replies')) {
         return { ok: true, json: async () => draftsPayload };
       }
       throw new Error(`Unexpected URL: ${url}`);
     },
   });
 
-  assert.deepEqual(requestedUrls, ['https://api.example.test/email-reply/drafts?status=manual_review&limit=100']);
+  assert.deepEqual(requestedUrls, ['https://api.example.test/email-replies?decision=manual_review&limit=100']);
   assert.equal(result.actorRole, 'operator');
   assert.equal(result.drafts.items.length, 3);
+});
+
+test('email reply review view supports backend /email-replies summary shape', () => {
+  const view = buildEmailReplyReviewView({
+    drafts: {
+      items: [
+        {
+          id: 'reply-summary',
+          customer_name: 'Summary Motors',
+          subject: 'Vehicle inquiry',
+          language: 'ru',
+          auto_send_decision: 'blocked',
+          hard_block_reasons: ['DNC'],
+          knowledge_hits: [{ title: '合作流程', similarity_score: 0.91 }],
+          preview: '客户询问合作流程。',
+          reply_draft: { subject: 'Re: Vehicle inquiry', body: 'Спасибо', prompt_version: 'email-reply-v1' },
+        },
+      ],
+    },
+    actorRole: 'operator',
+  });
+
+  assert.equal(view.queue[0].decisionLabel, '硬拦截');
+  assert.equal(view.queue[0].reason, 'DNC');
+  assert.equal(view.selectedDraft.finalReply.subject, 'Re: Vehicle inquiry');
+  assert.equal(view.selectedDraft.knowledgeHits[0].title, '合作流程');
 });
 
 test('email reply actions update final text and always request backend send check before send', async () => {

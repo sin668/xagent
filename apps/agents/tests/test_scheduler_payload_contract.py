@@ -14,6 +14,7 @@ from app.db.base import Base
 from app.db.session import get_db_session
 from app.main import app
 from app.settings import get_settings
+from tests.prompt_helpers import seed_prompt_templates
 
 
 PAYLOADS_PATH = Path(__file__).resolve().parents[2] / "api" / "app" / "agents" / "scheduler_payloads.py"
@@ -35,6 +36,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("SOURCE_DISCOVERY", "LEAD_EXTRACTION", "LEAD_GRADING"))
     try:
         yield db
     finally:
@@ -89,7 +91,14 @@ def test_apps_api_scheduler_lead_extraction_grading_payload_matches_apps_agents_
             "request_id": request_id,
             "trigger_source": "scheduler",
             "agent_mode": "shadow",
-            "input": api_scheduler_payloads.build_external_lead_extraction_grading_input(request_id=request_id),
+            "input": api_scheduler_payloads.build_external_lead_extraction_grading_input(
+                request_id=request_id,
+                source_url="https://autocity.example",
+                source_content=(
+                    "Auto City Dubai exports used vehicles. Contact sales@autocity.example, +971 50 123 4567. "
+                    "Website https://autocity.example."
+                ),
+            ),
             "options": {"timeout_seconds": 120, "shadow_mode": True},
         },
     )

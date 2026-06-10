@@ -125,17 +125,18 @@ def test_lead_grading_missing_evidence_routes_to_c_with_compliance_review() -> N
     assert "联系方式缺失" in suggestion.reasons
 
 
-def test_lead_grading_rejects_active_mode() -> None:
+def test_lead_grading_accepts_active_mode() -> None:
     runner = LeadGradingGraphRunner()
 
-    with pytest.raises(ValueError, match="Lead Grading 第四阶段只允许 shadow_run"):
-        runner.run(
-            LeadGradingGraphState(
-                grading_run_id="33333333-3333-3333-3333-333333333333",
-                extracted_lead=BASE_EXTRACTED_LEAD,
-                agent_mode="active",
-            )
+    result = runner.run(
+        LeadGradingGraphState(
+            grading_run_id="33333333-3333-3333-3333-333333333333",
+            extracted_lead=BASE_EXTRACTED_LEAD,
+            agent_mode="active",
         )
+    )
+
+    assert result.output.agent_mode == "active"
 
 
 def test_lead_grading_output_schema_rejects_auto_customer_promotion() -> None:

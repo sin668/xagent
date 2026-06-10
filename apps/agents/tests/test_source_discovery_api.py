@@ -12,6 +12,7 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.agent_service_run import AgentServiceRun
 from app.settings import get_settings
+from tests.prompt_helpers import seed_prompt_templates
 
 
 @pytest.fixture
@@ -24,6 +25,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("SOURCE_DISCOVERY",))
     try:
         yield db
     finally:
@@ -137,10 +139,10 @@ def test_source_discovery_api_returns_shadow_envelope_and_records_run(client: Te
     assert persisted.audit_json["writes_core_tables"] is False
 
 
-def test_source_discovery_api_blocks_active_mode(client: TestClient, session: Session) -> None:
+def test_source_discovery_api_blocks_dry_run_mode(client: TestClient, session: Session) -> None:
     response = client.post(
         "/agent-runs/source-discovery",
-        json=source_discovery_payload(agent_mode="active"),
+        json=source_discovery_payload(agent_mode="dry_run"),
         headers={"X-Agents-Api-Key": "phase4-secret"},
     )
 
@@ -148,10 +150,10 @@ def test_source_discovery_api_blocks_active_mode(client: TestClient, session: Se
     body = response.json()
     assert body["status"] == "failed"
     assert body["agent_type"] == "source_discovery"
-    assert body["agent_mode"] == "active"
+    assert body["agent_mode"] == "dry_run"
     assert body["output"] is None
     assert body["error"]["error_type"] == "risk_blocked"
-    assert "Source Discovery 第四阶段只允许 shadow_run" in body["error"]["message"]
+    assert "Source Discovery agent_mode 只允许 active 或 shadow" in body["error"]["message"]
 
     persisted = session.get(AgentServiceRun, UUID(body["agent_service_run_id"]))
     assert persisted is not None

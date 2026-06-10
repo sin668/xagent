@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   buildCustomerFilterTabs,
+  buildCustomerStats,
   createCustomersService,
   filterCustomers,
   getCustomerCardViewModel,
@@ -80,15 +81,31 @@ test('客户默认按下一步动作优先级排序', () => {
   assert.deepEqual(sorted.map((customer) => customer.id), ['customer-today', 'customer-compliance', 'customer-low']);
 });
 
-test('客户工作台筛选支持今日待跟进、C级待合规、有车型意向、待分配', () => {
+test('客户工作台筛选支持A/B/C客户、今日待跟进、C级待合规、有车型意向、待分配', () => {
   const customers = customerPayload.items.map(mapCustomer);
   const tabs = buildCustomerFilterTabs(customers);
 
   assert.deepEqual(tabs.map((tab) => tab.key), ['all', 'today', 'c_compliance', 'has_intent', 'unassigned']);
+  assert.deepEqual(filterCustomers(customers, 'grade_abc').map((item) => item.id), [
+    'customer-low',
+    'customer-today',
+    'customer-compliance',
+  ]);
   assert.equal(filterCustomers(customers, 'today').map((item) => item.id).join(','), 'customer-today');
   assert.equal(filterCustomers(customers, 'c_compliance').map((item) => item.id).join(','), 'customer-compliance');
   assert.deepEqual(filterCustomers(customers, 'has_intent').map((item) => item.id), ['customer-today', 'customer-compliance']);
   assert.equal(filterCustomers(customers, 'unassigned').map((item) => item.id).join(','), 'customer-compliance');
+});
+
+test('客户统计卡作为过滤入口，第一块统计 A/B/C 级客户', () => {
+  const customers = customerPayload.items.map(mapCustomer);
+  const stats = buildCustomerStats(customers);
+
+  assert.deepEqual(stats.map((stat) => stat.filterKey), ['grade_abc', 'has_intent', 'today']);
+  assert.equal(stats[0].label, 'A/B/C级客户');
+  assert.equal(stats[0].count, 3);
+  assert.equal(stats[1].count, 2);
+  assert.equal(stats[2].count, 1);
 });
 
 test('客户服务只读取 customers，不混入 staging_leads', async () => {

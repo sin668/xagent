@@ -51,6 +51,33 @@ function toNumber(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function stagingLeadIdFromExternalId(externalId) {
+  const value = String(externalId || '').trim();
+  return value.startsWith('staging:') ? value.slice('staging:'.length) : '';
+}
+
+function buildLeadStatsSummary(summary = {}, payload = {}) {
+  const explicitAbcCount = toNumber(summary.abc_grade_count) ?? toNumber(summary.actionable_lead_count);
+  const gradeAbcCount = hasOwn(summary, 'a_grade_count')
+    ? Number(summary.a_grade_count || 0) + Number(summary.b_grade_count || 0) + Number(summary.c_grade_count || 0)
+    : null;
+
+  return {
+    abcGradeCount: explicitAbcCount ?? gradeAbcCount,
+    sourceCount: toNumber(summary.source_count)
+      ?? toNumber(summary.lead_source_count)
+      ?? toNumber(summary.source_candidate_count)
+      ?? (payload.channel_outputs || []).length,
+    cleanedLeadCount: toNumber(summary.cleaned_lead_count)
+      ?? toNumber(summary.invalid_watch_count)
+      ?? toNumber(summary.invalid_count),
+  };
+}
+
 function buildSyntheticLeads(summary = {}, queueItems = []) {
   const candidateCount = Number(summary.candidate_count || 0);
   const bCount = Number(summary.b_grade_count || 0);
@@ -88,6 +115,7 @@ export function mapAdminOverviewToHomeData(payload = {}) {
 
   return {
     leads: buildSyntheticLeads(summary, queueItems),
+    leadStatsSummary: buildLeadStatsSummary(summary, payload),
     aiTasks: [
       {
         id: 'api-lead-review',
@@ -113,6 +141,7 @@ export function mapAdminOverviewToHomeData(payload = {}) {
 export function mapCustomerListToLeadPool(payload = {}) {
   return (payload.items || []).map((customer) => ({
     id: customer.id,
+    entityType: 'customer',
     externalId: customer.external_id || '',
     customerName: customer.name || 'Unknown',
     country: customer.country || 'Unknown',
@@ -126,6 +155,10 @@ export function mapCustomerListToLeadPool(payload = {}) {
     evidenceNote: customer.evidence_note || '',
     contacts: customer.contacts || [],
     sources: customer.sources || [],
+    aiRecommendationReason: customer.ai_recommendation_reason || '',
+    aiRecommendedGrade: customer.ai_recommended_grade || '',
+    sourceUrl: customer.source_url || customer.sources?.[0]?.url || '',
+    sourceEvidence: customer.source_evidence || customer.evidence_note || customer.sources?.[0]?.evidence || '',
     handoffTeam: normalizeGrade(customer.grade) === 'C' ? 'export_sales' : 'customer_service',
     complianceReviewStatus: normalizeGrade(customer.grade) === 'C' ? 'required' : '',
     isOverdue: false,
@@ -155,6 +188,7 @@ export function mapStagingLeadListToLeadPool(payload = {}) {
     const riskMarkers = [...(lead.risk_markers || []), ...duplicateMarkers(lead.duplicate_signals)];
     return {
       id: lead.id,
+      entityType: 'staging',
       customerName: lead.customer_name || 'Unknown',
       country: lead.country || 'Unknown',
       city: lead.city || 'Unknown',
@@ -174,6 +208,10 @@ export function mapStagingLeadListToLeadPool(payload = {}) {
       duplicateSignals: mapDuplicateSignals(lead.duplicate_signals),
       doNotContact: false,
       evidenceNote: [lead.source_evidence, ...riskMarkers].filter(Boolean).join(' · '),
+      aiRecommendationReason: lead.recommended_reason || lead.ai_recommendation_reason || '',
+      aiRecommendedGrade: lead.ai_recommended_grade || lead.recommended_grade || '',
+      sourceUrl: lead.source_url || '',
+      sourceEvidence: lead.source_evidence || '',
       handoffTeam: grade === 'C' ? 'export_sales' : 'customer_service',
       complianceReviewStatus: grade === 'C' ? 'required' : '',
       isOverdue: false,
@@ -183,8 +221,12 @@ export function mapStagingLeadListToLeadPool(payload = {}) {
 
 export function mapCustomerSummaryToLeadDetail(customer = {}) {
   const grade = normalizeGrade(customer.grade);
+  const stagingLeadId = stagingLeadIdFromExternalId(customer.external_id || customer.externalId);
   return {
     id: customer.id,
+    entityType: 'customer',
+    customerId: customer.id,
+    stagingLeadId,
     customerName: customer.name || 'Unknown',
     country: customer.country || 'Unknown',
     city: customer.city || 'Unknown',
@@ -210,6 +252,83 @@ export function mapCustomerSummaryToLeadDetail(customer = {}) {
     },
     doNotContact: Boolean(customer.do_not_contact),
     complianceReviewStatus: grade === 'C' ? 'required' : '',
+  };
+}
+
+export function mapCustomerDetailToLeadDetail(payload = {}) {
+  const profile = payload.profile || {};
+  const doNotContact = payload.do_not_contact || {};
+  const grade = normalizeGrade(profile.grade);
+  const stagingLeadId = stagingLeadIdFromExternalId(profile.external_id || profile.externalId || payload.external_id || payload.externalId);
+  const sources = Array.isArray(payload.sources) ? payload.sources : [];
+  const contacts = Array.isArray(payload.contacts) ? payload.contacts : [];
+  const followups = Array.isArray(payload.followups) ? payload.followups : [];
+  const firstSource = sources[0] || {};
+  const missingFields = Array.isArray(payload.pending_fields) ? payload.pending_fields : [];
+  const nextAction = payload.next_action || (doNotContact.enabled ? '勿扰客户，不得触达' : '人工复核');
+  const recommendationReason = profile.ai_recommendation_reason
+    || payload.ai_recommendation_reason
+    || firstSource.evidence_note
+    || nextAction
+    || 'Unknown';
+
+  return {
+    id: payload.id || profile.id,
+    entityType: 'customer',
+    customerId: payload.id || profile.id,
+    stagingLeadId,
+    customerName: profile.name || 'Unknown',
+    country: profile.country || 'Unknown',
+    city: profile.city || 'Unknown',
+    customerType: profile.customer_type || 'Unknown',
+    grade,
+    status: normalizeStatus(profile.status),
+    riskLevel: firstSource.risk_level || profile.risk_level || 'Unknown',
+    handoffTeam: profile.owner_team || (grade === 'C' ? 'export_sales' : 'customer_service'),
+    operatingSummary: profile.operating_summary
+      || payload.operating_summary
+      || firstSource.evidence_note
+      || nextAction
+      || 'Unknown',
+    aiRecommendation: {
+      confidence: null,
+      suggestion: profile.ai_recommended_grade ? `AI 推荐等级 ${profile.ai_recommended_grade}` : `当前客户等级 ${grade}`,
+      reason: recommendationReason,
+      missingInfo: missingFields,
+      nextAction,
+    },
+    sources: sources.map((source) => ({
+      type: source.platform || source.type || '客户来源',
+      url: source.source_url || source.url || '',
+      evidence: source.evidence_note || source.evidence || source.source_title || 'Unknown',
+    })),
+    contacts: contacts.map((contact) => ({
+      type: contact.type || contact.kind || 'Unknown',
+      value: contact.value || 'Unknown',
+      usage: contact.label || contact.evidence_note || contact.usage || '人工复核后使用',
+      sourceUrl: contact.source_url || '',
+      evidence: contact.evidence_note || '',
+    })),
+    followUps: followups.map((followup) => ({
+      title: [followup.team, followup.next_action].filter(Boolean).join(' · ') || followup.followup_type || '跟进记录',
+      detail: followup.content || followup.next_action || 'Unknown',
+    })),
+    inventoryMatch: {
+      label: '查看匹配车源',
+      path: `/pages/inventory/index?leadId=${encodeURIComponent(payload.id || profile.id || '')}`,
+    },
+    doNotContact: Boolean(doNotContact.enabled),
+    doNotContactCustomerId: payload.id || profile.id || '',
+    doNotContactReason: doNotContact.reason || '',
+    doNotContactMarkedBy: doNotContact.marked_by || '',
+    doNotContactMarkedAt: doNotContact.marked_at || '',
+    complianceReviewStatus: grade === 'C' || payload.compliance_status?.requires_review ? 'required' : '',
+    coreGate: {
+      status: 'ready',
+      canPromoteToCore: !doNotContact.enabled,
+      reasons: doNotContact.enabled ? ['勿扰客户，不得触达'] : ['已是客户详情，可进入人工复核'],
+    },
+    duplicateSignals: {},
   };
 }
 
@@ -242,6 +361,9 @@ export function mapStagingLeadDetailToLeadDetail(payload = {}) {
 
   return {
     id: lead.id,
+    entityType: 'staging',
+    stagingLeadId: lead.id,
+    customerId: '',
     customerName: lead.customer_name || 'Unknown',
     country: lead.country || 'Unknown',
     city: lead.city || 'Unknown',
@@ -287,7 +409,8 @@ export function mapStagingLeadDetailToLeadDetail(payload = {}) {
       label: '查看匹配车源',
       path: `/pages/inventory/index?leadId=${encodeURIComponent(lead.id || '')}`,
     },
-    doNotContact: false,
+    doNotContact: Boolean(payload.has_do_not_contact_match || lead.do_not_contact),
+    doNotContactCustomerId: payload.do_not_contact_customer_id || lead.do_not_contact_customer_id || '',
     complianceReviewStatus: grade === 'C' || lead.requires_compliance_review ? 'required' : '',
     coreGate: {
       status: gate.status || 'blocked',

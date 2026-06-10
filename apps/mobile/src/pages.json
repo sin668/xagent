@@ -19,6 +19,12 @@
       }
     },
     {
+      "path": "pages/leads/cleaned",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/sources/index",
       "style": {
         "navigationStyle": "custom"
@@ -32,6 +38,12 @@
     },
     {
       "path": "pages/lead-cleanup/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/insights/index",
       "style": {
         "navigationStyle": "custom"
       }
@@ -74,6 +86,12 @@
     },
     {
       "path": "pages/outreach/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/outreach/send",
       "style": {
         "navigationStyle": "custom"
       }

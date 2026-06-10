@@ -142,10 +142,10 @@ export function buildLeadFilterTabs(leads = []) {
 
 export function buildLeadPoolStats(leads = []) {
   return [
-    { key: 'email', label: '有邮箱联系线索', count: filterLeadPool(leads, 'email-contact').length, className: 'source-number-green' },
-    { key: 'social', label: '有社交媒体联系线索', count: filterLeadPool(leads, 'social-contact').length, className: 'source-number-blue' },
-    { key: 'grade-abc', label: 'A/B/C级线索', count: filterLeadPool(leads, 'grade-abc').length, className: 'source-number-green' },
-    { key: 'grade-de', label: 'D/E级线索', count: filterLeadPool(leads, 'grade-de').length, className: 'source-number-red' },
+    { key: 'email', filterKey: 'email-contact', label: '有邮箱联系线索', count: filterLeadPool(leads, 'email-contact').length, className: 'source-number-green' },
+    { key: 'social', filterKey: 'social-contact', label: '有社交媒体联系线索', count: filterLeadPool(leads, 'social-contact').length, className: 'source-number-blue' },
+    { key: 'grade-abc', filterKey: 'grade-abc', label: 'A/B/C级线索', count: filterLeadPool(leads, 'grade-abc').length, className: 'source-number-green' },
+    { key: 'grade-de', filterKey: 'grade-de', label: 'D/E级线索', count: filterLeadPool(leads, 'grade-de').length, className: 'source-number-red' },
   ];
 }
 
@@ -159,13 +159,31 @@ export function getLeadCardViewModel(lead) {
     approved: '合规已通过',
     rejected: '合规未通过',
   };
+  const contacts = leadContacts(lead).filter((item) => String(item?.value || '').trim());
+  const isDnc = isDoNotContact(lead);
+  const actionableGrade = ['A', 'B', 'C'].includes(grade);
+  const canPromote = actionableGrade && !isDnc && !needsHighSecondaryReview(lead);
+  const entityType = lead?.entityType || lead?.entity_type || 'staging';
+  const actions = [
+    entityType === 'customer' && !isDnc ? { key: 'mark-dnc', mode: 'api', label: '标记勿扰' } : null,
+    entityType === 'staging' && !isDnc ? { key: 'manual-enrich', mode: 'form', label: '人工补录' } : null,
+    actionableGrade && !isDnc && hasContact(lead) ? { key: 'ai-outreach', mode: 'navigate', label: 'AI触达', path: `/pages/outreach/index?leadId=${encodeURIComponent(lead?.id || '')}` } : null,
+    entityType === 'staging' && canPromote ? { key: 'promote', mode: 'api', label: '晋级客户' } : null,
+  ].filter(Boolean);
 
   return {
     id: lead?.id,
+    entityType,
     customerName: lead?.customerName || 'Unknown',
+    country: lead?.country || 'Unknown',
     city: lead?.city || 'Unknown',
+    locationLabel: `${lead?.country || 'Unknown'} · ${lead?.city || 'Unknown'}`,
     customerType: lead?.customerType || 'Unknown',
     channel: lead?.channel || 'Unknown',
+    contacts,
+    aiAdvice: lead?.aiRecommendationReason || lead?.recommendedReason || lead?.aiRecommendedGrade || '',
+    evidence: lead?.sourceEvidence || lead?.evidenceNote || '',
+    sourceUrl: lead?.sourceUrl || (Array.isArray(lead?.sources) && lead.sources[0]?.url) || '',
     evidenceNote: lead?.evidenceNote || '',
     gradeLabel: displayGradeLabel(grade),
     gradeClass: displayGradeClass(grade),
@@ -176,5 +194,6 @@ export function getLeadCardViewModel(lead) {
     riskMarkers: lead?.riskMarkers || [],
     isDoNotContact: isDoNotContact(lead),
     isOverdue: Boolean(lead?.isOverdue),
+    actions,
   };
 }

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from uuid import uuid4
 
 from sqlalchemy import create_engine, select
@@ -110,6 +111,32 @@ def lead_extraction_grading_response() -> dict:
                             "evidence": {"reference": "source_url", "quote": "https://lead-shadow.example"},
                         },
                         "audit_status": "shadow_only",
+                        "contacts": [
+                            {
+                                "contact_type": "email",
+                                "value": "sales@lead-shadow.example",
+                                "usage": "source_public_contact",
+                                "evidence": {"reference": "source_content", "quote": "sales@lead-shadow.example"},
+                            },
+                            {
+                                "contact_type": "email",
+                                "value": "export@lead-shadow.example",
+                                "usage": "source_public_contact",
+                                "evidence": {"reference": "source_content", "quote": "export@lead-shadow.example"},
+                            },
+                            {
+                                "contact_type": "phone",
+                                "value": "+971 50 123 4567",
+                                "usage": "source_public_contact",
+                                "evidence": {"reference": "source_content", "quote": "+971 50 123 4567"},
+                            },
+                            {
+                                "contact_type": "phone",
+                                "value": "+971 50 765 4321",
+                                "usage": "source_public_contact",
+                                "evidence": {"reference": "source_content", "quote": "+971 50 765 4321"},
+                            },
+                        ],
                     }
                 ],
                 "validation_errors": [],
@@ -150,6 +177,35 @@ def lead_extraction_grading_response() -> dict:
     }
 
 
+def lead_extraction_grading_batch_response() -> dict:
+    response = lead_extraction_grading_response()
+    first_output = deepcopy(response["output"])
+    second_output = deepcopy(response["output"])
+    first_output["source_candidate_id"] = "candidate-1"
+    second_output["source_candidate_id"] = "candidate-2"
+    second_output["extraction"]["candidates"][0]["source_url"] = "https://lead-batch-second.example"
+    second_output["extraction"]["candidates"][0]["company_name"]["value"] = "Second Batch Motors"
+    second_output["extraction"]["candidates"][0]["company_name"]["evidence"]["quote"] = "Second Batch Motors exports vehicles."
+    second_output["extraction"]["candidates"][0]["email"]["value"] = "sales@lead-batch-second.example"
+    second_output["extraction"]["candidates"][0]["email"]["evidence"]["quote"] = "sales@lead-batch-second.example"
+    second_output["grading"]["suggestions"][0]["source_url"] = "https://lead-batch-second.example"
+    response["output"]["batch_results"] = [
+        {
+            "status": "succeeded",
+            "source_candidate_id": "candidate-1",
+            "source_url": "https://lead-shadow.example",
+            "output": first_output,
+        },
+        {
+            "status": "succeeded",
+            "source_candidate_id": "candidate-2",
+            "source_url": "https://lead-batch-second.example",
+            "output": second_output,
+        },
+    ]
+    return response
+
+
 def test_consume_source_discovery_response_writes_lead_source_candidates() -> None:
     engine, session = make_session()
     try:
@@ -162,6 +218,24 @@ def test_consume_source_discovery_response_writes_lead_source_candidates() -> No
         assert candidates[0].source_url == "https://dealer-shadow.example"
         assert candidates[0].country == "Russia"
         assert candidates[0].approved_for_extraction is True
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_consume_lead_extraction_grading_batch_response_writes_multiple_staging_leads() -> None:
+    engine, session = make_session()
+    try:
+        result = ExternalAgentResultConsumer(session).consume_lead_extraction_grading_response(
+            lead_extraction_grading_batch_response()
+        )
+        session.commit()
+
+        leads = list(session.scalars(select(StagingLead)).all())
+        assert result.summary["created_count"] == 2
+        assert len(result.summary["processed_items"]) == 2
+        assert len(leads) == 2
+        assert {lead.customer_name for lead in leads} == {"Lead Shadow Motors", "Second Batch Motors"}
     finally:
         session.close()
         engine.dispose()
@@ -180,7 +254,9 @@ def test_consume_lead_extraction_grading_response_writes_staging_leads() -> None
         assert leads[0].recommended_grade.value == "A"
         assert leads[0].contacts_json == [
             {"type": "email", "value": "sales@lead-shadow.example", "usage": "source_public_contact"},
+            {"type": "email", "value": "export@lead-shadow.example", "usage": "source_public_contact"},
             {"type": "phone", "value": "+971 50 123 4567", "usage": "source_public_contact"},
+            {"type": "phone", "value": "+971 50 765 4321", "usage": "source_public_contact"},
         ]
     finally:
         session.close()

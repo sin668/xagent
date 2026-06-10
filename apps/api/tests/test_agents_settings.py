@@ -18,6 +18,13 @@ def test_agents_settings_have_local_service_defaults() -> None:
     assert config.external_agent_source_discovery_interval_seconds == 900
     assert config.external_agent_lead_extraction_grading_enabled is False
     assert config.external_agent_lead_extraction_grading_interval_seconds == 300
+    assert config.external_agent_lead_extraction_grading_batch_size == 10
+    assert config.external_agent_deep_enrichment_enabled is False
+    assert config.external_agent_deep_enrichment_interval_seconds == 600
+    assert config.external_agent_deep_enrichment_batch_size == 10
+    assert config.external_agent_lead_cleanup_enabled is False
+    assert config.external_agent_lead_cleanup_interval_seconds == 900
+    assert config.external_agent_lead_cleanup_batch_size == 50
 
 
 def test_agents_settings_load_env_aliases() -> None:
@@ -34,6 +41,13 @@ def test_agents_settings_load_env_aliases() -> None:
         EXTERNAL_AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS="901",
         EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_ENABLED="true",
         EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_INTERVAL_SECONDS="301",
+        EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_BATCH_SIZE="12",
+        EXTERNAL_AGENT_DEEP_ENRICHMENT_ENABLED="true",
+        EXTERNAL_AGENT_DEEP_ENRICHMENT_INTERVAL_SECONDS="601",
+        EXTERNAL_AGENT_DEEP_ENRICHMENT_BATCH_SIZE="14",
+        EXTERNAL_AGENT_LEAD_CLEANUP_ENABLED="true",
+        EXTERNAL_AGENT_LEAD_CLEANUP_INTERVAL_SECONDS="901",
+        EXTERNAL_AGENT_LEAD_CLEANUP_BATCH_SIZE="51",
     )
 
     assert config.agents_base_url == "http://127.0.0.1:8010"
@@ -49,6 +63,13 @@ def test_agents_settings_load_env_aliases() -> None:
     assert config.external_agent_source_discovery_interval_seconds == 901
     assert config.external_agent_lead_extraction_grading_enabled is True
     assert config.external_agent_lead_extraction_grading_interval_seconds == 301
+    assert config.external_agent_lead_extraction_grading_batch_size == 12
+    assert config.external_agent_deep_enrichment_enabled is True
+    assert config.external_agent_deep_enrichment_interval_seconds == 601
+    assert config.external_agent_deep_enrichment_batch_size == 14
+    assert config.external_agent_lead_cleanup_enabled is True
+    assert config.external_agent_lead_cleanup_interval_seconds == 901
+    assert config.external_agent_lead_cleanup_batch_size == 51
 
 
 def test_agents_settings_load_vehicle_leads_prefixed_aliases() -> None:
@@ -65,6 +86,13 @@ def test_agents_settings_load_vehicle_leads_prefixed_aliases() -> None:
         VEHICLE_LEADS_EXTERNAL_AGENT_SOURCE_DISCOVERY_INTERVAL_SECONDS="902",
         VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_ENABLED="true",
         VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_INTERVAL_SECONDS="302",
+        VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_BATCH_SIZE="13",
+        VEHICLE_LEADS_EXTERNAL_AGENT_DEEP_ENRICHMENT_ENABLED="true",
+        VEHICLE_LEADS_EXTERNAL_AGENT_DEEP_ENRICHMENT_INTERVAL_SECONDS="602",
+        VEHICLE_LEADS_EXTERNAL_AGENT_DEEP_ENRICHMENT_BATCH_SIZE="15",
+        VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_CLEANUP_ENABLED="true",
+        VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_CLEANUP_INTERVAL_SECONDS="902",
+        VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_CLEANUP_BATCH_SIZE="52",
     )
 
     assert config.agents_base_url == "http://agents.internal:8010"
@@ -80,6 +108,13 @@ def test_agents_settings_load_vehicle_leads_prefixed_aliases() -> None:
     assert config.external_agent_source_discovery_interval_seconds == 902
     assert config.external_agent_lead_extraction_grading_enabled is True
     assert config.external_agent_lead_extraction_grading_interval_seconds == 302
+    assert config.external_agent_lead_extraction_grading_batch_size == 13
+    assert config.external_agent_deep_enrichment_enabled is True
+    assert config.external_agent_deep_enrichment_interval_seconds == 602
+    assert config.external_agent_deep_enrichment_batch_size == 15
+    assert config.external_agent_lead_cleanup_enabled is True
+    assert config.external_agent_lead_cleanup_interval_seconds == 902
+    assert config.external_agent_lead_cleanup_batch_size == 52
 
 
 def test_empty_agents_api_key_disables_http_agent_runtime() -> None:

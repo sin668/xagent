@@ -5,7 +5,7 @@ from datetime import datetime
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from sqlalchemy import cast, func, or_, select
+from sqlalchemy import String, and_, cast, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, selectinload
 
@@ -67,6 +67,16 @@ class StagingLeadService:
     @staticmethod
     def default_requires_compliance_review(grade: CustomerGrade | str) -> bool:
         return CustomerGrade(grade) == CustomerGrade.C
+
+    @staticmethod
+    def manual_grade_update_exists(lead_id_column=None):
+        target_column = lead_id_column if lead_id_column is not None else StagingLead.id
+        return exists(
+            select(ReviewLog.id).where(
+                ReviewLog.action == "update_staging_grade",
+                ReviewLog.task_id == cast(target_column, String),
+            )
+        )
 
     @staticmethod
     def build_dedupe_key(customer_name: str, city: str | None, contacts_json: list) -> str:
@@ -489,11 +499,26 @@ class StagingLeadService:
         )
         if review_status is not None:
             statement = statement.where(StagingLead.review_status == StagingReviewStatus(review_status))
+        else:
+            statement = statement.where(
+                or_(
+                    StagingLead.review_status.notin_(
+                        [StagingReviewStatus.REJECTED, StagingReviewStatus.DUPLICATE]
+                    ),
+                    and_(
+                        StagingLead.recommended_grade.in_([CustomerGrade.WATCH, CustomerGrade.INVALID]),
+                        StagingLead.queue_status == StagingQueueStatus.NOT_ELIGIBLE,
+                        self.manual_grade_update_exists(),
+                    ),
+                )
+            )
         if recommended_grade is not None:
             grades = recommended_grade if isinstance(recommended_grade, list) else [recommended_grade]
             statement = statement.where(StagingLead.recommended_grade.in_([CustomerGrade(grade) for grade in grades]))
         if queue_status is not None:
             statement = statement.where(StagingLead.queue_status == StagingQueueStatus(queue_status))
+        else:
+            statement = statement.where(StagingLead.queue_status != StagingQueueStatus.BLOCKED)
         if source_risk_level is not None:
             statement = statement.where(CandidateUrl.source_risk_level == ChannelRiskLevel(source_risk_level))
         if requires_secondary_verification is not None:

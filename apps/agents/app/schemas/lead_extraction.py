@@ -1,7 +1,7 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 LeadExtractionFieldName = Literal[
@@ -40,6 +40,31 @@ class ExtractedLeadField(BaseModel):
         return self
 
 
+LeadContactType = Literal[
+    "email",
+    "phone",
+    "whatsapp",
+    "telegram",
+    "vk",
+    "vkontakte",
+    "ok",
+    "odnoklassniki",
+    "tiktok",
+    "max",
+    "website",
+    "other",
+]
+
+
+class ExtractedContact(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    contact_type: LeadContactType = Field(validation_alias=AliasChoices("contact_type", "type"))
+    value: str = Field(min_length=1)
+    usage: str | None = "source_public_contact"
+    evidence: FieldEvidence | None = None
+
+
 class LeadExtractionCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,6 +77,7 @@ class LeadExtractionCandidate(BaseModel):
     vehicle_interest: ExtractedLeadField
     export_intent: ExtractedLeadField
     website: ExtractedLeadField
+    contacts: list[ExtractedContact] = Field(default_factory=list)
     audit_status: Literal["shadow_only"] = "shadow_only"
 
 
@@ -60,7 +86,7 @@ class LeadExtractionAgentOutput(BaseModel):
 
     schema_version: Literal["phase4.agent.lead_extraction.v1"]
     extraction_run_id: UUID | str
-    agent_mode: Literal["shadow"] = "shadow"
+    agent_mode: Literal["active", "shadow"] = "shadow"
     candidates: list[LeadExtractionCandidate] = Field(default_factory=list)
     validation_errors: list[str] = Field(default_factory=list)
     audit: dict = Field(default_factory=dict)

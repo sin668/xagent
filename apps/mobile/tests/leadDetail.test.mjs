@@ -6,6 +6,7 @@ import {
   buildLeadDetailViewModel,
   canEnterOutreachQueue,
   markLeadDoNotContact,
+  unmarkLeadDoNotContact,
 } from '../src/services/leadDetail.js';
 
 const baseLead = {
@@ -57,7 +58,7 @@ test('lead detail view model exposes customer basics, evidence, AI advice, conta
   assert.equal(detail.contacts[0].value, 'sales@autocity.example.ru');
   assert.equal(detail.followUps[0].title, '待客服首次触达');
   assert.equal(detail.inventoryEntry.label, '查看 6 台匹配车源');
-  assert.equal(detail.outreachActionLabel, '生成草稿');
+  assert.equal(detail.outreachActionLabel, '晋级客户');
   assert.equal(detail.autoSendEnabled, false);
 });
 
@@ -86,6 +87,34 @@ test('lead cannot enter outreach queue after being marked do-not-contact', () =>
   assert.equal(marked.doNotContactMarkedBy, 'Anna');
   assert.equal(canEnterOutreachQueue(marked), false);
   assert.equal(buildLeadDetailViewModel(marked).outreachActionLabel, '已排除触达');
+});
+
+test('do-not-contact lead can be manually restored to normal queue state', () => {
+  const marked = markLeadDoNotContact(baseLead, {
+    actor: 'Anna',
+    reason: '客户明确拒绝继续联系',
+    markedAt: '2026-05-28T12:00:00Z',
+  });
+  const restored = unmarkLeadDoNotContact(marked, {
+    actor: '主管B',
+    reason: '客户重新同意沟通',
+  });
+
+  assert.equal(restored.doNotContact, false);
+  assert.equal(restored.status, 'pending');
+  assert.equal(restored.doNotContactReason, '取消勿扰：客户重新同意沟通');
+  assert.equal(canEnterOutreachQueue(restored), true);
+});
+
+test('AI outreach draft is available only when lead has an email contact', () => {
+  const emailDetail = buildLeadDetailViewModel(baseLead);
+  const noEmailDetail = buildLeadDetailViewModel({
+    ...baseLead,
+    contacts: [{ type: 'telegram', value: '@autocity' }],
+  });
+
+  assert.equal(emailDetail.canCreateOutreachDraft, true);
+  assert.equal(noEmailDetail.canCreateOutreachDraft, false);
 });
 
 test('source evidence is not considered viewable without url or evidence text', () => {
@@ -147,4 +176,76 @@ test('lead detail blocks promotion when duplicate signals require manual review'
   assert.equal(detail.duplicateLabel, '强重复阻断');
   assert.equal(detail.canEnterOutreachQueue, false);
   assert.equal(detail.outreachActionLabel, '重复待处理');
+});
+
+test('线索详情页面展示清洗原因并提供底部人工调级入口', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../src/pages/leads/detail.vue', import.meta.url), 'utf8');
+
+  assert.match(page, /清洗原因/);
+  assert.match(page, /cleanupReasons/);
+  assert.match(page, /leadCleanupService/);
+  assert.match(page, /stagingLeadActionsService/);
+  assert.match(page, /调整等级/);
+  assert.match(page, /handleUpdateGrade/);
+  assert.match(page, /A级/);
+  assert.match(page, /B级/);
+  assert.match(page, /C级/);
+  assert.match(page, /D级/);
+  assert.match(page, /E级/);
+});
+
+test('线索详情页面底部提供人工晋级客户按钮并调用 promote-to-customer', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../src/pages/leads/detail.vue', import.meta.url), 'utf8');
+
+  assert.match(page, /晋级客户/);
+  assert.match(page, /handleManualPromoteCustomer/);
+  assert.match(page, /const stagingLeadId = getStagingLeadId\(\)/);
+  assert.match(page, /\/staging-leads\/\$\{encodeURIComponent\(stagingLeadId\)\}\/promote-to-customer/);
+  assert.match(page, /buildPromoteStagingPayload/);
+  assert.match(page, /已晋级客户/);
+});
+
+test('线索详情调级和 staging 专属操作不再把客户ID当 staging lead ID', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../src/pages/leads/detail.vue', import.meta.url), 'utf8');
+
+  assert.match(page, /function getStagingLeadId\(\)/);
+  assert.match(page, /stagingLeadActionsService\.updateGrade\(stagingLeadId/);
+  assert.match(page, /enrichmentService\.listEnrichmentResults\(stagingLeadId\)/);
+  assert.match(page, /leadId: stagingLeadId/);
+  assert.doesNotMatch(page, /stagingLeadActionsService\.updateGrade\(detail\.value\.id/);
+  assert.doesNotMatch(page, /enrichmentService\.listEnrichmentResults\(detail\.value\.id\)/);
+});
+
+test('线索详情不再把已晋级客户兜底展示为线索详情', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../src/pages/leads/detail.vue', import.meta.url), 'utf8');
+
+  assert.match(page, /\/customers\/\$\{encodeURIComponent\(leadId\)\}/);
+  assert.match(page, /globalThis\.uni\?\.redirectTo/);
+  assert.match(page, /\/pages\/customers\/detail\?id=/);
+  assert.doesNotMatch(page, /mapCustomerDetailToLeadDetail/);
+  assert.doesNotMatch(page, /mapCustomerSummaryToLeadDetail/);
+});
+
+test('线索详情底部四个按钮单行显示并支持取消勿扰和邮箱触达门禁', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../src/pages/leads/detail.vue', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/styles/leadDetail.css', import.meta.url), 'utf8');
+
+  assert.match(page, /取消勿扰/);
+  assert.match(page, /handleToggleDoNotContact/);
+  assert.match(page, /getDoNotContactCustomerId/);
+  assert.match(page, /doNotContactCustomerId/);
+  assert.match(page, /\/do-not-contact\/cancel/);
+  assert.doesNotMatch(page, /\/customers\/\$\{encodeURIComponent\(detail\.value\.id\)\}\/do-not-contact\/cancel/);
+  assert.match(page, /AI触达草稿/);
+  assert.match(page, /canCreateOutreachDraft/);
+  assert.match(page, /openOutreach/);
+  assert.doesNotMatch(page, /handlePromoteStaging/);
+  assert.doesNotMatch(page, />\s*\{\{\s*detail\.outreachActionLabel\s*\}\}\s*</);
+  assert.doesNotMatch(page, />\s*晋级core\s*</);
+  assert.match(css, /\.action-bar\s*{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s);
 });

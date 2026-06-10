@@ -21,7 +21,7 @@ class SourceDiscoveryAgentOutput(BaseModel):
 
     schema_version: Literal["phase4.agent.source_discovery.v1"]
     discovery_run_id: UUID | str
-    agent_mode: Literal["shadow"] = "shadow"
+    agent_mode: Literal["active", "shadow"] = "shadow"
     candidates: list[SourceCandidateOutput] = Field(default_factory=list)
     blocked_items: list[dict] = Field(default_factory=list)
     audit: dict = Field(default_factory=dict)

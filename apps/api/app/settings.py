@@ -131,6 +131,63 @@ class Settings(BaseSettings):
             "EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_INTERVAL_SECONDS",
         ),
     )
+    external_agent_lead_extraction_grading_batch_size: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_BATCH_SIZE",
+            "EXTERNAL_AGENT_LEAD_EXTRACTION_GRADING_BATCH_SIZE",
+        ),
+    )
+    external_agent_deep_enrichment_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_DEEP_ENRICHMENT_ENABLED",
+            "EXTERNAL_AGENT_DEEP_ENRICHMENT_ENABLED",
+        ),
+    )
+    external_agent_deep_enrichment_interval_seconds: int = Field(
+        default=600,
+        ge=1,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_DEEP_ENRICHMENT_INTERVAL_SECONDS",
+            "EXTERNAL_AGENT_DEEP_ENRICHMENT_INTERVAL_SECONDS",
+        ),
+    )
+    external_agent_deep_enrichment_batch_size: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_DEEP_ENRICHMENT_BATCH_SIZE",
+            "EXTERNAL_AGENT_DEEP_ENRICHMENT_BATCH_SIZE",
+        ),
+    )
+    external_agent_lead_cleanup_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_CLEANUP_ENABLED",
+            "EXTERNAL_AGENT_LEAD_CLEANUP_ENABLED",
+        ),
+    )
+    external_agent_lead_cleanup_interval_seconds: int = Field(
+        default=900,
+        ge=1,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_CLEANUP_INTERVAL_SECONDS",
+            "EXTERNAL_AGENT_LEAD_CLEANUP_INTERVAL_SECONDS",
+        ),
+    )
+    external_agent_lead_cleanup_batch_size: int = Field(
+        default=50,
+        ge=1,
+        le=200,
+        validation_alias=AliasChoices(
+            "VEHICLE_LEADS_EXTERNAL_AGENT_LEAD_CLEANUP_BATCH_SIZE",
+            "EXTERNAL_AGENT_LEAD_CLEANUP_BATCH_SIZE",
+        ),
+    )
     agent_deep_enrichment_http_active_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices(

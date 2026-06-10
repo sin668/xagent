@@ -23,6 +23,10 @@ function normalizeBaseUrl(baseUrl) {
 }
 
 function routeFromDraft(draft = {}) {
+  const summaryDecision = draft.auto_send_decision || draft.autoSendDecision;
+  if (summaryDecision === 'auto_send_allowed') return 'auto_send';
+  if (summaryDecision === 'manual_review') return 'hold_for_manual_review';
+  if (summaryDecision === 'blocked') return 'block';
   const decision = draft.auto_send_decision_json || draft.autoSendDecisionJson || {};
   if (decision.route) return decision.route;
   if (draft.status === 'blocked') return 'block';
@@ -31,6 +35,8 @@ function routeFromDraft(draft = {}) {
 }
 
 function hardBlockReasons(draft = {}) {
+  const rootReasons = draft.hard_block_reasons || draft.hardBlockReasons || [];
+  if (Array.isArray(rootReasons) && rootReasons.length > 0) return rootReasons.map((item) => String(item).toLowerCase());
   const decision = draft.auto_send_decision_json || draft.autoSendDecisionJson || {};
   const reasons = decision.hard_block_reasons || decision.hardBlockReasons || [];
   return Array.isArray(reasons) ? reasons.map((item) => String(item).toLowerCase()) : [];
@@ -197,7 +203,7 @@ export async function fetchEmailQualityDashboard({
     fetcher(`${normalizedBaseUrl}/llm-prompt-templates`),
     fetcher(`${normalizedBaseUrl}/knowledge/embeddings/metrics`),
     fetcher(`${normalizedBaseUrl}/sync/audit-dashboard`),
-    fetcher(`${normalizedBaseUrl}/email-reply/drafts?limit=500`),
+    fetcher(`${normalizedBaseUrl}/email-replies?limit=500`),
     fetcher(`${normalizedBaseUrl}/dashboard/risk-events`),
   ]);
   return {

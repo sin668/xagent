@@ -26,6 +26,10 @@ function normalizeBaseUrl(baseUrl) {
 }
 
 function decisionFromDraft(draft = {}) {
+  const summaryDecision = draft.auto_send_decision || draft.autoSendDecision;
+  if (summaryDecision === 'auto_send_allowed') return 'auto_send';
+  if (summaryDecision === 'manual_review') return 'hold_for_manual_review';
+  if (summaryDecision === 'blocked') return 'block';
   const decision = draft.auto_send_decision_json || draft.autoSendDecisionJson || {};
   if (decision.route) return decision.route;
   if (draft.status === 'blocked') return 'block';
@@ -35,6 +39,8 @@ function decisionFromDraft(draft = {}) {
 }
 
 function hardBlockReasons(draft = {}) {
+  const rootReasons = draft.hard_block_reasons || draft.hardBlockReasons || [];
+  if (Array.isArray(rootReasons) && rootReasons.length > 0) return rootReasons;
   const decision = draft.auto_send_decision_json || draft.autoSendDecisionJson || {};
   const reasons = decision.hard_block_reasons || decision.hardBlockReasons || [];
   return Array.isArray(reasons) ? reasons : [];
@@ -58,8 +64,8 @@ function normalizeQueueItem(draft = {}) {
     customerName: draft.customer_name || draft.customerName || 'Unknown',
     customerId: draft.customer_id || draft.customerId || null,
     messageId: draft.message_id || draft.messageId || null,
-    subject: draft.inbound_subject || draft.inboundSubject || draft.thread_subject || draft.threadSubject || 'Unknown',
-    language: draft.reply_language || draft.replyLanguage || draft.detected_language || draft.detectedLanguage || 'Unknown',
+    subject: draft.subject || draft.inbound_subject || draft.inboundSubject || draft.thread_subject || draft.threadSubject || 'Unknown',
+    language: draft.language || draft.reply_language || draft.replyLanguage || draft.detected_language || draft.detectedLanguage || 'Unknown',
     status: draft.status || 'Unknown',
     statusLabel: STATUS_LABELS[draft.status] || draft.status || 'Unknown',
     decision,
@@ -70,9 +76,12 @@ function normalizeQueueItem(draft = {}) {
 }
 
 function normalizeSelectedDraft(draft = {}) {
-  const knowledgeHits = Array.isArray(draft.knowledge_hits_json || draft.knowledgeHitsJson)
-    ? (draft.knowledge_hits_json || draft.knowledgeHitsJson).map(normalizeKnowledgeHit)
+  const knowledgeHitsPayload = draft.knowledge_hits_json || draft.knowledgeHitsJson || draft.knowledge_hits || draft.knowledgeHits;
+  const knowledgeHits = Array.isArray(knowledgeHitsPayload)
+    ? knowledgeHitsPayload.map(normalizeKnowledgeHit)
     : [];
+  const replyDraft = draft.reply_draft || draft.replyDraft || {};
+  const autoSendCheck = draft.auto_send_check || draft.autoSendCheck || {};
   const hardReasons = hardBlockReasons(draft);
   return {
     id: draft.id || null,
@@ -84,25 +93,25 @@ function normalizeSelectedDraft(draft = {}) {
     },
     inbound: {
       messageId: draft.message_id || draft.messageId || null,
-      subject: draft.inbound_subject || draft.inboundSubject || draft.thread_subject || draft.threadSubject || 'Unknown',
-      body: draft.inbound_body || draft.inboundBody || '',
-      language: draft.detected_language || draft.detectedLanguage || 'Unknown',
+      subject: draft.subject || draft.inbound_subject || draft.inboundSubject || draft.thread_subject || draft.threadSubject || 'Unknown',
+      body: draft.inbound_body || draft.inboundBody || draft.preview || '',
+      language: draft.language || draft.detected_language || draft.detectedLanguage || 'Unknown',
     },
     aiSuggestion: {
-      subject: draft.ai_suggested_subject || draft.aiSuggestedSubject || 'Unknown',
-      body: draft.ai_suggested_body || draft.aiSuggestedBody || '',
-      promptVersionLabel: draft.prompt_version || draft.promptVersion || 'Unknown',
+      subject: draft.ai_suggested_subject || draft.aiSuggestedSubject || replyDraft.subject || draft.subject || 'Unknown',
+      body: draft.ai_suggested_body || draft.aiSuggestedBody || replyDraft.body || '',
+      promptVersionLabel: draft.prompt_version || draft.promptVersion || replyDraft.prompt_version || 'Unknown',
       model: draft.model || 'Unknown',
     },
     finalReply: {
-      subject: draft.final_subject || draft.finalSubject || draft.ai_suggested_subject || draft.aiSuggestedSubject || 'Unknown',
-      body: draft.final_body || draft.finalBody || draft.ai_suggested_body || draft.aiSuggestedBody || '',
+      subject: draft.final_subject || draft.finalSubject || draft.ai_suggested_subject || draft.aiSuggestedSubject || replyDraft.subject || draft.subject || 'Unknown',
+      body: draft.final_body || draft.finalBody || draft.ai_suggested_body || draft.aiSuggestedBody || replyDraft.body || '',
     },
     knowledgeHits,
     risk: {
       manualReviewRequired: Boolean(draft.manual_review_required ?? draft.manualReviewRequired),
       manualReviewReason: draft.manual_review_reason || draft.manualReviewReason || '',
-      autoSendAllowed: Boolean(draft.auto_send_allowed ?? draft.autoSendAllowed),
+      autoSendAllowed: Boolean(draft.auto_send_allowed ?? draft.autoSendAllowed ?? autoSendCheck.allow_auto_send),
       route: decisionFromDraft(draft),
       hardBlockReasons: hardReasons,
       hardBlockReasonsText: hardReasons.length > 0 ? hardReasons.join(', ') : '无硬拦截',
@@ -119,6 +128,7 @@ async function parseJsonResponse(response, errorPrefix) {
 
 export function buildEmailReplyDraftsQuery({
   status,
+  decision,
   manualReviewRequired,
   autoSendAllowed,
   customerId,
@@ -126,13 +136,12 @@ export function buildEmailReplyDraftsQuery({
   limit = 100,
 } = {}) {
   const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (manualReviewRequired !== undefined && manualReviewRequired !== null) {
-    params.set('manual_review_required', String(manualReviewRequired));
-  }
-  if (autoSendAllowed !== undefined && autoSendAllowed !== null) {
-    params.set('auto_send_allowed', String(autoSendAllowed));
-  }
+  const mappedDecision = decision
+    || (status === 'manual_review' ? 'manual_review' : null)
+    || (status === 'blocked' ? 'blocked' : null)
+    || (autoSendAllowed === true ? 'auto_send_allowed' : null)
+    || (manualReviewRequired === true ? 'manual_review' : null);
+  if (mappedDecision) params.set('decision', mappedDecision);
   if (customerId) params.set('customer_id', customerId);
   if (language) params.set('language', language);
   params.set('limit', String(limit));
@@ -188,7 +197,7 @@ export async function fetchEmailReplyReview({
   if (typeof fetcher !== 'function') {
     throw new Error('fetcher is required to load email reply review');
   }
-  const response = await fetcher(`${normalizeBaseUrl(baseUrl)}/email-reply/drafts${buildEmailReplyDraftsQuery(filters)}`);
+  const response = await fetcher(`${normalizeBaseUrl(baseUrl)}/email-replies${buildEmailReplyDraftsQuery(filters)}`);
   return {
     actorRole,
     drafts: await parseJsonResponse(response, 'Failed to load email reply drafts'),

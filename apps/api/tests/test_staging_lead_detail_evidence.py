@@ -154,7 +154,13 @@ def test_core_gate_blocks_high_secondary_and_watch_invalid() -> None:
 
 
 def test_staging_lead_detail_response_includes_sanitized_evidence_audit_and_gate() -> None:
-    detail = serialize_staging_lead_detail(_lead(), _snapshot(), _audit())
+    do_not_contact_customer_id = uuid4()
+    detail = serialize_staging_lead_detail(
+        _lead(),
+        _snapshot(),
+        _audit(),
+        do_not_contact_customer_id=do_not_contact_customer_id,
+    )
 
     assert detail.staging_lead.customer_name == "Auto City Moscow"
     assert detail.candidate_url.url == "https://dealer.example.ru"
@@ -164,6 +170,8 @@ def test_staging_lead_detail_response_includes_sanitized_evidence_audit_and_gate
     assert detail.ai_audit_summary.recommended_grade == "B"
     assert detail.core_gate.can_promote_to_core is True
     assert detail.core_gate.status == "ready"
+    assert detail.has_do_not_contact_match is True
+    assert detail.do_not_contact_customer_id == do_not_contact_customer_id
 
 
 async def cleanup_db_records() -> None:

@@ -72,6 +72,7 @@ class ExternalAgentResultConsumer:
         )
         created_count = 0
         updated_count = 0
+        processed_items: list[dict[str, Any]] = []
         for lead_payload in self._staging_lead_payloads(output):
             if not lead_payload["source_url"]:
                 continue
@@ -95,6 +96,7 @@ class ExternalAgentResultConsumer:
                     source_risk_level=lead_payload["source_risk_level"],
                 )
                 created_count += 1
+                item_status = "created"
             else:
                 existing.customer_name = lead_payload["customer_name"]
                 existing.country = lead_payload["country"]
@@ -108,10 +110,22 @@ class ExternalAgentResultConsumer:
                 existing.recommended_reason = lead_payload["recommended_reason"]
                 existing.missing_fields = lead_payload["missing_fields"]
                 updated_count += 1
+                item_status = "updated"
+            processed_items.append(
+                {
+                    "source_candidate_id": lead_payload.get("source_candidate_id"),
+                    "source_url": lead_payload["source_url"],
+                    "status": "succeeded",
+                    "write_action": item_status,
+                }
+            )
+        for item in self._failed_batch_items(output):
+            processed_items.append(item)
         task_run.output_summary_json = {
             "external_agent_run_id": response.get("agent_service_run_id"),
             "created_count": created_count,
             "updated_count": updated_count,
+            "processed_items": processed_items,
         }
         task_run.status = AgentTaskRunStatus.SUCCEEDED
         self.session.flush()
@@ -172,8 +186,8 @@ class ExternalAgentResultConsumer:
                 "risk_level": risk_level,
                 "discovery_method": "apps_agents_source_discovery",
                 "discovery_query": item.get("discovery_query"),
-                "discovery_reason": item.get("evidence_summary") or "apps/agents shadow source discovery.",
-                "evidence_note": item.get("evidence_summary") or "apps/agents shadow source discovery.",
+                "discovery_reason": item.get("evidence_summary") or "apps/agents external source discovery.",
+                "evidence_note": item.get("evidence_summary") or "apps/agents external source discovery.",
                 "evidence_links": [item.get("url")],
                 "confidence_score": None,
             }
@@ -198,12 +212,23 @@ class ExternalAgentResultConsumer:
             "task_type": "SOURCE_DISCOVERY",
             "country": output.get("market") or (output.get("audit") or {}).get("market") or "Unknown",
             "city": None,
-            "channel_strategy": "apps/agents LangGraph Source Discovery shadow output",
+            "channel_strategy": "apps/agents LangGraph Source Discovery output",
             "candidates": candidates,
             "blocked_candidates": blocked_candidates,
         }
 
     def _staging_lead_payloads(self, output: dict[str, Any]) -> list[dict[str, Any]]:
+        batch_results = [item for item in output.get("batch_results") or [] if isinstance(item, dict)]
+        if batch_results:
+            results: list[dict[str, Any]] = []
+            for item in batch_results:
+                if item.get("status") != "succeeded" or not isinstance(item.get("output"), dict):
+                    continue
+                for payload in self._staging_lead_payloads(item["output"]):
+                    payload["source_candidate_id"] = item.get("source_candidate_id") or payload.get("source_candidate_id")
+                    results.append(payload)
+            return results
+
         extraction = output.get("extraction") if isinstance(output.get("extraction"), dict) else {}
         grading = output.get("grading") if isinstance(output.get("grading"), dict) else {}
         suggestions = list(grading.get("suggestions") or [])
@@ -223,27 +248,44 @@ class ExternalAgentResultConsumer:
             results.append(
                 {
                     "source_url": source_url,
+                    "source_candidate_id": output.get("source_candidate_id"),
                     "source_risk_level": self._source_risk_from_suggestion(suggestion),
                     "customer_name": self._field_value(candidate, "company_name") or "Unknown",
                     "country": self._field_value(candidate, "country") or "Unknown",
                     "city": self._field_value(candidate, "city"),
                     "customer_type": CustomerType.LOCAL_DEALER_SECONDARY_DEALER.value,
                     "contacts_json": contacts,
-                    "activity_level": "external_agent_shadow",
+                    "activity_level": "external_agent_runtime",
                     "scale_signal": self._field_value(candidate, "export_intent"),
                     "import_used_car_relevance": self._field_value(candidate, "vehicle_interest"),
                     "source_evidence": evidence,
                     "recommended_grade": suggestion.get("recommended_grade") or CustomerGrade.C.value,
-                    "recommended_reason": "；".join(str(item) for item in suggestion.get("reasons") or []) or "apps/agents shadow grading.",
+                    "recommended_reason": "；".join(str(item) for item in suggestion.get("reasons") or []) or "apps/agents grading.",
                     "missing_fields": self._missing_fields(candidate),
                 }
             )
         return results
 
+    @staticmethod
+    def _failed_batch_items(output: dict[str, Any]) -> list[dict[str, Any]]:
+        failed: list[dict[str, Any]] = []
+        for item in output.get("batch_results") or []:
+            if not isinstance(item, dict) or item.get("status") == "succeeded":
+                continue
+            failed.append(
+                {
+                    "source_candidate_id": item.get("source_candidate_id"),
+                    "source_url": item.get("source_url"),
+                    "status": "failed",
+                    "error_message": (item.get("error") or {}).get("message") if isinstance(item.get("error"), dict) else None,
+                }
+            )
+        return failed
+
     def _ensure_candidate_url_for_staging_payload(self, payload: dict[str, Any]):
         task = self.raw_collection_service.create_collection_task(
             channel_name="apps_agents_lead_extraction_grading",
-            task_type="external_agent_shadow_lead_extraction_grading",
+            task_type="external_agent_lead_extraction_grading",
             risk_level=payload["source_risk_level"],
             allowed_actions="read_public_source_only",
             forbidden_actions="no_auto_outreach,no_login,no_anti_scraping_bypass",
@@ -256,7 +298,7 @@ class ExternalAgentResultConsumer:
             source_platform=SourcePlatform.OFFICIAL_WEBSITE,
             source_risk_level=payload["source_risk_level"],
             source_usage_type=SourceUsageType.AUTOMATIC_COLLECTION,
-            discovery_reason=payload["source_evidence"] or "apps/agents shadow lead extraction.",
+            discovery_reason=payload["source_evidence"] or "apps/agents lead extraction.",
             status=CandidateUrlStatus.STAGED,
         )
 
@@ -303,14 +345,50 @@ class ExternalAgentResultConsumer:
         return str(quote).strip() if quote else None
 
     def _contacts_from_candidate(self, candidate: dict[str, Any]) -> list[dict[str, str]]:
-        contacts = []
+        contacts: list[dict[str, str]] = []
+        for contact in candidate.get("contacts") or []:
+            if not isinstance(contact, dict):
+                continue
+            contact_type = str(contact.get("contact_type") or contact.get("type") or "").strip().lower()
+            value = str(contact.get("value") or "").strip()
+            if not contact_type or not value:
+                continue
+            contacts.append(
+                {
+                    "type": contact_type,
+                    "value": value,
+                    "usage": str(contact.get("usage") or "source_public_contact"),
+                }
+            )
         email = self._field_value(candidate, "email")
         phone = self._field_value(candidate, "phone")
         if email:
             contacts.append({"type": "email", "value": email, "usage": "source_public_contact"})
         if phone:
             contacts.append({"type": "phone", "value": phone, "usage": "source_public_contact"})
-        return contacts
+        return self._dedupe_contacts(contacts)
+
+    @staticmethod
+    def _dedupe_contacts(contacts: list[dict[str, str]]) -> list[dict[str, str]]:
+        deduped = []
+        seen: set[tuple[str, str]] = set()
+        for contact in contacts:
+            contact_type = str(contact.get("type") or "").strip().lower()
+            value = str(contact.get("value") or "").strip()
+            if not contact_type or not value:
+                continue
+            key = (contact_type, value.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(
+                {
+                    "type": contact_type,
+                    "value": value,
+                    "usage": str(contact.get("usage") or "source_public_contact"),
+                }
+            )
+        return deduped
 
     @staticmethod
     def _missing_fields(candidate: dict[str, Any]) -> list[str]:

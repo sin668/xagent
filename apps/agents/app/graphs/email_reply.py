@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from app.adapters.email_reply_api import EmailReplyApiClient
 from app.schemas.email_reply import EMAIL_REPLY_SCHEMA_VERSION, EmailReplyAgentOutput, EmailReplyKnowledgeHit, EmailReplyRequestEnvelope
 from app.services.llm_client import LLMClient, LLMClientResult
+from app.services.llm_prompt_repository import LLMPromptRepository, LLMPromptTemplateNotFound
 from app.settings import get_settings
 
 
@@ -64,57 +65,42 @@ class NullEmailReplyDrafter:
 class LLMEmailReplyDrafter:
     task_type = "EMAIL_REPLY"
 
-    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, *, llm_client: LLMClient | None = None, prompt_repository: LLMPromptRepository | None = None) -> None:
         self.llm_client = llm_client or LLMClient()
+        self.prompt_repository = prompt_repository or LLMPromptRepository()
 
     def draft(self, *, context: dict, knowledge_hits: list[EmailReplyKnowledgeHit], prompt: dict, options: dict) -> dict:
+        model = self.llm_client._model_for_task(self.task_type)
+        try:
+            prompt_template = self.prompt_repository.load_active_default(
+                task_type=self.task_type,
+                provider=self.llm_client.settings.llm_provider,
+                model=model,
+            )
+        except LLMPromptTemplateNotFound as exc:
+            return self._manual_review_fallback(
+                result=self._configuration_error_result(model=model, error_message=str(exc), error_type=exc.error_type),
+                options=options,
+            )
         result = self.llm_client.generate_json(
             task_type=self.task_type,
-            system_prompt=self._system_prompt(prompt),
-            user_prompt=self._user_prompt(context=context, knowledge_hits=knowledge_hits, prompt=prompt, options=options),
-            output_schema=EmailReplyAgentOutput.model_json_schema(),
+            system_prompt=prompt_template.system_prompt,
+            user_prompt=prompt_template.render_user_prompt(
+                {
+                    "context": context,
+                    "knowledge_hits": [item.model_dump(mode="json") for item in knowledge_hits],
+                    "prompt": prompt,
+                    "options": options,
+                }
+            ),
+            output_schema=prompt_template.output_schema_json,
         )
         if result.error or not isinstance(result.output_json, dict):
             return self._manual_review_fallback(result=result, options=options)
-        return self._with_audit(result.output_json, result)
+        return self._with_audit(result.output_json, result, prompt_audit=prompt_template.audit)
 
     @staticmethod
-    def _system_prompt(prompt: dict) -> str:
-        configured = prompt.get("system_prompt") or prompt.get("system")
-        if configured:
-            return str(configured)
-        return (
-            "你是海外车辆采购邮件回复 Agent。只能基于客户上下文和已审核知识生成结构化 JSON，"
-            "不得编造事实，不得承诺价格、合同、税务、法律、交付或出口管制事项。"
-            "缺失字段输出 Unknown、null 或空数组。不得写入业务 core 表。"
-        )
-
-    @staticmethod
-    def _user_prompt(
-        *,
-        context: dict,
-        knowledge_hits: list[EmailReplyKnowledgeHit],
-        prompt: dict,
-        options: dict,
-    ) -> str:
-        payload = {
-            "context": context,
-            "knowledge_hits": [item.model_dump(mode="json") for item in knowledge_hits],
-            "prompt": prompt,
-            "options": options,
-            "requirements": [
-                "输出 schema_version=email-reply-v1。",
-                "audit.writes_core_tables 必须为 false。",
-                "知识证据不足、语言不确定、DNC/D/E 或敏感承诺场景必须 manual_review_required=true。",
-                "auto_send_allowed 只能作为候选建议，最终发送必须由 apps/api 决策。",
-            ],
-        }
-        import json
-
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
-
-    @staticmethod
-    def _with_audit(output_json: dict, result: LLMClientResult) -> dict:
+    def _with_audit(output_json: dict, result: LLMClientResult, *, prompt_audit: dict[str, str]) -> dict:
         output = dict(output_json)
         audit = dict(output.get("audit") or {})
         audit.update(
@@ -125,6 +111,7 @@ class LLMEmailReplyDrafter:
                 "llm_base_url": result.base_url,
                 "latency_ms": result.latency_ms,
                 "token_usage": result.token_usage,
+                **prompt_audit,
             }
         )
         output["audit"] = audit
@@ -154,15 +141,33 @@ class LLMEmailReplyDrafter:
             },
         }
 
+    def _configuration_error_result(self, *, model: str, error_message: str, error_type: str) -> LLMClientResult:
+        return LLMClientResult(
+            provider=self.llm_client.settings.llm_provider,
+            model=model,
+            base_url=self.llm_client.settings.llm_base_url,
+            latency_ms=0,
+            token_usage=None,
+            output_json=None,
+            raw_response=None,
+            error={"type": error_type, "message": error_message},
+        )
+
 
 class EmailReplyGraphRunner:
-    def __init__(self, *, api_client: EmailReplyApiClient | None = None, llm_drafter=None) -> None:
+    def __init__(
+        self,
+        *,
+        api_client: EmailReplyApiClient | None = None,
+        llm_drafter=None,
+        prompt_repository: LLMPromptRepository | None = None,
+    ) -> None:
         settings = get_settings()
         self.api_client = api_client or EmailReplyApiClient(
             base_url=self._api_base_url_from_options(settings),
             api_key=settings.agents_api_key,
         )
-        self.llm_drafter = llm_drafter or LLMEmailReplyDrafter()
+        self.llm_drafter = llm_drafter or LLMEmailReplyDrafter(prompt_repository=prompt_repository)
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
 

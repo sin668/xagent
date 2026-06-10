@@ -23,6 +23,18 @@ function compactJson(value) {
   return JSON.stringify(value || {}, null, 2);
 }
 
+function promptInputText(template = {}) {
+  const safeTemplate = template && typeof template === 'object' ? template : {};
+  const sections = [];
+  if (safeTemplate.systemPromptPreview) {
+    sections.push(`System Prompt\n${safeTemplate.systemPromptPreview}`);
+  }
+  if (safeTemplate.userPromptPreview) {
+    sections.push(`User Prompt Template\n${safeTemplate.userPromptPreview}`);
+  }
+  return sections.join('\n\n') || '暂无 Prompt 输入内容。';
+}
+
 function schemaSummary(schema = {}) {
   const required = Array.isArray(schema.required) ? schema.required : [];
   if (required.length > 0) {
@@ -96,14 +108,18 @@ export function buildPromptTemplateQuery({ taskType, status, isDefault } = {}) {
   return query ? `?${query}` : '';
 }
 
-export function buildLlmGovernanceView({ health = {}, templates = {} } = {}) {
+export function buildLlmGovernanceView({ health = {}, templates = {}, selectedTemplateId = '' } = {}) {
   const models = health.models && typeof health.models === 'object' ? health.models : {};
   const modelSummary = Object.entries(models)
     .map(([key, value]) => `${key}: ${value || 'Unknown'}`)
     .join(' / ');
   const promptTemplates = Array.isArray(templates.items) ? templates.items.map(normalizeTemplate) : [];
   const defaultTemplates = promptTemplates.filter((template) => template.isDefault);
-  const schemaPreview = defaultTemplates[0] || promptTemplates[0] || {
+  const selectedTemplate = promptTemplates.find((template) => template.id === selectedTemplateId)
+    || defaultTemplates[0]
+    || promptTemplates[0]
+    || null;
+  const schemaPreview = selectedTemplate || {
     name: '暂无默认 Prompt',
     version: '',
     schemaText: '{}',
@@ -123,6 +139,13 @@ export function buildLlmGovernanceView({ health = {}, templates = {} } = {}) {
     promptTemplates,
     defaultTemplates,
     schemaPreview,
+    promptWorkbench: {
+      selectedTemplateId: selectedTemplate?.id || '',
+      title: selectedTemplate?.name || '暂无默认 Prompt',
+      version: selectedTemplate?.version || '',
+      promptInputText: promptInputText(selectedTemplate),
+      schemaOutputText: selectedTemplate?.schemaText || '{}',
+    },
     fallbackBoundaries: [
       { condition: '网络/超时/限流', decisionLabel: '可 fallback', className: 'blue' },
       { condition: 'schema 校验失败', decisionLabel: '不 fallback', className: 'red' },

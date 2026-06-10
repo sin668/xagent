@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.settings import settings
 
 
 def test_outreach_draft_api_returns_existing_safe_draft_with_audit() -> None:
@@ -86,3 +87,46 @@ def test_outreach_draft_api_requires_human_confirmation_before_recording_sent() 
     assert payload["status"] == "sent_manual"
     assert payload["auto_send"] is False
     assert payload["sender"] == "Anna"
+
+
+def test_outreach_draft_api_sends_manual_email_with_existing_email_sender() -> None:
+    client = TestClient(app)
+    customer_id = uuid4()
+    original_provider = settings.email_sender_provider
+    original_from = settings.email_sender_from_email
+    settings.email_sender_provider = "fake"
+    settings.email_sender_from_email = "sales@example.com"
+    try:
+        blocked = client.post(
+            f"/outreach-drafts/{customer_id}/send-email",
+            json={
+                "to_email": "buyer@example.ru",
+                "subject": "Поставка подержанных автомобилей из Китая",
+                "body": "Здравствуйте! Готовы обсудить поставки автомобилей.",
+                "sender": "Anna",
+                "human_confirmed": False,
+            },
+        )
+        response = client.post(
+            f"/outreach-drafts/{customer_id}/send-email",
+            json={
+                "to_email": "buyer@example.ru",
+                "subject": "Поставка подержанных автомобилей из Китая",
+                "body": "Здравствуйте! Готовы обсудить поставки автомобилей.",
+                "sender": "Anna",
+                "human_confirmed": True,
+            },
+        )
+    finally:
+        settings.email_sender_provider = original_provider
+        settings.email_sender_from_email = original_from
+
+    assert blocked.status_code == 400
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["customer_id"] == str(customer_id)
+    assert payload["status"] == "sent"
+    assert payload["provider"] == "fake"
+    assert payload["provider_message_id"].startswith("fake-")
+    assert payload["to_email"] == "buyer@example.ru"
+    assert payload["auto_send"] is False

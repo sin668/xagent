@@ -97,6 +97,12 @@ test('home dashboard summarizes acceptance metrics and channel performance', () 
   const dashboard = buildHomeDashboard({
     leads: sampleLeads,
     aiTasks: sampleAiTasks,
+    customers: [
+      { id: 'customer-a', grade: 'A', hasVehicleIntent: true, followupStatus: 'due_today' },
+      { id: 'customer-b', grade: 'B', hasVehicleIntent: false, nextAction: '今日待跟进' },
+      { id: 'customer-c', grade: 'C', hasVehicleIntent: true, nextAction: '销售跟进中' },
+      { id: 'customer-watch', grade: 'WATCH', hasVehicleIntent: true, nextAction: '今日待跟进' },
+    ],
     channels: [
       {
         name: '官网/公开目录',
@@ -119,9 +125,43 @@ test('home dashboard summarizes acceptance metrics and channel performance', () 
   assert.equal(dashboard.totalCandidateLeads, 5);
   assert.equal(dashboard.bGradeRatioText, '40%');
   assert.equal(dashboard.pendingFollowUpCount, 2);
+  assert.deepEqual(dashboard.leadStats.map((stat) => stat.label), ['A/B/C级线索', '线索来源', '被清洗线索']);
+  assert.deepEqual(dashboard.leadStats.map((stat) => stat.count), [4, 2, 1]);
   assert.equal(dashboard.executableAiTasks.length, 1);
   assert.equal(dashboard.channelPerformance.length, 1);
   assert.equal(dashboard.channelPerformance[0].name, '官网/公开目录');
+  assert.deepEqual(dashboard.customerStats.map((stat) => stat.label), ['A/B/C级客户', '车型意向客户', '今日待跟进']);
+  assert.deepEqual(dashboard.customerStats.map((stat) => stat.count), [3, 3, 2]);
+});
+
+test('home dashboard can use backend summary counts for lead statistic cards', () => {
+  const dashboard = buildHomeDashboard({
+    leads: sampleLeads,
+    channels: [],
+    leadStatsSummary: {
+      abc_grade_count: 128,
+      source_count: 93,
+      cleaned_lead_count: 41,
+    },
+  });
+
+  assert.deepEqual(dashboard.leadStats.map((stat) => stat.count), [128, 93, 41]);
+});
+
+test('home dashboard uses source candidate and executed cleanup totals for linked lead stat cards', () => {
+  const dashboard = buildHomeDashboard({
+    leads: sampleLeads,
+    channels: [
+      { name: '官网', riskLevel: 'Low' },
+      { name: '公开目录', riskLevel: 'Medium' },
+    ],
+    leadStatsSummary: {
+      sourceCandidatesTotal: 57,
+      cleanedLeadsTotal: 19,
+    },
+  });
+
+  assert.deepEqual(dashboard.leadStats.map((stat) => stat.count), [4, 57, 19]);
 });
 
 test('seed dashboard excludes High and Forbidden work from executable homepage sections', () => {

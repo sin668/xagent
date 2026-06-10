@@ -282,7 +282,7 @@ class CustomerPromotionService:
     def get_staging_lead(self, lead_id: UUID) -> StagingLead | None:
         return self.session.get(StagingLead, lead_id)
 
-    def has_do_not_contact_match(self, lead: StagingLead) -> bool:
+    def find_do_not_contact_customer_id(self, lead: StagingLead) -> UUID | None:
         contact_values = {
             str(item.get("value", "")).strip().lower()
             for item in (lead.contacts_json or [])
@@ -290,25 +290,27 @@ class CustomerPromotionService:
         }
         normalized_name = (lead.customer_name or "").strip().lower()
         if normalized_name and normalized_name != "unknown":
-            if self.session.scalar(
+            matched_customer_id = self.session.scalar(
                 select(Customer.id)
                 .where(
                     Customer.do_not_contact.is_(True),
                     (Customer.normalized_name == normalized_name) | (func.lower(Customer.name) == normalized_name),
                 )
                 .limit(1)
-            ):
-                return True
-        if not contact_values:
-            return False
-        return bool(
-            self.session.scalar(
-                select(ContactMethod.id)
-                .join(Customer, ContactMethod.customer_id == Customer.id)
-                .where(Customer.do_not_contact.is_(True), func.lower(ContactMethod.value).in_(contact_values))
-                .limit(1)
             )
+            if matched_customer_id:
+                return matched_customer_id
+        if not contact_values:
+            return None
+        return self.session.scalar(
+            select(Customer.id)
+            .join(ContactMethod, ContactMethod.customer_id == Customer.id)
+            .where(Customer.do_not_contact.is_(True), func.lower(ContactMethod.value).in_(contact_values))
+            .limit(1)
         )
+
+    def has_do_not_contact_match(self, lead: StagingLead) -> bool:
+        return self.find_do_not_contact_customer_id(lead) is not None
 
     def promote_to_customer(self, lead: StagingLead, *, request: PromoteStagingLeadToCustomerRequest) -> dict:
         payloads = self.build_promotion_payloads(

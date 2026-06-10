@@ -18,6 +18,10 @@ function normalizeGrade(value) {
   return String(value || 'Unknown').toUpperCase();
 }
 
+function isAbcGrade(value) {
+  return ['A', 'B', 'C'].includes(normalizeGrade(value));
+}
+
 function unknown(value) {
   return value == null || value === '' ? 'Unknown' : value;
 }
@@ -272,6 +276,9 @@ export function sortCustomersByNextAction(customers = []) {
 }
 
 export function filterCustomers(customers = [], filterKey = 'all') {
+  if (filterKey === 'grade_abc') {
+    return customers.filter((customer) => isAbcGrade(customer.grade));
+  }
   if (filterKey === 'today') {
     return customers.filter((customer) => customer.nextAction === '今日待跟进' || customer.followupStatus === 'due_today');
   }
@@ -294,6 +301,32 @@ export function buildCustomerFilterTabs(customers = []) {
     { key: 'c_compliance', label: 'C级待合规', count: filterCustomers(customers, 'c_compliance').length },
     { key: 'has_intent', label: '有车型意向', count: filterCustomers(customers, 'has_intent').length },
     { key: 'unassigned', label: '待分配', count: filterCustomers(customers, 'unassigned').length },
+  ];
+}
+
+export function buildCustomerStats(customers = []) {
+  return [
+    {
+      key: 'grade_abc',
+      filterKey: 'grade_abc',
+      label: 'A/B/C级客户',
+      count: filterCustomers(customers, 'grade_abc').length,
+      className: 'customers-number-blue',
+    },
+    {
+      key: 'has_intent',
+      filterKey: 'has_intent',
+      label: '车型意向客户',
+      count: filterCustomers(customers, 'has_intent').length,
+      className: 'customers-number-green',
+    },
+    {
+      key: 'today',
+      filterKey: 'today',
+      label: '今日待跟进',
+      count: filterCustomers(customers, 'today').length,
+      className: 'customers-number-amber',
+    },
   ];
 }
 

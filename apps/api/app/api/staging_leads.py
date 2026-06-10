@@ -139,7 +139,14 @@ def serialize_ai_audit_summary(audit) -> AIAuditSummaryResponse:
     )
 
 
-def serialize_staging_lead_detail(lead, latest_snapshot=None, latest_ai_audit=None, duplicate_signals=None) -> StagingLeadDetailResponse:
+def serialize_staging_lead_detail(
+    lead,
+    latest_snapshot=None,
+    latest_ai_audit=None,
+    duplicate_signals=None,
+    *,
+    do_not_contact_customer_id=None,
+) -> StagingLeadDetailResponse:
     candidate = lead.candidate_url
     source_url = candidate.url if candidate is not None else None
     has_evidence = any(
@@ -162,6 +169,8 @@ def serialize_staging_lead_detail(lead, latest_snapshot=None, latest_ai_audit=No
         latest_page_snapshot=serialize_page_snapshot(latest_snapshot),
         ai_audit_summary=serialize_ai_audit_summary(latest_ai_audit),
         core_gate=CoreGateResponse(**gate),
+        has_do_not_contact_match=do_not_contact_customer_id is not None,
+        do_not_contact_customer_id=do_not_contact_customer_id,
     )
 
 
@@ -257,6 +266,7 @@ async def get_staging_lead(
             service.latest_page_snapshot_for_lead(lead),
             service.latest_ai_audit_for_lead(lead),
             service.duplicate_signals_for_lead(lead),
+            do_not_contact_customer_id=CustomerPromotionService(sync_session).find_do_not_contact_customer_id(lead),
         )
 
     return await async_session.run_sync(run)

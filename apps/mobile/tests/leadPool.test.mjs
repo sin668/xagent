@@ -13,6 +13,7 @@ const sampleLeads = [
   {
     id: 'lead-a',
     customerName: 'Prime Auto Moscow',
+    entityType: 'customer',
     city: 'Moscow',
     customerType: '进口车商',
     channel: '官网',
@@ -22,10 +23,14 @@ const sampleLeads = [
     doNotContact: false,
     isOverdue: false,
     contacts: [{ type: 'Email', value: 'prime@dealer.example.ru' }],
+    aiRecommendationReason: '公开官网展示进口车采购需求，建议人工补录关键采购车型后推进。',
+    sourceUrl: 'https://prime.example.ru/contact',
+    sourceEvidence: '官网联系页公开邮箱和销售团队信息。',
   },
   {
     id: 'lead-b',
     customerName: 'AutoCity Moscow',
+    entityType: 'staging',
     city: 'Moscow',
     customerType: '二手进口车商',
     channel: '官网 + 邮箱',
@@ -160,12 +165,12 @@ test('lead pool stats summarize contact and grade groups for mobile header', () 
   const stats = buildLeadPoolStats(sampleLeads);
 
   assert.deepEqual(
-    stats.map((item) => `${item.key}:${item.label}:${item.count}`),
+    stats.map((item) => `${item.key}:${item.filterKey}:${item.label}:${item.count}`),
     [
-      'email:有邮箱联系线索:4',
-      'social:有社交媒体联系线索:3',
-      'grade-abc:A/B/C级线索:5',
-      'grade-de:D/E级线索:2',
+      'email:email-contact:有邮箱联系线索:4',
+      'social:social-contact:有社交媒体联系线索:3',
+      'grade-abc:grade-abc:A/B/C级线索:5',
+      'grade-de:grade-de:D/E级线索:2',
     ],
   );
 });
@@ -177,6 +182,35 @@ test('C grade lead card view model exposes sales handoff and compliance review s
   assert.equal(card.handoffLabel, '交付销售');
   assert.equal(card.complianceLabel, '待合规复核');
   assert.equal(card.riskLabel, '中风险');
+});
+
+test('lead card view model exposes sectioned visible fields and actionable entry buttons', () => {
+  const card = getLeadCardViewModel(sampleLeads.find((lead) => lead.id === 'lead-a'));
+
+  assert.equal(card.locationLabel, 'Unknown · Moscow');
+  assert.deepEqual(card.contacts.map((item) => `${item.type}:${item.value}`), ['Email:prime@dealer.example.ru']);
+  assert.equal(card.aiAdvice, '公开官网展示进口车采购需求，建议人工补录关键采购车型后推进。');
+  assert.equal(card.evidence, '官网联系页公开邮箱和销售团队信息。');
+  assert.equal(card.sourceUrl, 'https://prime.example.ru/contact');
+  assert.deepEqual(
+    card.actions.map((action) => `${action.key}:${action.label}`),
+    ['mark-dnc:标记勿扰', 'ai-outreach:AI触达'],
+  );
+});
+
+test('staging lead card exposes direct manual enrichment and promotion actions', () => {
+  const card = getLeadCardViewModel(sampleLeads.find((lead) => lead.id === 'lead-b'));
+
+  assert.deepEqual(
+    card.actions.map((action) => `${action.key}:${action.mode}:${action.label}`),
+    ['manual-enrich:form:人工补录', 'ai-outreach:navigate:AI触达', 'promote:api:晋级客户'],
+  );
+});
+
+test('do-not-contact lead hides direct mark do-not-contact action', () => {
+  const card = getLeadCardViewModel(sampleLeads.find((lead) => lead.id === 'lead-dnc'));
+
+  assert.equal(card.actions.some((action) => action.key === 'mark-dnc'), false);
 });
 
 test('lead card displays Watch as D grade and Invalid as E grade', () => {

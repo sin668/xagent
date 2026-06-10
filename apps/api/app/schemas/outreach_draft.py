@@ -52,3 +52,21 @@ class ManualSendRecordResponse(BaseModel):
     channel: str
     sent_at: str
     auto_send: bool
+
+
+class OutreachEmailSendRequest(BaseModel):
+    to_email: str = Field(min_length=1)
+    subject: str = Field(min_length=1)
+    body: str = Field(min_length=1)
+    sender: str = Field(default="mobile-operator", min_length=1)
+    human_confirmed: bool = True
+
+
+class OutreachEmailSendResponse(BaseModel):
+    customer_id: UUID
+    status: str
+    provider: str
+    provider_message_id: str | None = None
+    to_email: str
+    subject: str
+    auto_send: bool = False

@@ -583,7 +583,10 @@ class LeadEnrichmentService:
         if lead is None or not hasattr(lead, candidate.field_name):
             return lead
 
-        setattr(lead, candidate.field_name, candidate.candidate_value)
+        if candidate.field_name == "contacts_json":
+            lead.contacts_json = self.merge_contacts_json(lead.contacts_json, candidate.candidate_value)
+        else:
+            setattr(lead, candidate.field_name, candidate.candidate_value)
         lead.missing_fields = [
             field_name
             for field_name in (lead.missing_fields or [])
@@ -591,6 +594,23 @@ class LeadEnrichmentService:
         ]
         lead.updated_at = now or self._now()
         return lead
+
+    @staticmethod
+    def merge_contacts_json(existing_contacts: list | None, candidate_value) -> list:
+        merged: list = []
+        seen_values: set[str] = set()
+        for contact in [*(existing_contacts or []), *(candidate_value if isinstance(candidate_value, list) else [candidate_value])]:
+            if not isinstance(contact, dict):
+                continue
+            value = str(contact.get("value") or "").strip()
+            if not value:
+                continue
+            normalized = value.lower()
+            if normalized in seen_values:
+                continue
+            seen_values.add(normalized)
+            merged.append(contact)
+        return merged
 
     def reject_field_candidate_with_audit(
         self,

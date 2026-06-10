@@ -67,6 +67,23 @@ def test_lead_cleanup_graph_generates_duplicate_suggestions_without_core_writes(
     assert result.output.audit["auto_restore_invalid"] is False
 
 
+def test_lead_cleanup_normalize_preserves_valid_strong_duplicate_type() -> None:
+    normalized = LeadCleanupGraphRunner.normalize_cleanup_suggestion(
+        {
+            "staging_lead_id": "33333333-3333-3333-3333-333333333333",
+            "suggestion_type": "strong_duplicate",
+            "target_lead_id": "22222222-2222-2222-2222-222222222222",
+            "confidence_score": 0.92,
+            "reason": "强重复线索。",
+            "evidence_json": {"matched_fields": ["customer_name", "contact"]},
+            "recommended_action": "人工复核后归并重复线索",
+        }
+    )
+
+    assert normalized["suggestion_type"] == "strong_duplicate"
+    assert "normalized_from_suggestion_type" not in normalized["evidence_json"]
+
+
 def test_lead_cleanup_graph_classifies_invalid_reason_as_pending_suggestion() -> None:
     runner = LeadCleanupGraphRunner()
     state = LeadCleanupGraphState(
@@ -88,7 +105,30 @@ def test_lead_cleanup_graph_classifies_invalid_reason_as_pending_suggestion() ->
     suggestion = next(item for item in result.output.suggestions if item.suggestion_type == "confirm_invalid")
     assert suggestion.review_status == "pending"
     assert suggestion.evidence_json["invalid_reason"] == "仅销售配件，不是整车销售客户。"
-    assert suggestion.recommended_action == "人工确认无效原因后保留清洗结论"
+    assert suggestion.recommended_action == "确认无效并从线索池隐藏"
+
+
+def test_lead_cleanup_graph_generates_confirm_invalid_for_invalid_without_reason() -> None:
+    runner = LeadCleanupGraphRunner()
+    state = LeadCleanupGraphState(
+        cleanup_run_id="11111111-1111-1111-1111-111111111111",
+        leads=[
+            {
+                "staging_lead_id": "44444444-4444-4444-4444-444444444444",
+                "customer_name": "Unknown Parts",
+                "city": "Kazan",
+                "recommended_grade": "Invalid",
+                "contacts_json": [],
+            }
+        ],
+    )
+
+    result = runner.run(state)
+
+    suggestion = next(item for item in result.output.suggestions if item.suggestion_type == "confirm_invalid")
+    assert suggestion.review_status == "pending"
+    assert suggestion.evidence_json["invalid_reason"] == "Unknown"
+    assert suggestion.recommended_action == "确认无效并从线索池隐藏"
 
 
 def test_lead_cleanup_graph_finds_restore_candidates_but_does_not_restore() -> None:
@@ -114,6 +154,30 @@ def test_lead_cleanup_graph_finds_restore_candidates_but_does_not_restore() -> N
     assert suggestion.review_status == "pending"
     assert suggestion.evidence_json["restore_signal"] is True
     assert result.output.audit["auto_restore_invalid"] is False
+
+
+def test_lead_cleanup_graph_generates_manual_review_for_watch_without_restore_signal() -> None:
+    runner = LeadCleanupGraphRunner()
+    state = LeadCleanupGraphState(
+        cleanup_run_id="11111111-1111-1111-1111-111111111111",
+        leads=[
+            {
+                "staging_lead_id": "55555555-5555-5555-5555-555555555555",
+                "customer_name": "Siberia Auto",
+                "city": "Novosibirsk",
+                "recommended_grade": "Watch",
+                "contacts_json": [],
+                "source_evidence": "证据不足，暂不进入触达。",
+            }
+        ],
+    )
+
+    result = runner.run(state)
+
+    suggestion = next(item for item in result.output.suggestions if item.suggestion_type == "needs_manual_review")
+    assert suggestion.staging_lead_id == UUID("55555555-5555-5555-5555-555555555555")
+    assert suggestion.evidence_json["current_grade"] == "Watch"
+    assert suggestion.recommended_action == "保持 Watch，等待更多公开证据或人工复核"
 
 
 def test_lead_cleanup_graph_rejects_automatic_cleanup_actions() -> None:

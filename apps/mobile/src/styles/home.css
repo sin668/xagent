@@ -142,6 +142,13 @@
   margin-top: 14px;
 }
 
+.customer-metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .metric-card {
   min-height: 82px;
   padding: 14px 10px;
@@ -174,6 +181,15 @@
   color: #1d4ed8;
 }
 
+.customer-metric-card {
+  min-height: 74px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.customer-metric-value {
+  color: #0f766e;
+}
+
 .section-head {
   display: flex;
   justify-content: space-between;
@@ -197,6 +213,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .task-card,

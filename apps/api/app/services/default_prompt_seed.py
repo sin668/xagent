@@ -10,8 +10,8 @@ from app.models.llm_prompt_template import LLMPromptTemplate
 from app.services.llm_prompt_templates import LLMPromptTemplateService
 
 
-SOURCE_DISCOVERY_DEFAULT_NAME = "source_discovery_default"
-SOURCE_DISCOVERY_DEFAULT_VERSION = "v1.0"
+SOURCE_DISCOVERY_DEFAULT_NAME = "source_discovery_query_planner_default"
+SOURCE_DISCOVERY_DEFAULT_VERSION = "runtime-db-v1"
 
 
 class SourceDiscoveryDefaultPromptSeed:
@@ -79,26 +79,23 @@ class SourceDiscoveryDefaultPromptSeed:
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "你是海外车辆采购 AI 获客系统的 Source Discovery Agent。"
-            "你的唯一职责是发现潜在线索来源，不抽取客户名称、联系人、电话、邮箱或社交账号，"
-            "不自动触达，不生成私信，不加好友，不发送短信或邮件。"
-            "只能基于公开、无需登录、无需验证码、无需绕过反爬的页面和目录提出来源候选。"
-            "不得绕过登录、不得绕过验证码、不得绕过反爬、不得绕过平台限制。"
-            "High 风险来源只能进入人工复核，不得标记为自动抽取。"
-            "Forbidden 来源必须进入 blocked_candidates，不得进入 candidates。"
-            "缺失字段必须输出 Unknown、null 或空数组，不得编造 URL、平台、理由或证据。"
+            "你是海外车辆采购 AI 获客系统的 Source Discovery 来源发现 Agent。"
+            "你的任务是基于公开、无需登录、无需验证码、无需绕过反爬的 Low/Medium/High 风险渠道策略，"
+            "主动生成公开搜索查询，并尽可能给出可人工核验的公开线索来源候选。"
+            "只发现来源，不抽取客户，不自动触达，不生成私信，不绕过登录，不绕过验证码，不绕过反爬，不绕过平台限制。"
+            "High 风险来源只允许进入人工复核；Forbidden 来源必须进入 blocked_candidates，不得进入 candidates。"
+            "缺失信息输出空数组，不得编造。"
         )
 
     @staticmethod
     def _user_prompt_template() -> str:
         return (
-            "请为国家 {country}、城市 {city}、渠道策略 {channel_strategy} 发现公开车辆经销商线索来源。"
-            "只返回 JSON，不要输出解释文本。"
-            "每个候选来源必须包含 source_url、platform、risk_level、discovery_reason、evidence_note。"
-            "候选应优先来自官网、公开目录、搜索引擎结果、地图公开结果和公开行业页面。"
-            "不抽取客户，不自动触达，不生成私信，不绕过登录，不绕过验证码，不绕过反爬，不绕过平台限制。"
-            "High 风险来源必须标记为人工复核，approved_for_extraction 必须为 false。"
-            "Forbidden 来源必须放入 blocked_candidates，并说明 blocked_reason。"
+            "目标市场：{{market}}\n"
+            "渠道策略：{{channel_strategy}}\n"
+            "规则兜底查询：{{fallback_queries}}\n"
+            "请扩展 3 到 8 条可用于公开搜索的来源发现查询，并给出你能基于公开常识和公开入口建议人工核验的来源候选。"
+            "候选必须包含 source_url、platform、risk_level、discovery_reason、evidence_note。"
+            "不确定的字段用 Unknown；不得编造具体客户或联系方式；只输出 JSON。"
         )
 
     @staticmethod
@@ -106,12 +103,9 @@ class SourceDiscoveryDefaultPromptSeed:
         return {
             "type": "object",
             "additionalProperties": False,
-            "required": ["task_type", "country", "city", "channel_strategy", "candidates", "blocked_candidates"],
+            "required": ["queries", "candidates", "blocked_candidates"],
             "properties": {
-                "task_type": {"type": "string", "const": "SOURCE_DISCOVERY"},
-                "country": {"type": "string"},
-                "city": {"type": ["string", "null"]},
-                "channel_strategy": {"type": "string"},
+                "queries": {"type": "array", "items": {"type": "string"}},
                 "candidates": {
                     "type": "array",
                     "items": {
@@ -120,37 +114,21 @@ class SourceDiscoveryDefaultPromptSeed:
                         "required": [
                             "source_url",
                             "platform",
-                            "channel_name",
-                            "country",
-                            "city",
                             "risk_level",
-                            "discovery_method",
-                            "discovery_query",
                             "discovery_reason",
                             "evidence_note",
-                            "evidence_links",
-                            "confidence_score",
-                            "recommended_review_status",
-                            "approved_for_extraction",
                         ],
                         "properties": {
                             "source_url": {"type": "string"},
                             "platform": {"type": "string"},
-                            "channel_name": {"type": "string"},
-                            "country": {"type": "string"},
-                            "city": {"type": ["string", "null"]},
-                            "risk_level": {"type": "string", "enum": ["Low", "Medium", "High"]},
-                            "discovery_method": {"type": "string"},
-                            "discovery_query": {"type": ["string", "null"]},
+                            "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
                             "discovery_reason": {"type": "string"},
                             "evidence_note": {"type": "string"},
-                            "evidence_links": {"type": "array", "items": {"type": "string"}},
-                            "confidence_score": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
-                            "recommended_review_status": {
+                            "source_type": {
                                 "type": "string",
-                                "enum": ["auto_approved", "pending", "high_risk_review"],
+                                "enum": ["official_website", "public_directory", "public_social", "marketplace", "unknown"],
                             },
-                            "approved_for_extraction": {"type": "boolean"},
+                            "discovery_query": {"type": ["string", "null"]},
                         },
                     },
                 },
@@ -158,12 +136,10 @@ class SourceDiscoveryDefaultPromptSeed:
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "additionalProperties": False,
-                        "required": ["source_url", "risk_level", "blocked_reason"],
+                        "additionalProperties": True,
                         "properties": {
                             "source_url": {"type": "string"},
-                            "risk_level": {"type": "string", "enum": ["Forbidden", "High"]},
-                            "blocked_reason": {"type": "string"},
+                            "reason": {"type": "string"},
                         },
                     },
                 },

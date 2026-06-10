@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from app.schemas.agent_run import AgentRunAudit, AgentRunError, AgentRunRequest,
 from app.security import require_internal_api_key
 from app.services.agent_logging import log_agent_run_failed, log_agent_run_start, log_agent_run_succeeded
 from app.services.agent_service_runs import AgentRunNotFound, AgentServiceRunService
+from app.services.llm_prompt_repository import LLMPromptRepository
 
 
 router = APIRouter(
@@ -47,15 +49,82 @@ def run_deep_enrichment(
     )
 
     try:
-        graph_result = DeepEnrichmentGraphRunner().run(
-            DeepEnrichmentGraphState(
-                agent_run_id=input_payload.get("agent_run_id") or request.request_id,
-                staging_lead_id=input_payload["staging_lead_id"],
-                lead_snapshot=input_payload.get("lead_snapshot") or {},
-                missing_fields=list(input_payload.get("missing_fields") or []),
-                requested_actions=list(input_payload.get("requested_actions") or []),
+        leads = [item for item in input_payload.get("leads") or [] if isinstance(item, dict)]
+        if leads:
+            batch_results = []
+            executed_nodes = []
+            first_output = None
+            for index, lead in enumerate(leads):
+                item_request_id = lead.get("request_id") or f"{request.request_id}-{index + 1}"
+                try:
+                    result = DeepEnrichmentGraphRunner(prompt_repository=LLMPromptRepository(session)).run(
+                        DeepEnrichmentGraphState(
+                            agent_run_id=item_request_id,
+                            staging_lead_id=lead["staging_lead_id"],
+                            lead_snapshot=lead.get("lead_snapshot") or {},
+                            missing_fields=list(lead.get("missing_fields") or []),
+                            requested_actions=list(lead.get("requested_actions") or input_payload.get("requested_actions") or []),
+                        )
+                    )
+                    item_output = result.output.model_dump(mode="json")
+                    if first_output is None:
+                        first_output = item_output
+                    executed_nodes.extend(result.executed_nodes)
+                    batch_results.append(
+                        {
+                            "status": "succeeded",
+                            "request_id": str(item_request_id),
+                            "staging_lead_id": str(lead["staging_lead_id"]),
+                            "output": item_output,
+                        }
+                    )
+                except Exception as item_exc:
+                    batch_results.append(
+                        {
+                            "status": "failed",
+                            "request_id": str(item_request_id),
+                            "staging_lead_id": str(lead.get("staging_lead_id") or ""),
+                            "error": {
+                                "type": _classify_deep_enrichment_error(item_exc),
+                                "message": str(item_exc),
+                            },
+                        }
+                    )
+            succeeded_count = len([item for item in batch_results if item.get("status") == "succeeded"])
+            failed_count = len(batch_results) - succeeded_count
+            base_output = first_output or {
+                "schema_version": "phase3.agent.deep_enrichment.v1",
+                "agent_run_id": str(request.request_id),
+                "staging_lead_id": str((leads[0] if leads else {}).get("staging_lead_id") or ""),
+                "field_candidates": [],
+                "missing_fields": [],
+                "recommended_next_action": "manual_review",
+                "audit": {"writes_core_tables": False},
+            }
+            output = {
+                **base_output,
+                "batch_results": batch_results,
+                "audit": {
+                    **(base_output.get("audit") or {}),
+                    "writes_core_tables": False,
+                    "batch_mode": True,
+                    "batch_lead_count": len(leads),
+                    "batch_succeeded_count": succeeded_count,
+                    "batch_failed_count": failed_count,
+                },
+            }
+            graph_result = SimpleNamespace(output=None, executed_nodes=executed_nodes)
+        else:
+            graph_result = DeepEnrichmentGraphRunner(prompt_repository=LLMPromptRepository(session)).run(
+                DeepEnrichmentGraphState(
+                    agent_run_id=input_payload.get("agent_run_id") or request.request_id,
+                    staging_lead_id=input_payload["staging_lead_id"],
+                    lead_snapshot=input_payload.get("lead_snapshot") or {},
+                    missing_fields=list(input_payload.get("missing_fields") or []),
+                    requested_actions=list(input_payload.get("requested_actions") or []),
+                )
             )
-        )
+            output = graph_result.output.model_dump(mode="json")
     except Exception as exc:
         error_type = _classify_deep_enrichment_error(exc)
         failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
@@ -78,7 +147,6 @@ def run_deep_enrichment(
             error=AgentRunError(error_type=error_type, message=str(exc), retryable=False),
         )
 
-    output = graph_result.output.model_dump(mode="json")
     audit = _response_audit(output.get("audit") or {}, executed_nodes=graph_result.executed_nodes)
     succeeded = service.mark_succeeded(
         run.id,
@@ -134,7 +202,7 @@ def run_lead_cleanup(
     )
 
     try:
-        graph_result = LeadCleanupGraphRunner().run(
+        graph_result = LeadCleanupGraphRunner(prompt_repository=LLMPromptRepository(session)).run(
             LeadCleanupGraphState(
                 cleanup_run_id=input_payload.get("cleanup_run_id") or request.request_id,
                 leads=list(input_payload.get("leads") or []),
@@ -215,7 +283,7 @@ def run_source_discovery(
     )
 
     try:
-        graph_result = SourceDiscoveryGraphRunner().run(
+        graph_result = SourceDiscoveryGraphRunner(prompt_repository=LLMPromptRepository(session)).run(
             SourceDiscoveryGraphState(
                 discovery_run_id=input_payload.get("discovery_run_id") or request.request_id,
                 market=str(input_payload.get("market") or "Unknown"),
@@ -301,19 +369,28 @@ def run_lead_extraction_grading(
     )
 
     try:
-        graph_result = LeadExtractionGradingGraphRunner().run(
-            LeadExtractionGradingGraphState(
-                combined_run_id=input_payload.get("combined_run_id") or request.request_id,
-                extraction_run_id=input_payload.get("extraction_run_id") or request.request_id,
-                grading_run_id=input_payload.get("grading_run_id") or request.request_id,
-                source_url=str(input_payload.get("source_url") or ""),
-                source_content=str(input_payload.get("source_content") or ""),
-                agent_mode=request.agent_mode,
-                risk_flags=list(input_payload.get("risk_flags") or []),
-                existing_grade=input_payload.get("existing_grade"),
-                expected_contacts=dict(input_payload.get("expected_contacts") or {}),
+        sources = [item for item in input_payload.get("sources") or [] if isinstance(item, dict)]
+        if sources:
+            graph_result = _run_lead_extraction_grading_batch(
+                sources=sources,
+                request=request,
+                input_payload=input_payload,
+                prompt_repository=LLMPromptRepository(session),
             )
-        )
+        else:
+            graph_result = LeadExtractionGradingGraphRunner(prompt_repository=LLMPromptRepository(session)).run(
+                LeadExtractionGradingGraphState(
+                    combined_run_id=input_payload.get("combined_run_id") or request.request_id,
+                    extraction_run_id=input_payload.get("extraction_run_id") or request.request_id,
+                    grading_run_id=input_payload.get("grading_run_id") or request.request_id,
+                    source_url=str(input_payload.get("source_url") or ""),
+                    source_content=str(input_payload.get("source_content") or ""),
+                    agent_mode=request.agent_mode,
+                    risk_flags=list(input_payload.get("risk_flags") or []),
+                    existing_grade=input_payload.get("existing_grade"),
+                    expected_contacts=dict(input_payload.get("expected_contacts") or {}),
+                )
+            )
     except Exception as exc:
         error_type = _classify_lead_extraction_grading_error(exc)
         failed = service.mark_failed(run.id, error_type=error_type, error_message=str(exc))
@@ -363,6 +440,78 @@ def run_lead_extraction_grading(
     )
 
 
+def _run_lead_extraction_grading_batch(
+    *,
+    sources: list[dict[str, Any]],
+    request: AgentRunRequest,
+    input_payload: dict[str, Any],
+    prompt_repository: LLMPromptRepository,
+):
+    runner = LeadExtractionGradingGraphRunner(prompt_repository=prompt_repository)
+    batch_results: list[dict[str, Any]] = []
+    executed_nodes: list[str] = []
+    first_success = None
+    for index, source in enumerate(sources):
+        source_run_id = source.get("request_id") or f"{request.request_id}-{index + 1}"
+        try:
+            result = runner.run(
+                LeadExtractionGradingGraphState(
+                    combined_run_id=source_run_id,
+                    extraction_run_id=source.get("extraction_run_id") or source_run_id,
+                    grading_run_id=source.get("grading_run_id") or source_run_id,
+                    source_url=str(source.get("source_url") or ""),
+                    source_content=str(source.get("source_content") or ""),
+                    agent_mode=request.agent_mode,
+                    risk_flags=list(source.get("risk_flags") or input_payload.get("risk_flags") or []),
+                    existing_grade=source.get("existing_grade") or input_payload.get("existing_grade"),
+                    expected_contacts=dict(source.get("expected_contacts") or {}),
+                )
+            )
+            output = result.output.model_dump(mode="json")
+            output["source_candidate_id"] = source.get("source_candidate_id")
+            output["candidate_url_id"] = source.get("candidate_url_id")
+            batch_results.append(
+                {
+                    "status": "succeeded",
+                    "source_candidate_id": source.get("source_candidate_id"),
+                    "candidate_url_id": source.get("candidate_url_id"),
+                    "source_url": source.get("source_url"),
+                    "output": output,
+                }
+            )
+            executed_nodes.extend(result.executed_nodes)
+            if first_success is None:
+                first_success = result
+        except Exception as exc:
+            batch_results.append(
+                {
+                    "status": "failed",
+                    "source_candidate_id": source.get("source_candidate_id"),
+                    "candidate_url_id": source.get("candidate_url_id"),
+                    "source_url": source.get("source_url"),
+                    "error": {"type": _classify_lead_extraction_grading_error(exc), "message": str(exc)},
+                }
+            )
+    if first_success is None:
+        raise ValueError("Lead Extraction/Grading 批次没有任何来源成功生成可消费结果。")
+
+    output = first_success.output.model_copy(
+        update={
+            "combined_run_id": input_payload.get("combined_run_id") or request.request_id,
+            "batch_results": batch_results,
+            "audit": {
+                **first_success.output.audit,
+                "batch_mode": True,
+                "batch_source_count": len(sources),
+                "batch_succeeded_count": len([item for item in batch_results if item.get("status") == "succeeded"]),
+                "batch_failed_count": len([item for item in batch_results if item.get("status") != "succeeded"]),
+                "source_urls": [str(item.get("source_url") or "") for item in batch_results if item.get("source_url")],
+            },
+        }
+    )
+    return type(first_success)(output=output, executed_nodes=executed_nodes)
+
+
 @router.post("/email-reply", response_model=AgentRunResponse)
 def run_email_reply(
     request: AgentRunRequest,
@@ -381,7 +530,7 @@ def run_email_reply(
     service.mark_running(run.id)
 
     try:
-        graph_result = EmailReplyGraphRunner().run(
+        graph_result = EmailReplyGraphRunner(prompt_repository=LLMPromptRepository(session)).run(
             EmailReplyGraphState(
                 request_id=request.request_id,
                 thread_id=UUID(str(input_payload["thread_id"])),
@@ -447,14 +596,14 @@ def _classify_lead_cleanup_error(exc: Exception) -> str:
 
 def _classify_source_discovery_error(exc: Exception) -> str:
     message = str(exc)
-    if "只允许 shadow_run" in message or "登录采集" in message or "私有数据采集" in message or "lead_source_candidates" in message:
+    if "agent_mode 只允许" in message or "只允许 shadow_run" in message or "登录采集" in message or "私有数据采集" in message or "lead_source_candidates" in message:
         return "risk_blocked"
     return "schema_validation_error"
 
 
 def _classify_lead_extraction_grading_error(exc: Exception) -> str:
     message = str(exc)
-    if "只允许 shadow_run" in message or "Forbidden" in message or "勿扰" in message:
+    if "agent_mode 只允许" in message or "只允许 shadow_run" in message or "Forbidden" in message or "勿扰" in message:
         return "risk_blocked"
     if "证据" in message or "联系方式" in message:
         return "evidence_validation_error"
@@ -538,10 +687,20 @@ def _source_discovery_persisted_audit(graph_audit: dict[str, Any], *, executed_n
 
 
 def _deep_enrichment_output_summary(output: dict[str, Any], audit: dict[str, Any]) -> dict[str, Any]:
-    return {
+    summary = {
         "field_candidate_count": len(output.get("field_candidates") or []),
         "risk_flags": list(audit.get("risk_flags") or []),
     }
+    batch_results = [item for item in output.get("batch_results") or [] if isinstance(item, dict)]
+    if batch_results:
+        summary.update(
+            {
+                "batch_lead_count": len(batch_results),
+                "batch_succeeded_count": len([item for item in batch_results if item.get("status") == "succeeded"]),
+                "batch_failed_count": len([item for item in batch_results if item.get("status") != "succeeded"]),
+            }
+        )
+    return summary
 
 
 def _lead_cleanup_output_summary(output: dict[str, Any], audit: dict[str, Any]) -> dict[str, Any]:
@@ -564,12 +723,22 @@ def _lead_extraction_grading_output_summary(output: dict[str, Any], audit: dict[
     extraction = output.get("extraction") or {}
     grading = output.get("grading") or {}
     hard_rule_summary = output.get("hard_rule_summary") or {}
-    return {
+    batch_results = [item for item in output.get("batch_results") or [] if isinstance(item, dict)]
+    summary = {
         "extracted_candidate_count": len(extraction.get("candidates") or []),
         "grading_suggestion_count": len(grading.get("suggestions") or []),
         "hard_rules_applied": bool(hard_rule_summary.get("hard_rules_applied")),
         "risk_flags": list(audit.get("risk_flags") or []),
     }
+    if batch_results:
+        summary.update(
+            {
+                "batch_source_count": len(batch_results),
+                "batch_succeeded_count": len([item for item in batch_results if item.get("status") == "succeeded"]),
+                "batch_failed_count": len([item for item in batch_results if item.get("status") != "succeeded"]),
+            }
+        )
+    return summary
 
 
 def _email_reply_output_summary(output: dict[str, Any], audit: dict[str, Any]) -> dict[str, Any]:

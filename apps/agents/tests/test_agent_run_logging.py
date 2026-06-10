@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.db.session import get_db_session
 from app.main import app
 from app.settings import get_settings
+from tests.prompt_helpers import seed_prompt_templates
 
 
 @pytest.fixture
@@ -23,6 +24,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("DEEP_ENRICHMENT",))
     try:
         yield db
     finally:

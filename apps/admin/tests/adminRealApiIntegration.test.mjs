@@ -11,7 +11,7 @@ test('phase5 admin integration view proves prompt, knowledge, and email review u
   const view = buildPhase5AdminIntegrationView({
     prompt: { ok: true, status: 200, itemCount: 7, url: '/llm-prompt-templates' },
     knowledge: { ok: true, status: 200, itemCount: 12, url: '/knowledge/items?limit=100' },
-    emailReview: { ok: true, status: 200, itemCount: 5, url: '/email-reply/drafts?limit=100' },
+    emailReview: { ok: true, status: 200, itemCount: 5, url: '/email-replies?limit=100' },
     emailReplyQuality: { ok: true, status: 200, url: '/dashboard/email-reply-quality' },
     phase5GoNoGo: { ok: true, status: 200, url: '/dashboard/phase5-go-no-go-report' },
     phase5E2E: { ok: true, status: 200, url: '/dashboard/phase5-e2e-integration-report' },
@@ -62,7 +62,7 @@ test('fetch phase5 admin integration checks real backend contracts without seed 
       requestedUrls.push(url);
       if (url.endsWith('/llm-prompt-templates')) return { ok: true, status: 200, json: async () => ({ items: [{ id: 'p1' }] }) };
       if (url.endsWith('/knowledge/items?limit=100')) return { ok: true, status: 200, json: async () => ({ items: [{ id: 'k1' }, { id: 'k2' }] }) };
-      if (url.endsWith('/email-reply/drafts?limit=100')) return { ok: true, status: 200, json: async () => ({ items: [] }) };
+      if (url.endsWith('/email-replies?limit=100')) return { ok: true, status: 200, json: async () => ({ items: [] }) };
       if (url.endsWith('/dashboard/email-reply-quality')) return { ok: true, status: 200, json: async () => ({ draft_count: 2 }) };
       if (url.endsWith('/dashboard/phase5-go-no-go-report')) return { ok: true, status: 200, json: async () => ({ conclusion: 'go' }) };
       if (url.endsWith('/dashboard/phase5-e2e-integration-report')) return { ok: true, status: 200, json: async () => ({ overall_status: 'passed' }) };
@@ -73,7 +73,7 @@ test('fetch phase5 admin integration checks real backend contracts without seed 
   assert.deepEqual(requestedUrls, [
     'https://api.example.test/llm-prompt-templates',
     'https://api.example.test/knowledge/items?limit=100',
-    'https://api.example.test/email-reply/drafts?limit=100',
+    'https://api.example.test/email-replies?limit=100',
     'https://api.example.test/dashboard/email-reply-quality',
     'https://api.example.test/dashboard/phase5-go-no-go-report',
     'https://api.example.test/dashboard/phase5-e2e-integration-report',

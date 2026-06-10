@@ -65,10 +65,20 @@
           <text class="customer-detail-section-note">{{ viewModel.pendingFieldLabels.length }} 项</text>
         </view>
         <section class="customer-detail-card">
-          <view v-if="viewModel.pendingFieldLabels.length" class="customer-detail-chip-row">
-            <text v-for="item in viewModel.pendingFieldLabels" :key="item" class="customer-detail-tag customer-detail-tag-amber">
-              {{ item }}
-            </text>
+          <view v-if="pendingFieldItems.length" class="customer-detail-pending-list">
+            <view v-for="item in pendingFieldItems" :key="item.fieldName" class="customer-detail-pending-item">
+              <text class="customer-detail-tag customer-detail-tag-amber">{{ item.label }}</text>
+              <button class="customer-detail-inline-button" @click="openManualSupplement(item)">人工补录</button>
+            </view>
+            <view v-if="manualSupplementField" class="customer-detail-manual-form">
+              <view class="customer-detail-manual-head">
+                <text class="customer-detail-row-title">补录 {{ manualSupplementFieldLabel }}</text>
+                <text class="customer-detail-tag customer-detail-tag-blue">人工记录</text>
+              </view>
+              <input v-model="manualSupplementValue" class="customer-detail-input" placeholder="补录内容" />
+              <input v-model="manualSupplementEvidence" class="customer-detail-input" placeholder="证据说明，如官网公开页、人工电话确认" />
+              <button class="customer-detail-submit-button" @click="submitManualSupplement">提交补录</button>
+            </view>
           </view>
           <text v-else class="customer-detail-copy">暂无待补全字段。</text>
         </section>
@@ -78,12 +88,14 @@
           <text class="customer-detail-section-note">{{ viewModel.contactCountText }}</text>
         </view>
         <section class="customer-detail-card customer-detail-list">
-          <view v-for="contact in viewModel.contacts" :key="contact.id" class="customer-detail-row">
-            <view>
+          <view v-for="contact in viewModel.contacts" :key="contact.id" class="customer-detail-evidence-item">
+            <view class="customer-detail-evidence-head">
               <text class="customer-detail-row-title">{{ contact.displayText }}</text>
+              <text class="customer-detail-tag customer-detail-tag-green">{{ contact.isPrimary ? '主联系' : '联系' }}</text>
+            </view>
+            <view class="customer-detail-evidence-body">
               <text class="customer-detail-row-note">{{ contact.evidenceText }}</text>
             </view>
-            <text class="customer-detail-tag customer-detail-tag-green">{{ contact.isPrimary ? '主联系' : '联系' }}</text>
           </view>
           <text v-if="!viewModel.contacts.length" class="customer-detail-copy">联系方式待补全。</text>
         </section>
@@ -93,13 +105,15 @@
           <text class="customer-detail-section-note">{{ viewModel.sourceCountText }}</text>
         </view>
         <section class="customer-detail-card customer-detail-list">
-          <view v-for="source in viewModel.sources" :key="source.id" class="customer-detail-row">
-            <view>
+          <view v-for="source in viewModel.sources" :key="source.id" class="customer-detail-evidence-item">
+            <view class="customer-detail-evidence-head">
               <text class="customer-detail-row-title">{{ source.displayText }}</text>
+              <text class="customer-detail-tag customer-detail-tag-blue">{{ source.riskLevel }}</text>
+            </view>
+            <view class="customer-detail-evidence-body">
               <text class="customer-detail-row-note">{{ source.evidenceText }}</text>
               <text class="customer-detail-link">{{ source.sourceUrl }}</text>
             </view>
-            <text class="customer-detail-tag customer-detail-tag-blue">{{ source.riskLevel }}</text>
           </view>
           <text v-if="!viewModel.sources.length" class="customer-detail-copy">来源证据待补全。</text>
         </section>
@@ -166,11 +180,11 @@
       </template>
     </scroll-view>
 
-    <view class="customer-detail-action-bar">
+    <view class="customer-detail-action-bar customer-detail-action-bar-above-safe-area">
       <button class="customer-detail-button customer-detail-button-secondary" @click="goBack">返回客户池</button>
       <button
-        :class="['customer-detail-button', viewModel.canCreateOutreachDraft ? 'customer-detail-button-primary' : 'customer-detail-button-disabled']"
-        :disabled="!viewModel.canCreateOutreachDraft"
+        :class="['customer-detail-button', customerId ? 'customer-detail-button-primary' : 'customer-detail-button-disabled']"
+        :disabled="!customerId"
         @click="openFollowups"
       >
         人工记录跟进
@@ -184,6 +198,7 @@ import { computed, ref } from 'vue';
 import { onLoad as onUniLoad } from '@dcloudio/uni-app';
 
 import { customersService, getCustomerDetailViewModel, mapCustomerDetail } from '../../services/customers.js';
+import { customerFollowupsService } from '../../services/customerFollowups.js';
 import '../../styles/home.css';
 import '../../styles/customerDetail.css';
 
@@ -192,8 +207,20 @@ const detail = ref(fallbackDetail);
 const isLoading = ref(false);
 const errorMessage = ref('');
 const customerId = ref('');
+const manualSupplementField = ref('');
+const manualSupplementValue = ref('');
+const manualSupplementEvidence = ref('');
 
 const viewModel = computed(() => getCustomerDetailViewModel(detail.value));
+const pendingFieldItems = computed(() =>
+  (detail.value.pendingFields || []).map((field) => ({
+    fieldName: String(field || '').trim(),
+    label: `${String(field || '').trim()} 待补全`,
+  })).filter((item) => item.fieldName),
+);
+const manualSupplementFieldLabel = computed(() =>
+  pendingFieldItems.value.find((item) => item.fieldName === manualSupplementField.value)?.label || manualSupplementField.value,
+);
 const initials = computed(() => {
   const name = viewModel.value.name || '客户';
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '客户';
@@ -237,6 +264,51 @@ async function loadCustomer() {
   }
 }
 
+function openManualSupplement(item) {
+  manualSupplementField.value = item.fieldName;
+  manualSupplementValue.value = '';
+  manualSupplementEvidence.value = '';
+}
+
+function notify(message) {
+  if (globalThis.uni?.showToast) {
+    globalThis.uni.showToast({ title: message, icon: 'none' });
+  }
+}
+
+async function submitManualSupplement() {
+  const fieldName = manualSupplementField.value.trim();
+  const fieldValue = manualSupplementValue.value.trim();
+  const evidence = manualSupplementEvidence.value.trim();
+  if (!customerId.value || !fieldName || !fieldValue || !evidence) {
+    notify('请补齐字段、内容和证据');
+    return;
+  }
+
+  try {
+    const created = await customerFollowupsService.createFollowup(customerId.value, {
+      customerId: customerId.value,
+      ownerId: 'mobile-user',
+      team: 'customer_service',
+      followupType: 'manual_supplement',
+      content: `人工补录 ${fieldName}：${fieldValue}`,
+      customerFeedback: evidence,
+      nextAction: `已补录 ${fieldName}`,
+      createdBy: 'mobile-user',
+    });
+    detail.value = {
+      ...detail.value,
+      followups: [created, ...(detail.value.followups || [])],
+    };
+    manualSupplementField.value = '';
+    manualSupplementValue.value = '';
+    manualSupplementEvidence.value = '';
+    notify('已保存人工补录');
+  } catch (_error) {
+    notify('人工补录失败');
+  }
+}
+
 function goBack() {
   if (globalThis.uni?.navigateBack) {
     globalThis.uni.navigateBack();
@@ -248,7 +320,7 @@ function goBack() {
 }
 
 function openFollowups() {
-  if (!viewModel.value.canCreateOutreachDraft || !customerId.value || !globalThis.uni?.navigateTo) {
+  if (!customerId.value || !globalThis.uni?.navigateTo) {
     return;
   }
   globalThis.uni.navigateTo({ url: `/pages/customers/followups?id=${encodeURIComponent(customerId.value)}` });

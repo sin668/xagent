@@ -40,7 +40,7 @@
         <text class="detail-section-title">经营状况判断</text>
       </view>
       <section class="detail-panel">
-        <text class="detail-copy-strong">{{ detail.operatingSummary }}</text>
+        <text class="detail-copy detail-copy-plain">{{ detail.operatingSummary }}</text>
       </section>
 
       <view class="detail-section-head">
@@ -221,6 +221,21 @@
         </view>
       </section>
 
+      <view v-if="cleanupReasons.length" class="detail-section-head">
+        <text class="detail-section-title">清洗原因</text>
+        <text class="detail-section-note">{{ cleanupReasons.length }} 条</text>
+      </view>
+      <section v-if="cleanupReasons.length" class="detail-panel cleanup-reason-panel">
+        <view v-for="item in cleanupReasons" :key="item.id" class="cleanup-reason-item">
+          <view class="compliance-status-row">
+            <text class="pool-tag pool-tag-red">{{ item.suggestionTypeLabel }}</text>
+            <text class="pool-tag pool-tag-blue">{{ item.reviewStatusLabel }}</text>
+          </view>
+          <text class="detail-copy-strong">{{ item.reason }}</text>
+          <text v-if="item.executedAt" class="detail-copy">执行时间：{{ item.executedAt }}</text>
+        </view>
+      </section>
+
       <view class="detail-section-head">
         <text class="detail-section-title">跟进记录</text>
         <text class="detail-section-note">{{ detail.gradeLabel }} SLA</text>
@@ -320,16 +335,42 @@
     </scroll-view>
 
     <view class="action-bar">
-      <button class="detail-button detail-button-secondary" @click="handleMarkDoNotContact">
-        {{ detail.isDoNotContact ? '已勿扰' : '标记勿扰' }}
+      <button class="detail-button detail-button-secondary" @click="handleToggleDoNotContact">
+        {{ detail.isDoNotContact ? '取消勿扰' : '标记勿扰' }}
+      </button>
+      <button class="detail-button detail-button-secondary detail-grade-toggle" @click="toggleGradePanel">
+        调整等级
       </button>
       <button
         :class="['detail-button', detail.canEnterOutreachQueue ? 'detail-button-primary' : 'detail-button-disabled']"
         :disabled="!detail.canEnterOutreachQueue"
-        @click="handlePromoteStaging"
+        @click="handleManualPromoteCustomer"
       >
-        {{ detail.outreachActionLabel }}
+        晋级客户
       </button>
+      <button
+        :class="['detail-button', detail.canCreateOutreachDraft ? 'detail-button-primary' : 'detail-button-disabled']"
+        :disabled="!detail.canCreateOutreachDraft"
+        @click="openOutreach"
+      >
+        AI触达草稿
+      </button>
+    </view>
+    <view v-if="gradePanelVisible" class="detail-grade-sheet">
+      <view class="detail-grade-sheet-head">
+        <text class="detail-timeline-title">人工调整等级</text>
+        <text class="detail-copy">D级对应 Watch，E级对应 Invalid。</text>
+      </view>
+      <view class="detail-grade-options">
+        <button
+          v-for="grade in GRADE_OPTIONS"
+          :key="grade.value"
+          class="detail-grade-option"
+          @click="handleUpdateGrade(grade)"
+        >
+          {{ grade.label }}
+        </button>
+      </view>
     </view>
   </view>
 </template>
@@ -339,7 +380,6 @@ import { computed, onMounted, ref } from 'vue';
 
 import {
   mapComplianceStatus,
-  mapCustomerSummaryToLeadDetail,
   mapInventoryMatches,
   mapOutreachDraft,
   mapOutreachRecords,
@@ -348,10 +388,17 @@ import {
 import { apiClient } from '../../services/apiClient.js';
 import { buildComplianceReviewView } from '../../services/complianceReview.js';
 import { buildLeadEnrichmentViewModel, createLeadEnrichmentService } from '../../services/leadEnrichment.js';
-import { buildLeadDetailViewModel, buildPromoteStagingPayload, markLeadDoNotContact } from '../../services/leadDetail.js';
+import {
+  buildLeadDetailViewModel,
+  buildPromoteStagingPayload,
+  markLeadDoNotContact,
+  unmarkLeadDoNotContact,
+} from '../../services/leadDetail.js';
+import { leadCleanupService } from '../../services/leadCleanup.js';
 import { buildInventoryMatchView } from '../../services/inventoryMatch.js';
 import { buildOutreachDraftViewModel } from '../../services/outreachDraft.js';
 import { buildOutreachHistoryView } from '../../services/outreachRecord.js';
+import { stagingLeadActionsService } from '../../services/stagingLeadActions.js';
 import '../../styles/home.css';
 import '../../styles/leadPool.css';
 import '../../styles/leadDetail.css';
@@ -390,6 +437,9 @@ const emptyLeadDetail = {
   },
   duplicateSignals: {},
   doNotContact: false,
+  entityType: 'staging',
+  stagingLeadId: '',
+  customerId: '',
 };
 const emptyOutreachDraft = {
   id: '',
@@ -408,6 +458,13 @@ const emptyOutreachDraft = {
     outputSaved: false,
   },
 };
+const GRADE_OPTIONS = [
+  { label: 'A级', value: 'A' },
+  { label: 'B级', value: 'B' },
+  { label: 'C级', value: 'C' },
+  { label: 'D级', value: 'D' },
+  { label: 'E级', value: 'E' },
+];
 
 const leadState = ref(emptyLeadDetail);
 const outreachRecords = ref([]);
@@ -421,6 +478,8 @@ const manualEnrichmentVisible = ref(false);
 const manualFieldName = ref('');
 const manualCandidateValue = ref('');
 const manualEvidenceNote = ref('');
+const cleanupReasons = ref([]);
+const gradePanelVisible = ref(false);
 const enrichmentService = createLeadEnrichmentService({ apiClient });
 const detail = computed(() => buildLeadDetailViewModel(leadState.value));
 const enrichmentView = computed(() =>
@@ -476,7 +535,15 @@ function getCurrentLeadId() {
 }
 
 function getBackendCustomerId() {
-  return promotedCustomerId.value || detail.value.id;
+  return promotedCustomerId.value || leadState.value.customerId || detail.value.id;
+}
+
+function getDoNotContactCustomerId() {
+  return detail.value.doNotContactCustomerId || promotedCustomerId.value || leadState.value.customerId || detail.value.id;
+}
+
+function getStagingLeadId() {
+  return leadState.value.stagingLeadId || (leadState.value.entityType === 'staging' ? detail.value.id : '');
 }
 
 onMounted(async () => {
@@ -487,11 +554,20 @@ onMounted(async () => {
   } catch (_stagingError) {
     try {
       const customer = await apiClient.get(`/customers/${encodeURIComponent(leadId)}`);
-      leadState.value = mapCustomerSummaryToLeadDetail(customer);
+      const customerId = customer?.id || customer?.profile?.id || leadId;
+      if (customerId && globalThis.uni?.redirectTo) {
+        globalThis.uni.redirectTo({ url: `/pages/customers/detail?id=${encodeURIComponent(customerId)}` });
+        return;
+      }
+      leadState.value = {
+        ...emptyLeadDetail,
+        id: leadId,
+      };
     } catch (_customerError) {
       leadState.value = {
         ...emptyLeadDetail,
         id: leadId,
+        stagingLeadId: leadId,
       };
     }
   }
@@ -527,18 +603,39 @@ onMounted(async () => {
   }
 
   await refreshEnrichmentResults();
+  await refreshCleanupReasons();
 });
 
 async function refreshEnrichmentResults() {
-  if (!detail.value.id) {
+  const stagingLeadId = getStagingLeadId();
+  if (!stagingLeadId) {
     enrichmentResultsPayload.value = { items: [] };
     return;
   }
 
   try {
-    enrichmentResultsPayload.value = await enrichmentService.listEnrichmentResults(detail.value.id);
+    enrichmentResultsPayload.value = await enrichmentService.listEnrichmentResults(stagingLeadId);
   } catch (_error) {
     enrichmentResultsPayload.value = { items: [] };
+  }
+}
+
+async function refreshCleanupReasons() {
+  const stagingLeadId = getStagingLeadId();
+  if (!stagingLeadId) {
+    cleanupReasons.value = [];
+    return;
+  }
+
+  try {
+    const payload = await leadCleanupService.listCleanupSuggestions({
+      leadId: stagingLeadId,
+      reviewStatus: 'executed',
+      limit: 10,
+    });
+    cleanupReasons.value = payload.items || [];
+  } catch (_error) {
+    cleanupReasons.value = [];
   }
 }
 
@@ -548,14 +645,46 @@ function notify(message) {
   }
 }
 
+function toggleGradePanel() {
+  gradePanelVisible.value = !gradePanelVisible.value;
+}
+
+async function handleUpdateGrade(grade) {
+  const stagingLeadId = getStagingLeadId();
+  if (!stagingLeadId) {
+    notify('缺少线索ID');
+    gradePanelVisible.value = false;
+    return;
+  }
+
+  try {
+    const result = await stagingLeadActionsService.updateGrade(stagingLeadId, {
+      grade: grade.value,
+      actor: '当前用户',
+      reason: `移动端线索详情页人工调整为${grade.label}。`,
+    });
+    leadState.value = {
+      ...leadState.value,
+      grade: result.recommended_grade || leadState.value.grade,
+      complianceReviewStatus: result.recommended_grade === 'C' ? 'required' : leadState.value.complianceReviewStatus,
+      status: result.queue_status === 'not_eligible' ? String(result.recommended_grade || '').toLowerCase() : leadState.value.status,
+    };
+    gradePanelVisible.value = false;
+    notify(`已调整为${grade.label}`);
+  } catch (_error) {
+    notify('调整等级失败');
+  }
+}
+
 async function handleCreateEnrichmentRun() {
-  if (!enrichmentView.value.canTriggerDeepEnrichment || enrichmentLoading.value) {
+  const stagingLeadId = getStagingLeadId();
+  if (!stagingLeadId || !enrichmentView.value.canTriggerDeepEnrichment || enrichmentLoading.value) {
     return;
   }
 
   enrichmentLoading.value = true;
   try {
-    await enrichmentService.createEnrichmentRun(detail.value.id, {
+    await enrichmentService.createEnrichmentRun(stagingLeadId, {
       actor: '当前用户',
       manualKeywords: [detail.value.customerName, detail.value.city].filter((item) => item && item !== 'Unknown'),
       note: '移动端人工触发深挖线索。',
@@ -594,6 +723,12 @@ function toggleManualEnrichmentForm() {
 }
 
 async function handleCreateManualEnrichment() {
+  const stagingLeadId = getStagingLeadId();
+  if (!stagingLeadId) {
+    notify('客户详情不支持线索补录');
+    return;
+  }
+
   const fieldName = manualFieldName.value.trim();
   const candidateValue = manualCandidateValue.value.trim();
   const evidenceNote = manualEvidenceNote.value.trim();
@@ -603,7 +738,7 @@ async function handleCreateManualEnrichment() {
   }
 
   try {
-    await enrichmentService.createManualEnrichment(detail.value.id, {
+    await enrichmentService.createManualEnrichment(stagingLeadId, {
       operator: '当前用户',
       note: '移动端人工补录。',
       fields: [
@@ -626,8 +761,25 @@ async function handleCreateManualEnrichment() {
   }
 }
 
-async function handleMarkDoNotContact() {
+async function handleToggleDoNotContact() {
   if (detail.value.isDoNotContact) {
+    const nextLead = unmarkLeadDoNotContact(leadState.value, {
+      actor: '当前用户',
+      reason: '移动端人工取消勿扰',
+    });
+    const customerId = getDoNotContactCustomerId();
+
+    try {
+      await apiClient.post(`/customers/${encodeURIComponent(customerId)}/do-not-contact/cancel`, {
+        actor: '当前用户',
+        actor_role: 'admin',
+        reason: '移动端人工取消勿扰',
+      });
+      leadState.value = nextLead;
+      notify('已取消勿扰');
+    } catch (_error) {
+      notify('取消勿扰失败');
+    }
     return;
   }
 
@@ -638,7 +790,7 @@ async function handleMarkDoNotContact() {
   leadState.value = nextLead;
 
   try {
-    await apiClient.post(`/customers/${encodeURIComponent(detail.value.id)}/do-not-contact`, {
+    await apiClient.post(`/customers/${encodeURIComponent(getDoNotContactCustomerId())}/do-not-contact`, {
       actor: '当前用户',
       reason: '移动端人工标记勿扰',
     });
@@ -647,19 +799,25 @@ async function handleMarkDoNotContact() {
   }
 }
 
-async function handlePromoteStaging() {
-  if (!detail.value.canEnterOutreachQueue || promotedCustomerId.value) {
+async function handleManualPromoteCustomer() {
+  const stagingLeadId = getStagingLeadId();
+  if (!stagingLeadId || !detail.value.canEnterOutreachQueue || promotedCustomerId.value) {
     return;
   }
 
   try {
-    const result = await apiClient.post(`/staging-leads/${encodeURIComponent(detail.value.id)}/promote-to-customer`, buildPromoteStagingPayload({
+    const result = await apiClient.post(`/staging-leads/${encodeURIComponent(stagingLeadId)}/promote-to-customer`, buildPromoteStagingPayload({
       actor: '当前用户',
-      reviewNote: '移动端人工复核通过，准入闸门允许晋级 core。',
+      reviewNote: '移动端线索详情页人工点击晋级客户。',
     }));
     promotedCustomerId.value = result.customer_id || '';
+    notify('已晋级客户');
+    if (result.customer_id && globalThis.uni?.navigateTo) {
+      globalThis.uni.navigateTo({ url: `/pages/customers/detail?id=${encodeURIComponent(result.customer_id)}` });
+    }
   } catch (_error) {
     promotedCustomerId.value = '';
+    notify('晋级客户失败');
   }
 }
 
@@ -674,7 +832,7 @@ function openInventory() {
 }
 
 function openOutreach() {
-  if (!draft.value.canGenerateDraft || !globalThis.uni?.navigateTo) {
+  if (!detail.value.canCreateOutreachDraft || !draft.value.canGenerateDraft || !globalThis.uni?.navigateTo) {
     return;
   }
 

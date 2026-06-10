@@ -174,7 +174,7 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
       if (url.endsWith('/llm-prompt-templates')) return { ok: true, json: async () => promptTemplatesPayload };
       if (url.endsWith('/knowledge/embeddings/metrics')) return { ok: true, json: async () => embeddingMetricsPayload };
       if (url.endsWith('/sync/audit-dashboard')) return { ok: true, json: async () => aiAuditPayload };
-      if (url.endsWith('/email-reply/drafts?limit=500')) return { ok: true, json: async () => draftsPayload };
+      if (url.endsWith('/email-replies?limit=500')) return { ok: true, json: async () => draftsPayload };
       if (url.endsWith('/dashboard/risk-events')) return { ok: true, json: async () => riskEventsPayload };
       throw new Error(`Unexpected URL: ${url}`);
     },
@@ -186,7 +186,7 @@ test('fetch email quality dashboard calls real metrics APIs', async () => {
     'https://api.example.test/llm-prompt-templates',
     'https://api.example.test/knowledge/embeddings/metrics',
     'https://api.example.test/sync/audit-dashboard',
-    'https://api.example.test/email-reply/drafts?limit=500',
+    'https://api.example.test/email-replies?limit=500',
     'https://api.example.test/dashboard/risk-events',
   ]);
   assert.equal(payload.qualityFoundation.prompt_metrics.prompt_coverage_rate, 1);

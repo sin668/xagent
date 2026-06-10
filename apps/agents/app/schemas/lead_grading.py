@@ -37,6 +37,6 @@ class LeadGradingAgentOutput(BaseModel):
 
     schema_version: Literal["phase4.agent.lead_grading.v1"]
     grading_run_id: UUID | str
-    agent_mode: Literal["shadow"] = "shadow"
+    agent_mode: Literal["active", "shadow"] = "shadow"
     suggestions: list[LeadGradingSuggestion] = Field(default_factory=list)
     audit: dict = Field(default_factory=dict)

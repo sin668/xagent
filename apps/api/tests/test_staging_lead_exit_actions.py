@@ -135,9 +135,21 @@ def test_grade_update_keeps_watch_invalid_out_of_touch_queue_and_sets_c_complian
     )
     assert lead.recommended_grade == CustomerGrade.WATCH
     assert lead.queue_status == StagingQueueStatus.NOT_ELIGIBLE
-    assert lead.review_status == StagingReviewStatus.REJECTED
+    assert lead.review_status == StagingReviewStatus.PENDING_REVIEW
     assert lead.requires_compliance_review is False
     assert watch_result["review_log"].result == "Watch"
+    assert watch_result["review_log"].action == "update_staging_grade"
+
+
+def test_manual_grade_update_is_visible_but_agent_excluded_by_review_log_contract() -> None:
+    service_text = (API_ROOT / "app" / "services" / "staging_leads.py").read_text(encoding="utf-8")
+    scheduler_text = (API_ROOT / "app" / "services" / "external_agent_scheduler_bootstrap.py").read_text(encoding="utf-8")
+
+    assert "manual_grade_update_exists" in service_text
+    assert "update_staging_grade" in service_text
+    assert "StagingLead.review_status.notin_" in service_text
+    assert "manual_grade_update_exists" in scheduler_text
+    assert "not_(StagingLeadService.manual_grade_update_exists())" in scheduler_text
 
 
 def test_do_not_contact_lead_cannot_be_made_eligible_by_grade_update() -> None:

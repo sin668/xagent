@@ -8,6 +8,7 @@ from app.adapters.api_contract import ApiContractBoundary
 from app.schemas.deep_enrichment import DeepEnrichmentAgentOutput, FieldCandidateOutput
 from app.services.agent_logging import run_logged_node
 from app.services.llm_client import LLMClient
+from app.services.llm_prompt_repository import LLMPromptRepository, LLMPromptTemplateNotFound
 from app.tools.evidence_validator import filter_candidates_with_evidence
 from app.tools.public_search import EmptyPublicSearchTool, validate_public_search_actions
 
@@ -47,49 +48,46 @@ class DeepEnrichmentGraphResult:
 
 
 class LLMDeepEnrichmentExtractor:
-    def __init__(self, *, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, *, llm_client: LLMClient | None = None, prompt_repository: LLMPromptRepository | None = None) -> None:
         self.llm_client = llm_client or LLMClient()
+        self.prompt_repository = prompt_repository or LLMPromptRepository()
         self.last_audit: dict[str, Any] = {}
 
     def extract(self, state: DeepEnrichmentGraphState) -> list[dict]:
+        task_type = "DEEP_ENRICHMENT"
+        model = self.llm_client._model_for_task(task_type)
+        try:
+            prompt = self.prompt_repository.load_active_default(
+                task_type=task_type,
+                provider=self.llm_client.settings.llm_provider,
+                model=model,
+            )
+        except LLMPromptTemplateNotFound as exc:
+            self.last_audit = {
+                "used": False,
+                "provider": self.llm_client.settings.llm_provider,
+                "model": model,
+                "error": {"type": exc.error_type, "message": str(exc)},
+            }
+            raise
         result = self.llm_client.generate_json(
-            task_type="DEEP_ENRICHMENT",
-            system_prompt=(
-                "你是线索深挖补全 Agent。只从公开页面快照抽取候选字段。"
-                "缺失字段返回空数组，禁止编造；每个候选必须包含 source_url 和 evidence_note。"
+            task_type=task_type,
+            system_prompt=prompt.system_prompt,
+            user_prompt=prompt.render_user_prompt(
+                {
+                    "lead_snapshot": state.lead_snapshot,
+                    "missing_fields": state.missing_fields,
+                    "page_snapshots": state.page_snapshots,
+                }
             ),
-            user_prompt=(
-                f"线索快照：{state.lead_snapshot}\n"
-                f"缺失字段：{state.missing_fields}\n"
-                f"公开页面快照：{state.page_snapshots}"
-            ),
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "field_candidates": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "field_name": {"type": "string"},
-                                "candidate_value": {},
-                                "source_type": {"type": "string"},
-                                "source_url": {"type": ["string", "null"]},
-                                "evidence_note": {"type": "string"},
-                                "confidence_score": {"type": ["number", "null"]},
-                            },
-                            "required": ["field_name", "candidate_value", "source_type", "source_url", "evidence_note"],
-                        },
-                    }
-                },
-                "required": ["field_candidates"],
-            },
+            output_schema=prompt.output_schema_json,
         )
         self.last_audit = {
             "used": result.error is None,
             "provider": result.provider,
             "model": result.model,
             "token_usage": result.token_usage,
+            **prompt.audit,
         }
         if result.error:
             self.last_audit["error"] = result.error
@@ -107,10 +105,11 @@ class DeepEnrichmentGraphRunner:
         *,
         search_tool=None,
         llm_extractor: LLMDeepEnrichmentExtractor | None = None,
+        prompt_repository: LLMPromptRepository | None = None,
         boundary: ApiContractBoundary | None = None,
     ) -> None:
         self.search_tool = search_tool or EmptyPublicSearchTool()
-        self.llm_extractor = llm_extractor or LLMDeepEnrichmentExtractor()
+        self.llm_extractor = llm_extractor or LLMDeepEnrichmentExtractor(prompt_repository=prompt_repository)
         self.boundary = boundary or ApiContractBoundary()
         self.executed_nodes: list[str] = []
         self.compiled_graph = self._build_graph()
@@ -172,6 +171,17 @@ class DeepEnrichmentGraphRunner:
             }
             for item in state.public_sources
         ]
+        fallback_source_url = str(state.lead_snapshot.get("source_url") or "").strip()
+        fallback_text = str(state.lead_snapshot.get("source_evidence") or "").strip()
+        if fallback_source_url and fallback_text:
+            state.page_snapshots.append(
+                {
+                    "source_url": fallback_source_url,
+                    "title": "Staging source evidence",
+                    "text": fallback_text,
+                }
+            )
+            state.audit["fallback_page_snapshot_used"] = True
         return state
 
     def extract_candidates(self, state: DeepEnrichmentGraphState) -> DeepEnrichmentGraphState:
@@ -184,7 +194,7 @@ class DeepEnrichmentGraphRunner:
         self.mark("validate_evidence")
         state.field_candidates = [
             FieldCandidateOutput(**item)
-            for item in filter_candidates_with_evidence(state.raw_candidates)
+            for item in self.normalize_field_candidates(filter_candidates_with_evidence(state.raw_candidates))
             if self.has_page_text_evidence(state, item)
         ]
         return state
@@ -256,14 +266,60 @@ class DeepEnrichmentGraphRunner:
 
     @staticmethod
     def has_page_text_evidence(state: DeepEnrichmentGraphState, candidate: dict) -> bool:
-        value = str(candidate.get("candidate_value") or "").strip()
+        values = DeepEnrichmentGraphRunner.candidate_evidence_values(candidate.get("candidate_value"))
         source_url = str(candidate.get("source_url") or "").strip()
-        if not value or not source_url:
+        if not values or not source_url:
             return False
         for page in state.page_snapshots:
             if str(page.get("source_url") or "").strip() != source_url:
                 continue
             text = str(page.get("text") or "")
-            if value.lower() in text.lower():
+            lowered_text = text.lower()
+            if any(value.lower() in lowered_text for value in values):
                 return True
         return False
+
+    @staticmethod
+    def candidate_evidence_values(candidate_value: Any) -> list[str]:
+        if isinstance(candidate_value, list):
+            return [
+                str(item.get("value") if isinstance(item, dict) else item).strip()
+                for item in candidate_value
+                if str(item.get("value") if isinstance(item, dict) else item).strip()
+            ]
+        return [str(candidate_value).strip()] if str(candidate_value or "").strip() else []
+
+    @staticmethod
+    def normalize_field_candidates(candidates: list[dict]) -> list[dict]:
+        contact_field_types = {
+            "email": "email",
+            "mail": "email",
+            "phone": "phone",
+            "tel": "phone",
+            "whatsapp": "whatsapp",
+            "telegram": "telegram",
+            "vk": "vkontakte",
+            "vkontakte": "vkontakte",
+            "odnoklassniki": "odnoklassniki",
+            "ok": "odnoklassniki",
+            "tiktok": "tiktok",
+            "max": "max",
+            "website": "website",
+            "website_form": "website_form",
+        }
+        normalized: list[dict] = []
+        for candidate in candidates:
+            item = dict(candidate)
+            field_name = str(item.get("field_name") or "").strip().lower()
+            contact_type = contact_field_types.get(field_name)
+            if contact_type is not None:
+                item["field_name"] = "contacts_json"
+                item["candidate_value"] = [
+                    {
+                        "type": contact_type,
+                        "value": item.get("candidate_value"),
+                        "usage": "AI 深挖公开来源",
+                    }
+                ]
+            normalized.append(item)
+        return normalized

@@ -139,7 +139,7 @@ export async function fetchPhase5AdminIntegration({
     }),
     fetchJsonRecord({
       fetcher,
-      url: `${normalizedBaseUrl}/email-reply/drafts?limit=100`,
+      url: `${normalizedBaseUrl}/email-replies?limit=100`,
       domainLabel: DOMAIN_LABELS.emailReview,
     }),
     fetchJsonRecord({

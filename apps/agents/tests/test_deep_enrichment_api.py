@@ -12,6 +12,7 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.agent_service_run import AgentServiceRun
 from app.settings import get_settings
+from tests.prompt_helpers import seed_prompt_templates
 
 
 @pytest.fixture
@@ -24,6 +25,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("DEEP_ENRICHMENT",))
     try:
         yield db
     finally:
@@ -160,3 +162,54 @@ def test_deep_enrichment_api_records_failure_type_and_message(
     assert persisted.status == "failed"
     assert persisted.error_type == "risk_blocked"
     assert "不允许自动私信" in persisted.error_message
+
+
+def test_deep_enrichment_batch_keeps_successful_items_when_one_item_fails(
+    client: TestClient,
+    session: Session,
+) -> None:
+    payload = deep_enrichment_payload()
+    payload["input"] = {
+        "agent_run_id": payload["request_id"],
+        "leads": [
+            {
+                "request_id": "11111111-1111-1111-1111-111111111101",
+                "staging_lead_id": "33333333-3333-3333-3333-333333333333",
+                "lead_snapshot": {"customer_name": "Auto City", "contacts_json": []},
+                "missing_fields": ["contacts_json"],
+                "requested_actions": [],
+            },
+            {
+                "request_id": "11111111-1111-1111-1111-111111111102",
+                "staging_lead_id": "44444444-4444-4444-4444-444444444444",
+                "lead_snapshot": {"customer_name": "Blocked Dealer", "contacts_json": []},
+                "missing_fields": ["contacts_json"],
+                "requested_actions": ["auto_dm"],
+            },
+        ],
+    }
+
+    response = client.post(
+        "/agent-runs/deep-enrichment",
+        json=payload,
+        headers={"X-Agents-Api-Key": "phase4-secret"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "succeeded"
+    assert body["error"] is None
+    assert body["output"]["audit"]["batch_mode"] is True
+    assert body["output"]["audit"]["batch_lead_count"] == 2
+    assert body["output"]["audit"]["batch_succeeded_count"] == 1
+    assert body["output"]["audit"]["batch_failed_count"] == 1
+    assert [item["status"] for item in body["output"]["batch_results"]] == ["succeeded", "failed"]
+    assert body["output"]["batch_results"][1]["error"]["type"] == "risk_blocked"
+    assert "不允许自动私信" in body["output"]["batch_results"][1]["error"]["message"]
+
+    persisted = session.get(AgentServiceRun, UUID(body["agent_service_run_id"]))
+    assert persisted is not None
+    assert persisted.status == "succeeded"
+    assert persisted.output_summary_json["batch_lead_count"] == 2
+    assert persisted.output_summary_json["batch_succeeded_count"] == 1
+    assert persisted.output_summary_json["batch_failed_count"] == 1

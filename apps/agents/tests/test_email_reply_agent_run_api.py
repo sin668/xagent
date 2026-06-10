@@ -55,6 +55,9 @@ class FakeEmailReplyGraphResult:
 class FakeEmailReplyGraphRunner:
     calls = []
 
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
     def run(self, state):
         self.calls.append(state)
         return FakeEmailReplyGraphResult()

@@ -27,15 +27,31 @@ test('来源候选队列页面通过 sourceCandidates service 调真实 API', ()
   assert.doesNotMatch(page, /Seed|seed|mock/i);
 });
 
-test('来源候选队列页面支持风险、审核状态、国家、城市、平台筛选', () => {
+test('来源候选队列页面支持统计驱动的风险与准入筛选', () => {
   const page = readText(pagePath);
 
-  for (const token of ['riskLevel', 'reviewStatus', 'country', 'city', 'platform']) {
+  for (const token of ['riskLevel', 'approvedForExtraction', 'isDuplicate', 'activeSourceStat']) {
     assert.match(page, new RegExp(token));
   }
-  for (const label of ['Low', 'Medium', 'High', 'Forbidden']) {
+  for (const label of ['待审 High', '可抽取来源', '重复候选', '阻断来源']) {
     assert.match(page, new RegExp(label));
   }
+});
+
+test('来源候选队列页面通过顶部统计筛选并移除中间 Tab 过滤区', () => {
+  const page = readText(pagePath);
+  const css = readText(stylePath);
+
+  assert.match(page, /sourceStats/);
+  assert.match(page, /selectSourceStat/);
+  assert.match(page, /source-summary-tile-active/);
+  assert.match(page, /goBack/);
+  assert.match(page, /source-nav-centered/);
+  assert.doesNotMatch(page, /source-chip-row/);
+  assert.doesNotMatch(page, /risk-strip/);
+  assert.doesNotMatch(page, /filter-grid/);
+  assert.match(css, /\.source-nav-centered/);
+  assert.match(css, /\.source-summary-tile-active/);
 });
 
 test('来源候选队列页面展示 URL/domain、风险、证据和是否可抽取', () => {

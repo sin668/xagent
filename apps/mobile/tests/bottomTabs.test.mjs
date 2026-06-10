@@ -13,7 +13,7 @@ test('bottom tabs expose top-level mobile destinations with active state', () =>
       'leads:/pages/leads/index:true',
       'customers:/pages/customers/index:false',
       'email:/pages/email-replies/index:false',
-      'sources:/pages/sources/index:false',
+      'insights:/pages/inventory/index:false',
     ],
   );
   assert.equal(tabs.some((tab) => tab.key === 'ai'), false);
@@ -35,6 +35,16 @@ test('bottom tabs support email replies as a fifth-stage top-level destination',
   assert.equal(email.path, '/pages/email-replies/index');
   assert.equal(email.label, '邮件');
   assert.equal(email.active, true);
+});
+
+test('bottom tabs replace sources with insights destination', () => {
+  const tabs = buildBottomTabs('insights');
+  const insights = tabs.find((tab) => tab.key === 'insights');
+
+  assert.equal(insights.path, '/pages/inventory/index');
+  assert.equal(insights.label, '洞察');
+  assert.equal(insights.active, true);
+  assert.equal(tabs.some((tab) => tab.label === '来源'), false);
 });
 
 test('bottom tab navigation uses redirectTo and skips the active tab', () => {

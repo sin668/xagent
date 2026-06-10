@@ -52,10 +52,91 @@ function evidenceValue(evidence = {}, key, fallback = '') {
   return evidence[key] ?? evidence[String(key).replace(/[A-Z]/g, (item) => `_${item.toLowerCase()}`)] ?? fallback;
 }
 
+function compactUnknown(value) {
+  const text = String(value || '').trim();
+  return text && text.toLowerCase() !== 'unknown' ? text : '';
+}
+
+function domainFromUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch (_error) {
+    return raw.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] || '';
+  }
+}
+
+function fallbackLeadDisplayName(item = {}, evidence = {}) {
+  const evidenceLinks = evidence.evidence_links || evidence.evidenceLinks || [];
+  const sourceUrl = (
+    item.source_url
+    || item.sourceUrl
+    || item.url
+    || evidence.source_url
+    || evidence.sourceUrl
+    || evidence.url
+    || evidenceLinks[0]
+  );
+  return domainFromUrl(sourceUrl) || 'Unknown';
+}
+
+function normalizeContact(contact = {}) {
+  const type = contact.type || contact.method_type || contact.methodType || contact.contact_type || contact.contactType || 'contact';
+  const value = contact.value || contact.contact_value || contact.contactValue || contact.url || contact.handle || '';
+  if (!String(value).trim()) {
+    return null;
+  }
+
+  return {
+    type: String(type),
+    value: String(value),
+    usage: contact.usage || contact.note || contact.evidence_note || contact.evidenceNote || '公开联系方式',
+  };
+}
+
+function appendContacts(result, source) {
+  if (!Array.isArray(source)) {
+    return;
+  }
+
+  for (const contact of source) {
+    const normalized = normalizeContact(contact);
+    if (!normalized) {
+      continue;
+    }
+    const key = `${normalized.type}:${normalized.value}`.toLowerCase();
+    if (!result.some((item) => `${item.type}:${item.value}`.toLowerCase() === key)) {
+      result.push(normalized);
+    }
+  }
+}
+
+function extractContacts(item = {}, evidence = {}) {
+  const contacts = [];
+  appendContacts(contacts, evidence.contacts || evidence.contact_methods || evidence.contactMethods);
+  appendContacts(contacts, item.contacts_json || item.contactsJson || item.contact_methods || item.contactMethods);
+  return contacts;
+}
+
 export function mapCleanupSuggestion(item = {}) {
   const evidence = item.evidence_json || item.evidenceJson || {};
   const suggestionType = item.suggestion_type || item.suggestionType || 'needs_manual_review';
   const reviewStatus = item.review_status || item.reviewStatus || 'pending';
+  const leadDisplayName = (
+    compactUnknown(item.lead_name)
+    || compactUnknown(item.leadName)
+    || compactUnknown(item.customer_name)
+    || compactUnknown(item.customerName)
+    || compactUnknown(evidenceValue(evidence, 'lead_name', ''))
+    || compactUnknown(evidenceValue(evidence, 'customer_name', ''))
+    || compactUnknown(evidenceValue(evidence, 'original_lead_name', ''))
+    || fallbackLeadDisplayName(item, evidence)
+  );
   const requiresElevatedPermission = HIGH_RISK_TYPES.has(suggestionType);
   const permissionHint = requiresElevatedPermission
     ? String(evidenceValue(evidence, 'high_risk_reason', '高风险动作需要合规或管理员权限提示。'))
@@ -65,6 +146,7 @@ export function mapCleanupSuggestion(item = {}) {
     id: item.id,
     cleanupRunId: item.cleanup_run_id || item.cleanupRunId || '',
     stagingLeadId: item.staging_lead_id || item.stagingLeadId || '',
+    leadDisplayName,
     suggestionType,
     suggestionTypeLabel: SUGGESTION_TYPE_LABELS[suggestionType] || suggestionType,
     targetLeadId: item.target_lead_id || item.targetLeadId || '',
@@ -75,6 +157,7 @@ export function mapCleanupSuggestion(item = {}) {
     evidenceJson: evidence,
     evidenceNote: evidenceValue(evidence, 'evidence_note', item.reason || 'Unknown'),
     evidenceLinks: evidence.evidence_links || evidence.evidenceLinks || [],
+    contacts: extractContacts(item, evidence),
     recommendedAction: item.recommended_action || item.recommendedAction || 'Unknown',
     reviewStatus,
     reviewStatusLabel: REVIEW_STATUS_LABELS[reviewStatus] || reviewStatus,

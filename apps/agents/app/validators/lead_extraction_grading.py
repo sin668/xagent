@@ -38,17 +38,18 @@ class LeadExtractionGradingValidator:
         risk_flags: list[str],
         expected_contacts: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        candidate = extraction.candidates[0] if extraction.candidates else None
+        candidates = list(extraction.candidates)
+        first_candidate = candidates[0] if candidates else None
         suggestion = grading.suggestions[0] if grading.suggestions else None
         validation_errors: list[str] = []
 
-        schema_passed = candidate is not None and suggestion is not None and not extraction.validation_errors
+        schema_passed = bool(candidates) and len(grading.suggestions) >= len(candidates) and not extraction.validation_errors
         if not schema_passed:
             validation_errors.append("schema 校验失败")
 
-        evidence_hit_rate = self.evidence_hit_rate(candidate)
+        evidence_hit_rate = self.evidence_hit_rate(first_candidate)
         invalid_contacts = self.invalid_contacts(
-            candidate=candidate,
+            candidates=candidates,
             source_content=source_content,
             expected_contacts=expected_contacts or {},
         )
@@ -93,29 +94,45 @@ class LeadExtractionGradingValidator:
     def invalid_contacts(
         self,
         *,
-        candidate: LeadExtractionCandidate | None,
+        candidates: list[LeadExtractionCandidate],
         source_content: str,
         expected_contacts: dict[str, Any],
     ) -> list[InvalidContact]:
-        if candidate is None:
+        if not candidates:
             return []
         normalized_source = self.normalize(source_content)
-        values: dict[str, str | None] = {
-            "email": candidate.email.value,
-            "phone": candidate.phone.value,
-        }
+        values: list[tuple[str, str]] = []
+        for candidate in candidates:
+            values.extend((field_name, value) for field_name, value in self.contact_values(candidate))
+
         for field_name in CONTACT_FIELDS:
             expected_value = expected_contacts.get(field_name)
             if expected_value:
-                values[field_name] = str(expected_value)
+                values.append((field_name, str(expected_value)))
 
         invalid: list[InvalidContact] = []
-        for field_name, value in values.items():
+        seen: set[tuple[str, str]] = set()
+        for field_name, value in values:
             if not value:
                 continue
+            key = (field_name, self.normalize(value))
+            if key in seen:
+                continue
+            seen.add(key)
             if self.normalize(value) not in normalized_source:
                 invalid.append(InvalidContact(field_name=field_name, value=value))
         return invalid
+
+    @staticmethod
+    def contact_values(candidate: LeadExtractionCandidate) -> list[tuple[str, str]]:
+        values: list[tuple[str, str]] = []
+        for field_name in CONTACT_FIELDS:
+            field = getattr(candidate, field_name)
+            if field.value:
+                values.append((field_name, field.value))
+        for contact in candidate.contacts:
+            values.append((contact.contact_type, contact.value))
+        return values
 
     def hard_rule_consistency_rate(
         self,

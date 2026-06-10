@@ -13,10 +13,11 @@ from app.graphs.source_discovery import SourceDiscoveryGraphRunner, SourceDiscov
 from app.main import app
 from app.models.agent_service_run import AgentServiceRun
 from app.settings import get_settings
+from tests.prompt_helpers import StaticPromptRepository, seed_prompt_templates
 
 
 def test_source_discovery_validation_nodes_normalize_dedupe_and_block_invalid_sources() -> None:
-    runner = SourceDiscoveryGraphRunner()
+    runner = SourceDiscoveryGraphRunner(prompt_repository=StaticPromptRepository())
     state = SourceDiscoveryGraphState(
         discovery_run_id="11111111-1111-1111-1111-111111111111",
         market="Russia",
@@ -92,6 +93,7 @@ def session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
+    seed_prompt_templates(db, ("SOURCE_DISCOVERY",))
     try:
         yield db
     finally:
@@ -148,7 +150,11 @@ def test_source_discovery_api_persists_node_execution_summaries_in_audit_json(cl
     assert persisted is not None
     assert persisted.audit_json["executed_nodes"] == [
         {"node": "load_channel_strategy", "status": "succeeded", "summary": {"agent_mode": "shadow"}},
-        {"node": "build_discovery_queries", "status": "succeeded", "summary": {"query_count": 1}},
+        {
+            "node": "build_discovery_queries",
+            "status": "succeeded",
+            "summary": {"query_count": 1, "llm_candidate_count": 0},
+        },
         {"node": "search_public_sources", "status": "succeeded", "summary": {"raw_candidate_count": 1}},
         {"node": "normalize_source_candidates", "status": "succeeded", "summary": {"normalized_count": 1}},
         {"node": "classify_channel_risk", "status": "succeeded", "summary": {"risk_counts": {"low": 1}}},
